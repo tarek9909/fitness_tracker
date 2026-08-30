@@ -1,0 +1,29 @@
+# Dependencies & Builds
+node_modules/
+dist/
+.dart_tool/
+build/
+.gradle/
+.idea/
+
+# Environment Configurations & Local Secrets
+.env
+*.env
+**/.env
+**/*.env.local
+
+# Databases & Runtime State
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+.tmp/
+**/tests/.tmp/
+*.log
+
+# Explicitly preserve authoritative MySQL canonical dump
+!/fitness_tracker.db
+
+

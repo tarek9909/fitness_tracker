@@ -1,0 +1,2564 @@
+openapi: 3.1.0
+info:
+  title: Fitness Tracking Platform API
+  version: 1.0.0
+  description: Authoritative REST API for multi-user fitness management, daily tracking, workout/diet plan builders, progress analysis, reminders, and administration.
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local Development Server
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      tags: [System]
+      responses:
+        '200':
+          description: System status and database connectivity
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      status: { type: string, example: "ok" }
+                      timestamp: { type: string, format: date-time }
+                      database: { type: string, example: "connected" }
+
+  /health/live:
+    get:
+      summary: Liveness probe
+      tags: [System]
+      responses:
+        '200':
+          description: Process liveness status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      status: { type: string, example: "alive" }
+                      timestamp: { type: string, format: date-time }
+                      uptimeSeconds: { type: integer, example: 42 }
+
+  /health/ready:
+    get:
+      summary: Readiness probe
+      tags: [System]
+      responses:
+        '200':
+          description: System is ready to accept traffic
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      status: { type: string, example: "ready" }
+                      timestamp: { type: string, format: date-time }
+                      database: { type: string, example: "connected" }
+        '503':
+          description: System is unready (database unreachable)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: false }
+                  data:
+                    type: object
+                    properties:
+                      status: { type: string, example: "unready" }
+                      timestamp: { type: string, format: date-time }
+                      database: { type: string, example: "unreachable" }
+
+  /auth/login:
+    post:
+      summary: User / Admin Login
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email, example: "user@example.com" }
+                password: { type: string, example: "Secret123!" }
+                deviceName: { type: string, example: "Pixel 8 Pro" }
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionResponse'
+
+  /auth/refresh:
+    post:
+      summary: Refresh Access Token
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        '200':
+          description: New access token and rotated refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionResponse'
+
+  /auth/logout:
+    post:
+      summary: Revoke session
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken: { type: string }
+      responses:
+        '200':
+          description: Logged out
+
+  /auth/forgot-password:
+    post:
+      summary: Request password reset token (alias)
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '202':
+          description: Reset request accepted
+
+  /auth/request-password-reset:
+    post:
+      summary: Request password reset token
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '202':
+          description: Reset request accepted
+
+  /auth/reset-password:
+    post:
+      summary: Reset password with token
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, minLength: 6 }
+      responses:
+        '200':
+          description: Password reset successful
+
+  /me:
+    get:
+      summary: Get current authenticated user profile
+      tags: [Current User]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+    patch:
+      summary: Update user profile
+      tags: [Current User]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName: { type: string }
+                lastName: { type: string }
+                phone: { type: string }
+                heightCm: { type: number }
+                timezone: { type: string }
+                locale: { type: string }
+      responses:
+        '200':
+          description: Updated profile
+
+  /me/settings:
+    get:
+      summary: Get notification and user settings
+      tags: [Current User]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Settings data
+    patch:
+      summary: Update notification settings
+      tags: [Current User]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                allowPush: { type: boolean }
+                allowInApp: { type: boolean }
+                allowReminders: { type: boolean }
+                allowMissedTaskAlerts: { type: boolean }
+      responses:
+        '200':
+          description: Updated settings
+
+  /me/notification-settings:
+    get:
+      summary: Get notification preferences and quiet hours configuration
+      tags: [Current User]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Notification settings and category preferences
+    patch:
+      summary: Update notification preferences and quiet hours configuration
+      tags: [Current User]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pushEnabled: { type: boolean }
+                inAppEnabled: { type: boolean }
+                localNotificationsEnabled: { type: boolean }
+                quietHoursEnabled: { type: boolean }
+                quietHoursStart: { type: string, nullable: true }
+                quietHoursEnd: { type: string, nullable: true }
+                categories: { type: object, additionalProperties: { type: boolean } }
+      responses:
+        '200':
+          description: Updated notification settings
+    put:
+      summary: Replace notification preferences and quiet hours configuration
+      tags: [Current User]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pushEnabled: { type: boolean }
+                inAppEnabled: { type: boolean }
+                localNotificationsEnabled: { type: boolean }
+                quietHoursEnabled: { type: boolean }
+                quietHoursStart: { type: string, nullable: true }
+                quietHoursEnd: { type: string, nullable: true }
+                categories: { type: object, additionalProperties: { type: boolean } }
+      responses:
+        '200':
+          description: Replaced notification settings
+
+  /me/goals:
+    get:
+      summary: Get active user targets (weight goal, water target, cardio targets)
+      tags: [Goals]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: User targets
+
+  /me/today:
+    get:
+      summary: Resolve daily agenda and compliance tasks for today
+      tags: [Daily Plan]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: date
+          in: query
+          required: false
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Resolved daily tasks and protocol targets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyPlanResponse'
+
+  /me/days/{date}:
+    get:
+      summary: Resolve daily agenda for a specific historical or target date
+      tags: [Daily Plan]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: date
+          in: path
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Resolved agenda for date
+
+  /me/weight:
+    get:
+      summary: Get current weight and target
+      tags: [Weight]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 30 }
+      responses:
+        '200':
+          description: Weight status
+    post:
+      summary: Log body weight
+      tags: [Weight]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [weightKg]
+              properties:
+                weightKg: { type: number, minimum: 20, maximum: 500 }
+                date: { type: string, format: date }
+                notes: { type: string }
+                clientOperationId: { type: string }
+      responses:
+        '200':
+          description: Logged weight entry
+    put:
+      summary: Update/upsert body weight entry
+      tags: [Weight]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [weightKg]
+              properties:
+                weightKg: { type: number, minimum: 20, maximum: 500 }
+                date: { type: string, format: date }
+                notes: { type: string }
+                clientOperationId: { type: string }
+      responses:
+        '200':
+          description: Logged weight entry
+
+  /me/weight/history:
+    get:
+      summary: Get weight logging history and rolling averages
+      tags: [Weight]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 30 }
+      responses:
+        '200':
+          description: Weight history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      currentWeightKg: { type: number, nullable: true }
+                      rolling7DayAvg: { type: number, nullable: true }
+                      rollingAverageKg: { type: number, nullable: true }
+                      goal: { type: object, nullable: true }
+                      entries:
+                        type: array
+                        items: { type: object }
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /me/water:
+    post:
+      summary: Log water intake
+      tags: [Water]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amountMl]
+              properties:
+                amountMl: { type: integer, minimum: 1, maximum: 10000 }
+                date: { type: string, format: date }
+                clientOperationId: { type: string }
+      responses:
+        '201':
+          description: Water logged
+
+  /me/water/today:
+    get:
+      summary: Get today water intake summary and entries
+      tags: [Water]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Today water summary
+
+  /me/water/history:
+    get:
+      summary: Get historical water logs
+      tags: [Water]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 60 }
+      responses:
+        '200':
+          description: Water history list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        intake_date: { type: string, format: date }
+                        total_ml: { type: integer, example: 2500 }
+                        amount_ml: { type: integer, example: 2500 }
+                        entry_count: { type: integer, example: 3 }
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /me/water/{entryId}:
+    delete:
+      summary: Delete a logged water entry
+      tags: [Water]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: entryId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Entry deleted
+
+  /me/meals/today:
+    get:
+      summary: Get today diet meals with configured food options
+      tags: [Meals]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Today meals
+
+  /me/meals/history:
+    get:
+      summary: Get historical meal logs
+      tags: [Meals]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Meal history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: array
+                    items: { type: object }
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /me/meals/{mealId}/log:
+    put:
+      summary: Log/update meal completion with food option selections
+      tags: [Meals]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: mealId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                logDate: { type: string, format: date }
+                status: { type: string, enum: [completed, skipped, partial] }
+                notes: { type: string }
+                selections:
+                  type: array
+                  items:
+                    type: object
+                    required: [optionGroupId, optionId]
+                    properties:
+                      optionGroupId: { type: integer }
+                      optionId: { type: integer }
+                      foodId: { type: integer }
+                      quantity: { type: number, exclusiveMinimum: 0 }
+                clientOperationId: { type: string }
+      responses:
+        '200':
+          description: Meal logged
+
+  /me/workouts/start:
+    post:
+      summary: Start or resume workout session
+      tags: [Workouts]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                workoutPlanDayId: { type: integer }
+                sessionDate: { type: string, format: date }
+                clientOperationId: { type: string }
+      responses:
+        '201':
+          description: Workout session started
+        '200':
+          description: Existing workout session resumed
+
+  /me/workouts/{sessionId}:
+    get:
+      summary: Get details and exercises of a workout session
+      tags: [Workouts]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Workout session details
+
+  /me/workouts/{sessionId}/sets:
+    post:
+      summary: Log workout set
+      tags: [Workouts]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionExerciseId, setNumber]
+              properties:
+                sessionExerciseId: { type: integer }
+                setNumber: { type: integer, minimum: 1 }
+                setType: { type: string, enum: [warmup, working, dropset, failure] }
+                weightKg: { type: number, minimum: 0, maximum: 1000 }
+                reps: { type: integer, minimum: 1, maximum: 500 }
+                rir: { type: integer, minimum: 0, maximum: 10 }
+                durationSeconds: { type: integer }
+                distanceMeters: { type: number }
+                notes: { type: string }
+                completed: { type: boolean }
+                clientOperationId: { type: string }
+      responses:
+        '200':
+          description: Set recorded
+
+  /me/workouts/{sessionId}/complete:
+    post:
+      summary: Complete workout session
+      tags: [Workouts]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes: { type: string }
+                rating: { type: integer, minimum: 1, maximum: 5 }
+                clientOperationId: { type: string }
+      responses:
+        '200':
+          description: Workout marked completed
+
+  /me/workouts/{sessionId}/skip:
+    post:
+      summary: Skip workout session
+      tags: [Workouts]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes: { type: string }
+                clientOperationId: { type: string }
+      responses:
+        '200':
+          description: Workout marked skipped
+
+  /me/exercises/{exerciseId}/previous-performance:
+    get:
+      summary: Get recent history and max weight for exercise
+      tags: [Workouts]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: exerciseId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Historical performance data
+
+  /exercises/metadata:
+    get:
+      summary: Get muscle groups and equipment types metadata (user accessible)
+      tags: [Exercises]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Metadata lists
+
+  /me/cardio:
+    post:
+      summary: Log cardio session
+      tags: [Cardio]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cardioActivityId, durationMinutes]
+              properties:
+                cardioActivityId: { type: integer }
+                cardioDate: { type: string, format: date }
+                durationMinutes: { type: integer, minimum: 1, maximum: 1440 }
+                distanceKm: { type: number }
+                caloriesBurned: { type: integer }
+                averageHeartRate: { type: integer }
+                speedKmh: { type: number }
+                inclinePct: { type: number }
+                notes: { type: string }
+                clientOperationId: { type: string }
+      responses:
+        '201':
+          description: Cardio logged
+
+  /me/cardio/activities:
+    get:
+      summary: List available cardio activities
+      tags: [Cardio]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: List of cardio activities
+
+  /me/cardio/history:
+    get:
+      summary: Get cardio session history
+      tags: [Cardio]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Cardio history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: array
+                    items: { type: object }
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /me/progress:
+    get:
+      summary: Get overall user progress and adherence metrics
+      tags: [Progress]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Progress data
+
+  /me/progress/workouts:
+    get:
+      summary: Get workout volume and completion progress
+      tags: [Progress]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Workout progress
+
+  /me/notifications:
+    get:
+      summary: Get user in-app notifications
+      tags: [Notifications]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Notifications list
+
+  /me/notifications/{id}/read:
+    post:
+      summary: Mark notification as read
+      tags: [Notifications]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Marked as read
+
+  /me/devices:
+    post:
+      summary: Register mobile push notification device
+      tags: [Notifications]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceUuid, platform, pushToken]
+              properties:
+                deviceUuid: { type: string }
+                platform: { type: string, enum: [ios, android] }
+                pushToken: { type: string }
+                appVersion: { type: string }
+      responses:
+        '200':
+          description: Push device registered
+
+  /foods:
+    get:
+      summary: Search and list food items (user accessible)
+      tags: [Foods]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: Food items list
+
+  /admin/users:
+    get:
+      summary: List platform users
+      tags: [Admin, Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: User list
+    post:
+      summary: Create new user
+      tags: [Admin, Users]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, firstName, password]
+              properties:
+                email: { type: string, format: email }
+                firstName: { type: string }
+                lastName: { type: string }
+                password: { type: string }
+                timezone: { type: string }
+                locale: { type: string }
+                roleId: { type: integer }
+      responses:
+        '201':
+          description: User created
+
+  /admin/users/{userId}:
+    get:
+      summary: Get user details
+      tags: [Admin, Users]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: User details
+    patch:
+      summary: Update user attributes
+      tags: [Admin, Users]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName: { type: string }
+                lastName: { type: string }
+                timezone: { type: string }
+                locale: { type: string }
+      responses:
+        '200':
+          description: Updated user
+
+  /admin/users/{userId}/disable:
+    post:
+      summary: Disable user account
+      tags: [Admin, Users]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: User disabled
+
+  /admin/users/{userId}/enable:
+    post:
+      summary: Enable user account
+      tags: [Admin, Users]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: User enabled
+
+  /admin/users/{userId}/workout-assignments:
+    get:
+      summary: Get user workout plan assignment history
+      tags: [Admin, Assignments]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Assignment history
+    post:
+      summary: Assign workout plan version to user
+      tags: [Admin, Assignments]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [workoutPlanVersionId, effectiveFrom]
+              properties:
+                workoutPlanVersionId: { type: integer }
+                effectiveFrom: { type: string, format: date }
+                effectiveTo: { type: string, format: date }
+                notes: { type: string }
+      responses:
+        '201':
+          description: Assignment created
+
+  /admin/users/{userId}/diet-assignments:
+    get:
+      summary: Get user diet plan assignment history
+      tags: [Admin, Assignments]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Assignment history
+    post:
+      summary: Assign diet plan version to user
+      tags: [Admin, Assignments]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dietPlanVersionId, effectiveFrom]
+              properties:
+                dietPlanVersionId: { type: integer }
+                effectiveFrom: { type: string, format: date }
+                effectiveTo: { type: string, format: date }
+                notes: { type: string }
+      responses:
+        '201':
+          description: Assignment created
+
+  /admin/users/{userId}/weight-goals:
+    get:
+      summary: Get user weight goal history
+      tags: [Admin, Goals]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Weight goals list
+    post:
+      summary: Set user weight goal
+      tags: [Admin, Goals]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [targetWeightKg]
+              properties:
+                startWeightKg: { type: number }
+                targetWeightKg: { type: number }
+                targetDate: { type: string, format: date }
+      responses:
+        '201':
+          description: Weight goal set
+
+  /admin/users/{userId}/water-targets:
+    get:
+      summary: Get user water target history
+      tags: [Admin, Goals]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Water targets list
+    post:
+      summary: Set user water target
+      tags: [Admin, Goals]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [targetMl]
+              properties:
+                targetMl: { type: integer, minimum: 500, maximum: 10000 }
+      responses:
+        '201':
+          description: Water target set
+
+  /admin/users/{userId}/cardio-targets:
+    get:
+      summary: Get user cardio target schedule
+      tags: [Admin, Goals]
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Cardio targets list with weekdays and activity metadata
+    post:
+      summary: Create user cardio target schedule with parameters and weekdays
+      tags: [Admin, Goals]
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [minDurationMinutes, weekdays, effectiveFrom]
+              properties:
+                cardioActivityId: { type: integer, nullable: true }
+                minDurationMinutes: { type: integer, minimum: 1, maximum: 1440 }
+                maxDurationMinutes: { type: integer, minimum: 1, maximum: 1440, nullable: true }
+                targetSpeedMinKmh: { type: number, minimum: 0, maximum: 100, nullable: true }
+                targetSpeedMaxKmh: { type: number, minimum: 0, maximum: 100, nullable: true }
+                targetInclineMin: { type: number, minimum: 0, maximum: 100, nullable: true }
+                targetInclineMax: { type: number, minimum: 0, maximum: 100, nullable: true }
+                targetDistanceMinKm: { type: number, minimum: 0, maximum: 1000, nullable: true }
+                targetDistanceMaxKm: { type: number, minimum: 0, maximum: 1000, nullable: true }
+                weekdays:
+                  type: array
+                  items: { type: integer, minimum: 1, maximum: 7 }
+                  minItems: 1
+                effectiveFrom: { type: string, format: date }
+                effectiveUntil: { type: string, format: date, nullable: true }
+                notes: { type: string, maxLength: 1000, nullable: true }
+      responses:
+        '201':
+          description: Cardio target created
+
+  /admin/users/{userId}/cardio-targets/{targetId}:
+    delete:
+      summary: Deactivate or remove user cardio target
+      tags: [Admin, Goals]
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: targetId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Cardio target deactivated
+
+  /admin/users/{userId}/water-quick-add:
+    get:
+      summary: Get user water quick-add preset options
+      tags: [Admin, Goals]
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: List of water quick add presets
+    put:
+      summary: Update user water quick-add preset options
+      tags: [Admin, Goals]
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [options]
+              properties:
+                options:
+                  type: array
+                  items:
+                    oneOf:
+                      - type: integer
+                        minimum: 50
+                        maximum: 5000
+                      - type: object
+                        required: [amountMl]
+                        properties:
+                          amountMl: { type: integer, minimum: 50, maximum: 5000 }
+                          displayOrder: { type: integer }
+                          isActive: { type: boolean }
+      responses:
+        '200':
+          description: Water quick add options updated
+    post:
+      summary: Update user water quick-add preset options (alias for PUT)
+      tags: [Admin, Goals]
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [options]
+              properties:
+                options:
+                  type: array
+                  items:
+                    oneOf:
+                      - type: integer
+                        minimum: 50
+                        maximum: 5000
+                      - type: object
+                        required: [amountMl]
+                        properties:
+                          amountMl: { type: integer, minimum: 50, maximum: 5000 }
+                          displayOrder: { type: integer }
+                          isActive: { type: boolean }
+      responses:
+        '200':
+          description: Water quick add options updated
+
+  /admin/users/{userId}/adherence-config:
+    get:
+      summary: Get per-user adherence weights configuration
+      tags: [Admin, Goals]
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Adherence weights configuration
+    put:
+      summary: Save per-user adherence weights configuration (must total 100%)
+      tags: [Admin, Goals]
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dietWeightPct, workoutWeightPct, cardioWeightPct, waterWeightPct, weightLoggingWeightPct]
+              properties:
+                dietWeightPct: { type: number, minimum: 0, maximum: 100 }
+                workoutWeightPct: { type: number, minimum: 0, maximum: 100 }
+                cardioWeightPct: { type: number, minimum: 0, maximum: 100 }
+                waterWeightPct: { type: number, minimum: 0, maximum: 100 }
+                weightLoggingWeightPct: { type: number, minimum: 0, maximum: 100 }
+                effectiveFrom: { type: string, format: date }
+      responses:
+        '200':
+          description: Adherence weights saved
+    post:
+      summary: Save per-user adherence weights configuration (alias for PUT)
+      tags: [Admin, Goals]
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dietWeightPct, workoutWeightPct, cardioWeightPct, waterWeightPct, weightLoggingWeightPct]
+              properties:
+                dietWeightPct: { type: number, minimum: 0, maximum: 100 }
+                workoutWeightPct: { type: number, minimum: 0, maximum: 100 }
+                cardioWeightPct: { type: number, minimum: 0, maximum: 100 }
+                waterWeightPct: { type: number, minimum: 0, maximum: 100 }
+                weightLoggingWeightPct: { type: number, minimum: 0, maximum: 100 }
+                effectiveFrom: { type: string, format: date }
+      responses:
+        '200':
+          description: Adherence weights saved
+
+  /admin/cardio/activities:
+    get:
+      summary: List all cardio activities for administration and target assignment
+      tags: [Admin, Cardio]
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }]
+      responses:
+        '200':
+          description: List of cardio activities
+
+  /admin/exercises/metadata:
+    get:
+      summary: Get muscle groups and equipment types metadata
+      tags: [Admin, Exercises]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Metadata lists
+
+  /admin/exercises:
+    get:
+      summary: Search and list exercises
+      tags: [Admin, Exercises]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema: { type: string }
+        - name: muscleGroupId
+          in: query
+          required: false
+          schema: { type: integer }
+        - name: equipmentTypeId
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Exercises list
+    post:
+      summary: Create new exercise in library
+      tags: [Admin, Exercises]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                description: { type: string }
+                primaryMuscleGroupId: { type: integer }
+                equipmentTypeId: { type: integer }
+                trackingType: { type: string, enum: [weight_reps, bodyweight_reps, time_distance, time_only] }
+                instructions: { type: string }
+      responses:
+        '201':
+          description: Exercise created
+
+  /admin/exercises/{id}:
+    get:
+      summary: Get exercise details
+      tags: [Admin, Exercises]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Exercise details
+    patch:
+      summary: Update exercise details
+      tags: [Admin, Exercises]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                primaryMuscleGroupId: { type: integer }
+                equipmentTypeId: { type: integer }
+                instructions: { type: string }
+      responses:
+        '200':
+          description: Exercise updated
+
+  /admin/exercises/{id}/archive:
+    post:
+      summary: Archive exercise
+      tags: [Admin, Exercises]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Exercise archived
+
+  /admin/exercises/{id}/restore:
+    post:
+      summary: Restore archived exercise
+      tags: [Admin, Exercises]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Exercise restored
+
+  /admin/foods/measurement-units:
+    get:
+      summary: List available measurement units
+      tags: [Admin, Foods]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Measurement units list
+
+  /admin/foods:
+    get:
+      summary: Search and list food database items
+      tags: [Admin, Foods]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: Food items list
+    post:
+      summary: Create new food item
+      tags: [Admin, Foods]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, servingQuantity, servingUnitId, calories]
+              properties:
+                name: { type: string }
+                brand: { type: string }
+                servingQuantity: { type: number }
+                servingUnitId: { type: integer }
+                calories: { type: number }
+                proteinG: { type: number }
+                carbsG: { type: number }
+                fatG: { type: number }
+      responses:
+        '201':
+          description: Food item created
+
+  /admin/foods/{id}:
+    get:
+      summary: Get food item details
+      tags: [Admin, Foods]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Food item details
+    patch:
+      summary: Update food item details
+      tags: [Admin, Foods]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                brand: { type: string }
+                servingQuantity: { type: number }
+                servingUnitId: { type: integer }
+                calories: { type: number }
+                proteinG: { type: number }
+                carbsG: { type: number }
+                fatG: { type: number }
+      responses:
+        '200':
+          description: Food item updated
+    delete:
+      summary: Archive food item
+      tags: [Admin, Foods]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Food item archived
+
+  /admin/foods/{id}/archive:
+    post:
+      summary: Archive food item
+      tags: [Admin, Foods]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Food item archived
+
+  /admin/foods/{id}/restore:
+    post:
+      summary: Restore archived food item
+      tags: [Admin, Foods]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Food item restored
+
+  /admin/workout-plans:
+    get:
+      summary: List workout plans
+      tags: [Admin, Workout Plans]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Workout plans list
+    post:
+      summary: Create workout plan
+      tags: [Admin, Workout Plans]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                description: { type: string }
+                goalCategory: { type: string }
+      responses:
+        '201':
+          description: Workout plan created
+
+  /admin/workout-plans/{planId}:
+    get:
+      summary: Get workout plan details and versions
+      tags: [Admin, Workout Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Workout plan details
+    patch:
+      summary: Update workout plan
+      tags: [Admin, Workout Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+      responses:
+        '200':
+          description: Plan updated
+
+  /admin/workout-plans/{planId}/versions:
+    post:
+      summary: Create new version draft (cloned from existing version or empty)
+      tags: [Admin, Workout Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fromVersionId: { type: integer }
+      responses:
+        '201':
+          description: Draft version created
+
+  /admin/workout-versions/{versionId}:
+    get:
+      summary: Get workout version structure, days, and exercises
+      tags: [Admin, Workout Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Version structure
+
+  /admin/workout-versions/{versionId}/publish:
+    post:
+      summary: Publish draft workout version (immutable once published)
+      tags: [Admin, Workout Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Version published
+
+  /admin/workout-versions/{versionId}/days:
+    post:
+      summary: Add training day to draft version
+      tags: [Admin, Workout Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, weekdayNumber]
+              properties:
+                name: { type: string }
+                weekdayNumber: { type: integer, minimum: 1, maximum: 7 }
+                isRestDay: { type: boolean }
+                notes: { type: string }
+      responses:
+        '201':
+          description: Day added
+
+  /admin/workout-days/{dayId}:
+    patch:
+      summary: Update workout day
+      tags: [Admin, Workout Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: dayId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                isRestDay: { type: boolean }
+      responses:
+        '200':
+          description: Day updated
+    delete:
+      summary: Delete workout day from draft
+      tags: [Admin, Workout Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: dayId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Day deleted
+
+  /admin/workout-days/{dayId}/exercises:
+    post:
+      summary: Add exercise to workout day
+      tags: [Admin, Workout Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: dayId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [exerciseId]
+              properties:
+                exerciseId: { type: integer }
+                orderIndex: { type: integer }
+                targetSets: { type: integer }
+                repsMin: { type: integer }
+                repsMax: { type: integer }
+                rirTarget: { type: integer }
+                restSeconds: { type: integer }
+                notes: { type: string }
+      responses:
+        '201':
+          description: Exercise added
+
+  /admin/workout-exercises/{id}:
+    patch:
+      summary: Update exercise prescription
+      tags: [Admin, Workout Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                targetSets: { type: integer }
+                repsMin: { type: integer }
+                repsMax: { type: integer }
+                notes: { type: string }
+      responses:
+        '200':
+          description: Exercise updated
+    delete:
+      summary: Remove exercise from workout day
+      tags: [Admin, Workout Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Exercise removed
+
+  /admin/diet-plans:
+    get:
+      summary: List diet plans
+      tags: [Admin, Diet Plans]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Diet plans list
+    post:
+      summary: Create diet plan
+      tags: [Admin, Diet Plans]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                description: { type: string }
+                dailyCaloriesTarget: { type: integer }
+      responses:
+        '201':
+          description: Diet plan created
+
+  /admin/diet-plans/{id}:
+    get:
+      summary: Get diet plan details and versions
+      tags: [Admin, Diet Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Diet plan details
+
+  /admin/diet-plans/{id}/versions:
+    post:
+      summary: Create new diet version draft (cloned from existing version or empty)
+      tags: [Admin, Diet Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fromVersionId: { type: integer }
+      responses:
+        '201':
+          description: Draft version created
+
+  /admin/diet-versions/{versionId}:
+    get:
+      summary: Get diet version structure, meals, and food option groups
+      tags: [Admin, Diet Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Diet version structure
+    patch:
+      summary: Update diet version details
+      tags: [Admin, Diet Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                dailyCaloriesTarget: { type: integer }
+                dailyProteinTargetG: { type: number }
+                dailyCarbsTargetG: { type: number }
+                dailyFatTargetG: { type: number }
+                changeSummary: { type: string }
+      responses:
+        '200':
+          description: Diet version updated
+
+  /admin/diet-versions/{versionId}/publish:
+    post:
+      summary: Publish draft diet version (immutable once published)
+      tags: [Admin, Diet Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Diet version published
+
+  /admin/diet-versions/{versionId}/meals:
+    post:
+      summary: Add meal to draft diet version
+      tags: [Admin, Diet Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                scheduledTime: { type: string }
+                orderIndex: { type: integer }
+                notes: { type: string }
+      responses:
+        '201':
+          description: Meal added
+
+  /admin/diet-meals/{mealId}:
+    patch:
+      summary: Update meal in draft version
+      tags: [Admin, Diet Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: mealId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                scheduledTime: { type: string }
+                orderIndex: { type: integer }
+                notes: { type: string }
+      responses:
+        '200':
+          description: Meal updated
+    delete:
+      summary: Delete meal from draft version
+      tags: [Admin, Diet Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: mealId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Meal deleted
+
+  /admin/diet-meals/{mealId}/groups:
+    post:
+      summary: Add food option group to meal
+      tags: [Admin, Diet Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: mealId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                isRequired: { type: boolean }
+                minSelections: { type: integer }
+                maxSelections: { type: integer }
+                orderIndex: { type: integer }
+      responses:
+        '201':
+          description: Group created
+
+  /admin/diet-option-groups/{groupId}:
+    patch:
+      summary: Update option group in draft version
+      tags: [Admin, Diet Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                isRequired: { type: boolean }
+                minSelections: { type: integer }
+                maxSelections: { type: integer }
+                orderIndex: { type: integer }
+      responses:
+        '200':
+          description: Group updated
+    delete:
+      summary: Delete option group from draft version
+      tags: [Admin, Diet Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Group deleted
+
+  /admin/diet-option-groups/{groupId}/options:
+    post:
+      summary: Add food option item to option group
+      tags: [Admin, Diet Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [servingQuantity]
+              properties:
+                foodId: { type: integer }
+                customLabel: { type: string }
+                servingQuantity: { type: number }
+                servingUnitId: { type: integer }
+                calories: { type: number }
+                proteinG: { type: number }
+                carbsG: { type: number }
+                fatG: { type: number }
+                isDefault: { type: boolean }
+                orderIndex: { type: integer }
+      responses:
+        '201':
+          description: Option added
+
+  /admin/diet-options/{optionId}:
+    patch:
+      summary: Update food option item in draft version
+      tags: [Admin, Diet Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: optionId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                foodId: { type: integer }
+                customLabel: { type: string }
+                servingQuantity: { type: number }
+                servingUnitId: { type: integer }
+                calories: { type: number }
+                proteinG: { type: number }
+                carbsG: { type: number }
+                fatG: { type: number }
+                isDefault: { type: boolean }
+                orderIndex: { type: integer }
+      responses:
+        '200':
+          description: Option updated
+    delete:
+      summary: Delete food option item from draft version
+      tags: [Admin, Diet Plans]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: optionId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Option deleted
+
+  /admin/reminders:
+    get:
+      summary: List reminder rule configurations
+      tags: [Admin, Reminders]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Reminders list
+    post:
+      summary: Create reminder rule
+      tags: [Admin, Reminders]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ruleKey, titleTemplate, messageTemplate, targetCategory]
+              properties:
+                ruleKey: { type: string }
+                titleTemplate: { type: string }
+                messageTemplate: { type: string }
+                targetCategory: { type: string }
+                triggerTime: { type: string }
+      responses:
+        '201':
+          description: Reminder created
+
+  /admin/reminders/process:
+    post:
+      summary: On-demand administrative HTTP trigger for reminder rule evaluation
+      tags: [Admin, Reminders]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Worker processing results
+
+  /admin/audit-logs:
+    get:
+      summary: List administrative audit log events
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Audit logs list
+
+  /admin/analytics/overview:
+    get:
+      summary: Platform-wide analytics and KPIs
+      tags: [Admin]
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }]
+      parameters:
+        - name: days
+          in: query
+          required: false
+          schema: { type: integer, default: 30 }
+      responses:
+        '200':
+          description: Platform KPIs and adherence metrics
+
+  /admin/analytics/users:
+    get:
+      summary: List athlete users analytics summary
+      tags: [Admin]
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }]
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: List of athlete users with adherence and workout summaries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: array
+                    items: { type: object }
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /admin/analytics/users/{userId}:
+    get:
+      summary: Deep-dive per-user fitness analytics and progression
+      tags: [Admin]
+      security: [{ bearerAuth: [] }, { cookieAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: days
+          in: query
+          required: false
+          schema: { type: integer, default: 30 }
+      responses:
+        '200':
+          description: Per-user detailed fitness metrics and historical trends
+
+  /me/workouts/active:
+    get:
+      summary: Get active in-progress workout session
+      tags: [Workouts]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Active session or null
+
+  /me/workouts/history:
+    get:
+      summary: Get completed workout session history
+      tags: [Workouts]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200':
+          description: Workout history sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: array
+                    items: { type: object }
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /me/workouts/{sessionId}/discard:
+    post:
+      summary: Discard in-progress workout session
+      tags: [Workouts]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Session discarded
+
+  /me/notifications/read-all:
+    post:
+      summary: Mark all notifications as read
+      tags: [Notifications]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: All marked as read
+
+  /me/notifications/{id}/dismiss:
+    post:
+      summary: Dismiss a notification
+      tags: [Notifications]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Notification dismissed
+
+  /admin/reminders/{id}:
+    get:
+      summary: Get reminder rule details
+      tags: [Admin, Reminders]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Reminder rule details
+    put:
+      summary: Update reminder rule
+      tags: [Admin, Reminders]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Reminder rule updated
+    delete:
+      summary: Delete reminder rule
+      tags: [Admin, Reminders]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Reminder rule deleted
+
+  /admin/reminders/{id}/toggle:
+    patch:
+      summary: Toggle reminder active status
+      tags: [Admin, Reminders]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Reminder toggled
+
+  /admin/notifications:
+    get:
+      summary: List all notifications for administration
+      tags: [Admin, Notifications]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Notifications list
+    post:
+      summary: Dispatch manual notification to user or broadcast
+      tags: [Admin, Notifications]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201':
+          description: Notification dispatched
+
+  /admin/notifications/{id}:
+    get:
+      summary: Get notification detail and deliveries
+      tags: [Admin, Notifications]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Notification detail
+
+  /admin/users/{userId}/monitoring:
+    get:
+      summary: Get user monitoring dossier and full tracking summary
+      tags: [Admin, Users]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: User monitoring dossier
+
+  /admin/audit-logs/{id}:
+    get:
+      summary: Get detailed audit log event
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Audit log detail
+
+  /admin/settings:
+    get:
+      summary: Get application and system settings
+      tags: [Admin, Settings]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: System and app settings
+    put:
+      summary: Update platform settings
+      tags: [Admin, Settings]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Settings updated
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Pagination:
+      type: object
+      required: [page, limit, total, totalPages]
+      properties:
+        page: { type: integer, minimum: 1 }
+        limit: { type: integer, minimum: 1 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+
+    AuthSessionResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            accessToken: { type: string }
+            refreshToken: { type: string }
+            expiresInSeconds: { type: integer, example: 900 }
+
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        role: { type: string, example: "user" }
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string, format: email }
+        timezone: { type: string }
+        locale: { type: string }
+        status: { type: string }
+
+    UserProfileResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            heightCm: { type: number }
+            currentWeightKg: { type: number }
+            targetWeightKg: { type: number }
+            dietPlan: { type: object }
+            workoutPlan: { type: object }
+
+    DailyPlanResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data:
+          type: object
+          properties:
+            date: { type: string, format: date }
+            timezone: { type: string }
+            tasks:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: integer }
+                  taskType: { type: string }
+                  taskKey: { type: string }
+                  title: { type: string }
+                  status: { type: string }
+                  isCompleted: { type: boolean }
+            weight: { type: object }
+            water: { type: object }
+            diet: { type: object }
+            workout: { type: object }
+            cardio: { type: object }
+            summary:
+              type: object
+              properties:
+                completedTasks: { type: integer }
+                totalTasks: { type: integer }
+                overallAdherencePct: { type: number }

@@ -1,0 +1,6 @@
+# Example Android Keystore signing configuration for release packaging
+# Copy this file to android/key.properties (do NOT commit real secrets to Git)
+storePassword=your-keystore-password
+keyPassword=your-key-password
+keyAlias=fitness_release_key
+storeFile=../keystores/release.keystore

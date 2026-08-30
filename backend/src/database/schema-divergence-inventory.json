@@ -1,0 +1,761 @@
+{
+  "canonicalTableCount": 50,
+  "activeTableCount": 51,
+  "canonicalTables": [
+    "api_idempotency_keys",
+    "audit_logs",
+    "body_weight_entries",
+    "cardio_activities",
+    "cardio_logs",
+    "daily_tasks",
+    "diet_meal_option_groups",
+    "diet_meal_options",
+    "diet_meals",
+    "diet_plan_versions",
+    "diet_plans",
+    "equipment_types",
+    "exercise_muscle_groups",
+    "exercises",
+    "foods",
+    "meal_log_selections",
+    "meal_logs",
+    "measurement_units",
+    "muscle_groups",
+    "notification_deliveries",
+    "notifications",
+    "password_reset_tokens",
+    "reminder_rule_weekdays",
+    "reminder_rules",
+    "roles",
+    "system_settings",
+    "user_adherence_configs",
+    "user_cardio_target_days",
+    "user_cardio_targets",
+    "user_daily_summaries",
+    "user_diet_assignments",
+    "user_notification_preferences",
+    "user_notification_settings",
+    "user_progress_snapshots",
+    "user_push_devices",
+    "user_refresh_tokens",
+    "user_water_quick_add_options",
+    "user_water_targets",
+    "user_weight_goals",
+    "user_workout_assignments",
+    "users",
+    "water_entries",
+    "workout_plan_days",
+    "workout_plan_exercise_sets",
+    "workout_plan_exercises",
+    "workout_plan_versions",
+    "workout_plans",
+    "workout_session_exercises",
+    "workout_sessions",
+    "workout_sets"
+  ],
+  "activeTables": [
+    "api_idempotency_keys",
+    "audit_logs",
+    "body_weight_entries",
+    "cardio_activities",
+    "cardio_logs",
+    "daily_tasks",
+    "diet_meal_option_groups",
+    "diet_meal_options",
+    "diet_meals",
+    "diet_plan_versions",
+    "diet_plans",
+    "equipment_types",
+    "exercise_muscle_groups",
+    "exercises",
+    "foods",
+    "meal_log_selections",
+    "meal_logs",
+    "measurement_units",
+    "muscle_groups",
+    "notification_deliveries",
+    "notifications",
+    "password_reset_tokens",
+    "reminder_rule_weekdays",
+    "reminder_rules",
+    "roles",
+    "system_settings",
+    "user_adherence_configs",
+    "user_cardio_target_days",
+    "user_cardio_targets",
+    "user_daily_summaries",
+    "user_diet_assignments",
+    "user_notification_preferences",
+    "user_notification_settings",
+    "user_progress_snapshots",
+    "user_push_devices",
+    "user_refresh_tokens",
+    "user_water_quick_add_options",
+    "user_water_targets",
+    "user_weight_goals",
+    "user_workout_assignments",
+    "users",
+    "water_entries",
+    "worker_locks",
+    "workout_plan_days",
+    "workout_plan_exercise_sets",
+    "workout_plan_exercises",
+    "workout_plan_versions",
+    "workout_plans",
+    "workout_session_exercises",
+    "workout_sessions",
+    "workout_sets"
+  ],
+  "tablesOnlyInCanonical": [],
+  "tablesOnlyInActive": [
+    "worker_locks"
+  ],
+  "columnDiscrepancies": [
+    {
+      "tableName": "body_weight_entries",
+      "missingInActive": [],
+      "missingInCanonical": [
+        "client_operation_id",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "cardio_activities",
+      "missingInActive": [
+        "description",
+        "supports_speed",
+        "supports_incline",
+        "supports_distance"
+      ],
+      "missingInCanonical": [
+        "category",
+        "tracks_distance",
+        "tracks_speed",
+        "tracks_incline",
+        "tracks_heart_rate",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "cardio_logs",
+      "missingInActive": [
+        "user_cardio_target_id",
+        "activity_name_snapshot",
+        "incline",
+        "started_at",
+        "completed_at"
+      ],
+      "missingInCanonical": [
+        "average_heart_rate",
+        "incline_pct",
+        "client_operation_id",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "daily_tasks",
+      "missingInActive": [
+        "user_diet_assignment_id",
+        "user_workout_assignment_id",
+        "diet_meal_id",
+        "workout_plan_day_id",
+        "user_cardio_target_id",
+        "user_water_target_id",
+        "user_weight_goal_id",
+        "title_snapshot",
+        "description_snapshot",
+        "target_snapshot",
+        "scheduled_at"
+      ],
+      "missingInCanonical": [
+        "task_type",
+        "title",
+        "description",
+        "scheduled_time",
+        "status",
+        "is_required",
+        "missed_at",
+        "source_entity_type",
+        "source_entity_id",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "diet_meal_option_groups",
+      "missingInActive": [
+        "group_order",
+        "min_selection_count",
+        "max_selection_count",
+        "notes"
+      ],
+      "missingInCanonical": [
+        "min_selections",
+        "max_selections",
+        "order_index",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "diet_meal_options",
+      "missingInActive": [
+        "option_order",
+        "label",
+        "quantity",
+        "unit_id",
+        "calories_snapshot",
+        "protein_g_snapshot",
+        "carbs_g_snapshot",
+        "fat_g_snapshot",
+        "fiber_g_snapshot",
+        "notes",
+        "is_active"
+      ],
+      "missingInCanonical": [
+        "custom_label",
+        "serving_quantity",
+        "serving_unit_id",
+        "calories",
+        "protein_g",
+        "carbs_g",
+        "fat_g",
+        "is_default",
+        "order_index",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "diet_meals",
+      "missingInActive": [
+        "meal_order",
+        "default_grace_minutes",
+        "description",
+        "is_required"
+      ],
+      "missingInCanonical": [
+        "order_index",
+        "notes",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "diet_plan_versions",
+      "missingInActive": [
+        "daily_calorie_target",
+        "daily_protein_target_g",
+        "daily_carbs_target_g",
+        "daily_fat_target_g",
+        "change_notes",
+        "published_by"
+      ],
+      "missingInCanonical": [
+        "title",
+        "status",
+        "change_summary",
+        "archived_at",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "diet_plans",
+      "missingInActive": [],
+      "missingInCanonical": [
+        "daily_calories_target",
+        "protein_grams_target",
+        "carbs_grams_target",
+        "fat_grams_target",
+        "is_archived",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "equipment_types",
+      "missingInActive": [
+        "description"
+      ],
+      "missingInCanonical": [
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "exercises",
+      "missingInActive": [
+        "is_active",
+        "created_by"
+      ],
+      "missingInCanonical": [
+        "primary_muscle_group_id",
+        "tracking_type",
+        "is_archived",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "foods",
+      "missingInActive": [
+        "brand",
+        "reference_quantity",
+        "reference_unit_id",
+        "created_by"
+      ],
+      "missingInCanonical": [
+        "measurement_unit_id",
+        "default_serving_amount",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "meal_log_selections",
+      "missingInActive": [
+        "group_name_snapshot",
+        "option_label_snapshot",
+        "quantity_snapshot",
+        "unit_code_snapshot",
+        "calories_snapshot",
+        "protein_g_snapshot",
+        "carbs_g_snapshot",
+        "fat_g_snapshot",
+        "fiber_g_snapshot"
+      ],
+      "missingInCanonical": [
+        "food_id",
+        "quantity",
+        "calories",
+        "protein_g",
+        "carbs_g",
+        "fat_g"
+      ]
+    },
+    {
+      "tableName": "meal_logs",
+      "missingInActive": [
+        "user_diet_assignment_id",
+        "diet_plan_version_id",
+        "meal_date",
+        "meal_name_snapshot",
+        "scheduled_time_snapshot",
+        "actual_calories",
+        "actual_protein_g",
+        "actual_carbs_g",
+        "actual_fat_g",
+        "completed_at"
+      ],
+      "missingInCanonical": [
+        "log_date",
+        "status",
+        "consumed_at",
+        "client_operation_id",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "measurement_units",
+      "missingInActive": [],
+      "missingInCanonical": [
+        "unit_type",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "muscle_groups",
+      "missingInActive": [],
+      "missingInCanonical": [
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "notification_deliveries",
+      "missingInActive": [
+        "user_push_device_id",
+        "provider_message_id",
+        "attempt_count",
+        "last_error",
+        "sent_at"
+      ],
+      "missingInCanonical": [
+        "delivery_channel",
+        "device_uuid",
+        "status",
+        "error_message"
+      ]
+    },
+    {
+      "tableName": "notifications",
+      "missingInActive": [
+        "daily_task_id",
+        "reminder_rule_id",
+        "message",
+        "deep_link",
+        "dedupe_key",
+        "scheduled_at",
+        "dismissed_at"
+      ],
+      "missingInCanonical": [
+        "category",
+        "body",
+        "data_payload",
+        "dedup_key",
+        "is_read"
+      ]
+    },
+    {
+      "tableName": "reminder_rule_weekdays",
+      "missingInActive": [
+        "weekday",
+        "created_at"
+      ],
+      "missingInCanonical": [
+        "weekday_number"
+      ]
+    },
+    {
+      "tableName": "reminder_rules",
+      "missingInActive": [
+        "name",
+        "user_id",
+        "diet_meal_id",
+        "workout_plan_day_id",
+        "offset_minutes",
+        "grace_period_minutes",
+        "repeat_interval_minutes",
+        "max_repeats",
+        "active_window_start",
+        "active_window_end",
+        "created_by"
+      ],
+      "missingInCanonical": [
+        "title",
+        "category",
+        "mode",
+        "relative_minutes_offset",
+        "interval_minutes",
+        "message_template",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "roles",
+      "missingInActive": [],
+      "missingInCanonical": [
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "system_settings",
+      "missingInActive": [],
+      "missingInCanonical": [
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "user_adherence_configs",
+      "missingInActive": [
+        "diet_weight_pct",
+        "workout_weight_pct",
+        "cardio_weight_pct",
+        "water_weight_pct",
+        "weight_logging_weight_pct",
+        "effective_from",
+        "effective_until",
+        "is_active"
+      ],
+      "missingInCanonical": [
+        "diet_weight",
+        "workout_weight",
+        "cardio_weight",
+        "water_weight",
+        "weight_logging_weight",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "user_cardio_target_days",
+      "missingInActive": [
+        "weekday",
+        "created_at"
+      ],
+      "missingInCanonical": [
+        "weekday_number"
+      ]
+    },
+    {
+      "tableName": "user_cardio_targets",
+      "missingInActive": [
+        "target_minutes_min",
+        "target_minutes_max",
+        "target_speed_min_kmh",
+        "target_speed_max_kmh",
+        "target_incline_min",
+        "target_incline_max",
+        "target_distance_min_km",
+        "target_distance_max_km",
+        "notes",
+        "created_by"
+      ],
+      "missingInCanonical": [
+        "min_duration_minutes",
+        "max_duration_minutes",
+        "target_distance_km",
+        "min_speed_kmh",
+        "max_speed_kmh",
+        "min_incline_pct",
+        "max_incline_pct",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "user_daily_summaries",
+      "missingInActive": [
+        "weight_kg",
+        "meals_expected",
+        "meals_completed",
+        "meals_partial",
+        "meals_skipped",
+        "workout_expected",
+        "workout_completed",
+        "cardio_target_minutes",
+        "cardio_actual_minutes",
+        "water_target_ml",
+        "water_actual_ml",
+        "weight_logged",
+        "weight_logging_adherence_pct"
+      ],
+      "missingInCanonical": [
+        "weight_logging_pct",
+        "total_water_ml",
+        "total_cardio_minutes",
+        "workout_session_completed",
+        "weight_recorded_kg",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "user_diet_assignments",
+      "missingInActive": [],
+      "missingInCanonical": [
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "user_notification_preferences",
+      "missingInActive": [],
+      "missingInCanonical": [
+        "category",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "user_notification_settings",
+      "missingInActive": [
+        "in_app_enabled",
+        "push_enabled",
+        "local_notifications_enabled"
+      ],
+      "missingInCanonical": [
+        "id",
+        "allow_push",
+        "allow_in_app",
+        "allow_reminders",
+        "allow_missed_task_alerts",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "user_progress_snapshots",
+      "missingInActive": [],
+      "missingInCanonical": [
+        "period_type"
+      ]
+    },
+    {
+      "tableName": "user_push_devices",
+      "missingInActive": [],
+      "missingInCanonical": [
+        "platform",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "user_water_quick_add_options",
+      "missingInActive": [
+        "display_order",
+        "is_active"
+      ],
+      "missingInCanonical": [
+        "label",
+        "order_index"
+      ]
+    },
+    {
+      "tableName": "user_water_targets",
+      "missingInActive": [
+        "target_ml",
+        "created_by"
+      ],
+      "missingInCanonical": [
+        "daily_target_ml",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "user_weight_goals",
+      "missingInActive": [
+        "starting_weight_kg",
+        "created_by"
+      ],
+      "missingInCanonical": [
+        "start_weight_kg",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "user_workout_assignments",
+      "missingInActive": [],
+      "missingInCanonical": [
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "users",
+      "missingInActive": [],
+      "missingInCanonical": [
+        "gender",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "water_entries",
+      "missingInActive": [
+        "user_water_target_id",
+        "recorded_at",
+        "notes"
+      ],
+      "missingInCanonical": [
+        "logged_at",
+        "client_operation_id"
+      ]
+    },
+    {
+      "tableName": "workout_plan_days",
+      "missingInActive": [
+        "weekday",
+        "description",
+        "day_order"
+      ],
+      "missingInCanonical": [
+        "weekday_number",
+        "order_index",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "workout_plan_exercise_sets",
+      "missingInActive": [
+        "target_duration_seconds",
+        "target_distance_meters",
+        "rir_target",
+        "notes"
+      ],
+      "missingInCanonical": [
+        "set_type",
+        "target_rir"
+      ]
+    },
+    {
+      "tableName": "workout_plan_exercises",
+      "missingInActive": [
+        "exercise_order",
+        "exercise_name_snapshot",
+        "target_reps_min",
+        "target_reps_max"
+      ],
+      "missingInCanonical": [
+        "order_index",
+        "reps_min",
+        "reps_max",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "workout_plan_versions",
+      "missingInActive": [
+        "change_notes",
+        "published_by"
+      ],
+      "missingInCanonical": [
+        "title",
+        "status",
+        "change_summary",
+        "archived_at",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "workout_plans",
+      "missingInActive": [
+        "goal"
+      ],
+      "missingInCanonical": [
+        "goal_category",
+        "is_archived",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "workout_session_exercises",
+      "missingInActive": [
+        "workout_plan_exercise_id",
+        "exercise_order",
+        "exercise_name_snapshot",
+        "planned_sets_snapshot",
+        "planned_reps_min_snapshot",
+        "planned_reps_max_snapshot",
+        "planned_rest_seconds_snapshot",
+        "planned_rir_snapshot",
+        "started_at",
+        "completed_at"
+      ],
+      "missingInCanonical": [
+        "order_index",
+        "planned_sets",
+        "reps_min_target",
+        "reps_max_target",
+        "rir_target",
+        "rest_seconds_target"
+      ]
+    },
+    {
+      "tableName": "workout_sessions",
+      "missingInActive": [
+        "user_workout_assignment_id",
+        "workout_plan_version_id",
+        "workout_date",
+        "workout_name_snapshot"
+      ],
+      "missingInCanonical": [
+        "session_date",
+        "duration_seconds",
+        "status",
+        "rating",
+        "client_operation_id",
+        "updated_at"
+      ]
+    },
+    {
+      "tableName": "workout_sets",
+      "missingInActive": [
+        "performed_at"
+      ],
+      "missingInCanonical": [
+        "set_type",
+        "updated_at"
+      ]
+    }
+  ],
+  "isHarmonized": false
+}

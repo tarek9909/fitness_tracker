@@ -1,0 +1,128 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ----------------------------------------------------------------------------
+  # Job 1: Backend Quality, Contract & Schema Gates
+  # ----------------------------------------------------------------------------
+  backend:
+    name: Backend CI Gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'backend/package-lock.json'
+
+      - name: Install Dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: TypeScript Lint (tsc --noEmit)
+        working-directory: backend
+        run: npm run lint
+
+      - name: Automated Unit & Integration Tests (Vitest)
+        working-directory: backend
+        run: npm test
+
+      - name: Compile TypeScript to Production Bundle
+        working-directory: backend
+        run: npm run build
+
+      - name: OpenAPI Contract Parity Audit
+        working-directory: backend
+        run: npm run audit:contract
+
+      - name: Canonical MySQL Schema Parity Audit
+        working-directory: backend
+        run: npm run audit:mysql
+
+  # ----------------------------------------------------------------------------
+  # Job 2: Admin Dashboard Quality & Build Gates
+  # ----------------------------------------------------------------------------
+  admin-dashboard:
+    name: Admin Dashboard CI Gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'admin-dashboard/package-lock.json'
+
+      - name: Install Dependencies
+        working-directory: admin-dashboard
+        run: npm ci
+
+      - name: TypeScript Lint (tsc --noEmit)
+        working-directory: admin-dashboard
+        run: npm run lint
+
+      - name: Unit Tests (Vitest)
+        working-directory: admin-dashboard
+        run: npm test
+
+      - name: Compile Production Bundle (Vite)
+        working-directory: admin-dashboard
+        run: npm run build
+
+  # ----------------------------------------------------------------------------
+  # Job 3: Mobile App Quality, Analysis & Build Gates
+  # ----------------------------------------------------------------------------
+  mobile-app:
+    name: Flutter Mobile CI Gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        working-directory: mobile-app
+        run: flutter pub get
+
+      - name: Static Code Analysis
+        working-directory: mobile-app
+        run: flutter analyze --no-fatal-infos
+
+      - name: Automated Tests
+        working-directory: mobile-app
+        run: flutter test
+
+      - name: Build Verification (Android APK validation check)
+        working-directory: mobile-app
+        run: flutter build apk --debug --no-tree-shake-icons
