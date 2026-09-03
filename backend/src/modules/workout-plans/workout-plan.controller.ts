@@ -4,7 +4,7 @@ import { WorkoutPlanService } from './workout-plan.service.js';
 import { AuthenticatedRequest } from '../../shared/types/index.js';
 import { ValidationError } from '../../shared/errors/app-error.js';
 import { recordAuditEvent } from '../../shared/utils/audit-utils.js';
-import { parsePositiveInt } from '../../shared/utils/request-utils.js';
+import { isDateOnly, parsePositiveInt } from '../../shared/utils/request-utils.js';
 import { assertCanViewWorkoutPlan, assertCanModifyWorkoutPlan } from './workout-plan-ownership.js';
 import { getDatabasePool } from '../../database/pool.js';
 import { getUserLocalDate } from '../../shared/utils/date-utils.js';
@@ -20,7 +20,7 @@ const updatePlanSchema = createPlanSchema.partial().extend({
 });
 
 const activatePlanSchema = z.object({
-  effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'effectiveFrom must be YYYY-MM-DD').optional(),
+  effectiveFrom: z.string().refine(isDateOnly, 'effectiveFrom must be a valid YYYY-MM-DD date').optional(),
 });
 
 const cloneVersionSchema = z.object({

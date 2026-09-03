@@ -494,8 +494,24 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
       final data = res is Map<String, dynamic> && res['data'] != null
           ? res['data'] as Map<String, dynamic>
           : (res is Map<String, dynamic> ? res : null);
+      var normalized = _normalisePlan(data);
+      final versionId = normalized?['version'] is Map
+          ? (normalized!['version']['id'] as num?)?.toInt()
+          : null;
+      if (normalized != null && versionId != null) {
+        final versionRes = await widget.apiClient.get(
+          '/me/diet-plans/${widget.planId}/versions/$versionId',
+        );
+        final versionData = versionRes is Map<String, dynamic> && versionRes['data'] is Map
+            ? Map<String, dynamic>.from(versionRes['data'] as Map)
+            : null;
+        if (versionData != null) {
+          normalized = {...normalized, 'version': versionData};
+        }
+      }
+      if (!mounted) return;
       setState(() {
-        _plan = _normalisePlan(data);
+        _plan = normalized;
         _isLoading = false;
       });
     } catch (e) {
@@ -808,7 +824,7 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
                           style: TextStyle(color: colors.textSecondary))
                     else
                       DropdownButtonFormField<int>(
-                        value: selectedFoodId,
+                        initialValue: selectedFoodId,
                         dropdownColor: colors.surfaceElevated,
                         isExpanded: true,
                         decoration: InputDecoration(

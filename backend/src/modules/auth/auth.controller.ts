@@ -21,15 +21,6 @@ const logoutSchema = z.object({
   refreshToken: z.string().optional(),
 });
 
-const forgotPasswordSchema = z.object({
-  email: z.string().email(),
-});
-
-const resetPasswordSchema = z.object({
-  token: z.string().min(32).max(191),
-  password: z.string().min(8).max(128),
-});
-
 export class AuthController {
   private service = new AuthService();
 
@@ -151,21 +142,6 @@ export class AuthController {
       success: true,
       data: { message: 'Successfully logged out' },
     });
-  }
-
-  async forgotPassword(request: FastifyRequest, reply: FastifyReply) {
-    const body = forgotPasswordSchema.parse(request.body);
-    await this.service.requestPasswordReset(body.email);
-    return reply.status(202).send({
-      success: true,
-      data: { message: 'If the account exists, password reset instructions will be sent.' },
-    });
-  }
-
-  async resetPassword(request: FastifyRequest, reply: FastifyReply) {
-    const body = resetPasswordSchema.parse(request.body);
-    await this.service.resetPassword(body.token, body.password);
-    return reply.status(200).send({ success: true, data: { message: 'Password has been reset.' } });
   }
 
   // --- Self-Service OTP Security Endpoints ---

@@ -29,7 +29,6 @@ Its purpose is to allow users to:
 * Record workout performance
 * Record weight used during exercises
 * Record repetitions
-* Record RIR where applicable
 * Record cardio
 * View progress
 * View weight trends
@@ -1151,7 +1150,6 @@ Responsibilities:
 * Set logging
 * Weight
 * Reps
-* RIR
 * Duration/distance depending on type
 * Exercise completion
 * Workout completion
@@ -1229,8 +1227,6 @@ TODAY
 Set 1
 Weight [      ]
 Reps   [      ]
-RIR    [      ]
-
 Set 2
 ...
 ```
@@ -1261,8 +1257,6 @@ For `weight_reps`:
 Weight
 
 Reps
-
-Optional RIR
 
 Set Type
 
@@ -1304,14 +1298,12 @@ Input fields depend on tracking type.
 ```text
 Weight
 Reps
-RIR
 ```
 
 ## Reps Only
 
 ```text
 Reps
-RIR
 ```
 
 ## Duration
@@ -2475,9 +2467,9 @@ Workout logging must be extremely efficient.
 Possible row:
 
 ```text
-SET   KG      REPS     RIR
+SET   KG      REPS
 
-1     [100]   [12]     [2]
+1     [100]   [12]
 
 2     [100]   [11]     [2]
 ```
@@ -3343,8 +3335,6 @@ Set Rows
 Weight
 
 Reps
-
-RIR
 
 Duration
 

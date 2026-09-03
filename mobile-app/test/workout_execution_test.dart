@@ -91,7 +91,6 @@ void main() {
                   'reps_min_target': 8,
                   'reps_max_target': 12,
                   'target_weight_kg': 65.0,
-                  'rir_target': 2,
                   'sets': [
                     {
                       'id': 301,

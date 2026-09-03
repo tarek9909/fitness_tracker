@@ -5,8 +5,7 @@ import { env } from '../../config/env.js';
 import { getDatabasePool } from '../../database/pool.js';
 import { signAccessToken, generateSecureToken, hashToken } from '../../shared/utils/crypto-utils.js';
 import { UserAuthPayload } from '../../shared/types/index.js';
-import { UnauthorizedError, ForbiddenError, ValidationError, AppError } from '../../shared/errors/app-error.js';
-import { emailService } from '../../shared/services/email.service.js';
+import { UnauthorizedError, ForbiddenError, AppError } from '../../shared/errors/app-error.js';
 import { otpService } from '../../shared/services/otp.service.js';
 import { logger } from '../../config/logger.js';
 
@@ -26,8 +25,6 @@ export interface LoginResult {
 }
 
 // In-memory test token delivery container (used strictly during automated tests)
-export const testResetTokenStore = new Map<string, string>();
-
 export class AuthService {
   private repo = new AuthRepository();
   private db = getDatabasePool();
@@ -171,42 +168,6 @@ export class AuthService {
     }
   }
 
-  async requestPasswordReset(email: string): Promise<void> {
-    if (env.emailProvider === 'none') {
-      throw new ValidationError('Password reset email delivery provider is not configured on this environment.');
-    }
-
-    const user = await this.repo.findUserByEmail(email);
-    // Keep this endpoint enumeration-resistant
-    if (!user) return;
-
-    const rawToken = generateSecureToken();
-    const tokenHash = hashToken(rawToken);
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-    await this.repo.createPasswordResetToken(user.id, tokenHash, expiresAt);
-
-    if (env.emailProvider === 'mock' || env.nodeEnv === 'test') {
-      testResetTokenStore.set(user.email.toLowerCase(), rawToken);
-    }
-
-    try {
-      await emailService.sendPasswordResetEmail(user.email, rawToken);
-    } catch (error) {
-      // Cleanly remove the token so no unusable token remains in the database
-      await this.db.execute('DELETE FROM password_reset_tokens WHERE token_hash = ?', [tokenHash]);
-      if (env.emailProvider === 'mock' || env.nodeEnv === 'test') {
-        testResetTokenStore.delete(user.email.toLowerCase());
-      }
-      throw error;
-    }
-  }
-
-  async resetPassword(rawToken: string, password: string): Promise<void> {
-    const passwordHash = await bcrypt.hash(password, 12);
-    const updated = await this.repo.resetPassword(hashToken(rawToken), passwordHash);
-    if (!updated) throw new UnauthorizedError('Password reset token is invalid or expired', 'PASSWORD_RESET_INVALID');
-  }
-
   // --- OTP Self-Service Security Flows ---
 
   async requestPasswordResetOtp(email: string): Promise<{ challengeId: string }> {
@@ -281,6 +242,7 @@ export class AuthService {
       challengeId,
       purpose: 'password_change',
       otp,
+      expectedUserId: userId,
     });
     const passwordHash = await bcrypt.hash(newPassword, 12);
     await this.db.withTransaction(async (conn) => {
@@ -374,11 +336,13 @@ export class AuthService {
       challengeId: pendingReq.current_email_challenge_id,
       purpose: 'email_change_current',
       otp: currentEmailOtp,
+      expectedUserId: userId,
     });
     await otpService.verifyChallenge({
       challengeId: pendingReq.new_email_challenge_id,
       purpose: 'email_change_new',
       otp: newEmailOtp,
+      expectedUserId: userId,
     });
     const existing = await this.repo.findUserByEmail(pendingReq.new_email);
     if (existing && existing.id !== userId) {

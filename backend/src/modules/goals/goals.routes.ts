@@ -559,6 +559,9 @@ export class GoalsController {
     const today = getUserLocalDate(user?.timezone || 'UTC');
     const body = createWeightGoalSchema.parse(request.body);
     const startDate = body.startDate || today;
+    if (body.targetDate && body.targetDate < startDate) {
+      throw new ValidationError('targetDate cannot be before startDate');
+    }
 
     await this.db.execute(
       `UPDATE user_weight_goals SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND status = 'active'`,

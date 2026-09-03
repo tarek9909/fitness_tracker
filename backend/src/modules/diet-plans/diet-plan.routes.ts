@@ -7,7 +7,7 @@ import { requireAdmin } from '../../middleware/authorize.js';
 import { AuthenticatedRequest } from '../../shared/types/index.js';
 import { recordAuditEvent } from '../../shared/utils/audit-utils.js';
 import { getDatabasePool } from '../../database/pool.js';
-import { parsePositiveInt } from '../../shared/utils/request-utils.js';
+import { isDateOnly, parsePositiveInt } from '../../shared/utils/request-utils.js';
 import { assertCanViewDietPlan, assertCanModifyDietPlan } from './diet-plan-ownership.js';
 import { getUserLocalDate, shiftDate } from '../../shared/utils/date-utils.js';
 
@@ -1082,7 +1082,7 @@ export class DietPlanController {
     const plan = await this.service.getPlanById(planId);
     assertCanViewDietPlan(plan, auth);
     const body = z.object({
-      effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'effectiveFrom must be YYYY-MM-DD').optional(),
+      effectiveFrom: z.string().refine(isDateOnly, 'effectiveFrom must be a valid YYYY-MM-DD date').optional(),
     }).parse(request.body || {});
     const user = await this.db.queryOne<{ timezone?: string | null }>('SELECT timezone FROM users WHERE id = ?', [auth.userId]);
     const today = getUserLocalDate(user?.timezone || 'UTC');

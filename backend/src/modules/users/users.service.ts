@@ -54,8 +54,8 @@ export class UsersService {
 
   async updateUser(userId: number, fields: {
     firstName?: string;
-    lastName?: string;
-    phone?: string;
+    lastName?: string | null;
+    phone?: string | null;
     dateOfBirth?: string | null;
     heightCm?: number | null;
     gender?: string | null;

@@ -1,6 +1,10 @@
 # Fitness Platform: Self-Service Configuration, OTP Security, Gmail SMTP, and RIR Removal
 
-**Status:** Planning document only. No application source, database, environment, or generated files are changed by this document.
+**Status:** Implementation completed locally and verified with automated backend, dashboard, mobile, contract, migration, and Gmail SMTP transport checks. Production deployment, live MySQL access, and controlled mailbox delivery remain operational follow-up items.
+
+**Implementation note:** This document remains the end-to-end source of truth and checklist. The application changes are now present in the repository; checklist items that require production credentials, deployment access, or a real mailbox smoke test remain open until those operations are performed.
+
+**Local verification completed:** 205 backend tests, backend lint/build, 76 Flutter tests, clean `flutter analyze`, dashboard lint/build, SQLite migration coverage, Gmail SMTP transport verification, and complete runtime/OpenAPI parity (197/197 operations). The only RIR references intentionally retained are the forward migration and migration-test fixtures that remove legacy database columns. Live MySQL verification is pending because this workspace has no usable MySQL password; no real OTP email was sent during verification.
 
 **Objective:** Enable a user to configure and own a private fitness program from the mobile app, allow secure email and password changes through email OTP verification, configure Gmail SMTP for transactional mail, and remove RIR from the entire product.
 

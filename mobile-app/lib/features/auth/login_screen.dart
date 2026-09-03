@@ -254,6 +254,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             'newPassword': newPwd,
                           },
                         );
+                        if (!ctx.mounted || !mounted) return;
                         Navigator.pop(ctx);
                         setState(() {
                           _emailController.text = resetEmailCtrl.text.trim();

@@ -34,7 +34,6 @@ The dashboard should allow administrators to configure:
 * Sets
 * Repetitions
 * Rest periods
-* RIR
 * Diet plans
 * Diet versions
 * Meals
@@ -1082,8 +1081,6 @@ Minimum Reps
 Maximum Reps
 
 Rest
-
-RIR
 
 Optional
 
@@ -3278,8 +3275,6 @@ Rep Range
 
 Rest
 
-RIR
-
 Notes
 
 Order
@@ -3767,7 +3762,7 @@ WORKOUT PUBLISHING
 
 because that proves the core requirement:
 
-> **An administrator can configure a completely new workout plan—including weekly schedule, training days, rest days, exercises, sets, repetitions, rest periods, RIR, notes, and ordering—and publish it without changing any application source code.**
+> **An administrator can configure a completely new workout plan—including weekly schedule, training days, rest days, exercises, sets, repetitions, rest periods, notes, and ordering—and publish it without changing any application source code.**
 
 After that, the next major milestone is the equivalent:
 

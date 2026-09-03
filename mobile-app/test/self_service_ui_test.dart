@@ -7,7 +7,6 @@ import 'package:fitness_mobile_app/core/api/api_client.dart';
 import 'package:fitness_mobile_app/core/auth/auth_session.dart';
 import 'package:fitness_mobile_app/core/storage/secure_storage_service.dart';
 import 'package:fitness_mobile_app/core/sync/sync_coordinator.dart';
-import 'package:fitness_mobile_app/core/widgets/premium_widgets.dart';
 import 'package:fitness_mobile_app/features/workout/workout_plans_screen.dart';
 import 'package:fitness_mobile_app/features/diet/diet_plans_screen.dart';
 import 'package:fitness_mobile_app/features/configuration/fitness_configuration_screen.dart';
@@ -160,7 +159,9 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('PHYSICAL METRICS & LEVEL'), findsOneWidget);
+      expect(find.text('PROFILE & PHYSICAL METRICS'), findsOneWidget);
+      await tester.drag(find.byType(ListView).first, const Offset(0, -600));
+      await tester.pumpAndSettle();
       expect(find.text('WEIGHT GOAL TARGETS'), findsOneWidget);
 
       // Switch to Water Tab

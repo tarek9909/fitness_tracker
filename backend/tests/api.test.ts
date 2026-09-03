@@ -5,8 +5,7 @@ import { buildApp } from '../src/app/app.js';
 import { runMigrations } from '../src/database/migrate.js';
 import { seedDatabase } from '../src/database/seed.js';
 import { getDatabasePool, closeDatabasePool, resetDatabasePool } from '../src/database/pool.js';
-import { testResetTokenStore } from '../src/modules/auth/auth.service.js';
-import { testSentEmails } from '../src/shared/services/email.service.js';
+import { testOtpStore } from '../src/shared/services/email.service.js';
 import { ReminderWorker } from '../src/workers/reminder.worker.js';
 import { FastifyInstance } from 'fastify';
 import { env } from '../src/config/env.js';
@@ -294,48 +293,46 @@ describe('Fitness Platform REST API Suite', () => {
       expect(res.json().error.code).toBe('REFRESH_TOKEN_INVALID');
     });
 
-    it('Password reset workflow: request, reset with token, and login with new password', async () => {
+    it('Password reset workflow: request, reset with OTP, and login with new password', async () => {
       // 1. Request reset
       const reqRes = await app.inject({
         method: 'POST',
         url: '/api/v1/auth/request-password-reset',
         payload: { email: 'john.doe@fitnessplatform.com' },
       });
-      expect(reqRes.statusCode).toBe(202);
+      expect(reqRes.statusCode).toBe(200);
       expect(reqRes.json().success).toBe(true);
 
-      const resetToken = testResetTokenStore.get('john.doe@fitnessplatform.com');
-      expect(resetToken).toBeDefined();
-
-      // Verify email was dispatched to mock store with template
-      const sentEmail = testSentEmails.find(e => e.to === 'john.doe@fitnessplatform.com');
-      expect(sentEmail).toBeDefined();
-      expect(sentEmail?.subject).toContain('Password Reset');
-      expect(sentEmail?.html).toContain(resetToken);
+      const challengeId = reqRes.json().data.challengeId;
+      const otp = testOtpStore.get('john.doe@fitnessplatform.com:password_reset');
+      expect(challengeId).toBeDefined();
+      expect(otp).toMatch(/^\d{6}$/);
 
       // 2. Perform reset
       const resetRes = await app.inject({
         method: 'POST',
         url: '/api/v1/auth/reset-password',
         payload: {
-          token: resetToken,
-          password: 'NewUserPassword123!',
+          challengeId,
+          otp,
+          newPassword: 'NewUserPassword123!',
         },
       });
       expect(resetRes.statusCode).toBe(200);
       expect(resetRes.json().success).toBe(true);
 
-      // 3. Replay reset token must fail
+      // 3. Replay OTP must fail
       const replayReset = await app.inject({
         method: 'POST',
         url: '/api/v1/auth/reset-password',
         payload: {
-          token: resetToken,
-          password: 'AnotherPassword123!',
+          challengeId,
+          otp,
+          newPassword: 'AnotherPassword123!',
         },
       });
-      expect(replayReset.statusCode).toBe(401);
-      expect(replayReset.json().error.code).toBe('PASSWORD_RESET_INVALID');
+      expect(replayReset.statusCode).toBe(400);
+      expect(replayReset.json().error.code).toBe('OTP_ALREADY_USED');
 
       // 4. Login with updated password and verify HttpOnly cookies
       const newLogin = await app.inject({
@@ -494,39 +491,44 @@ describe('Fitness Platform REST API Suite', () => {
       expect(validCsrf.json().success).toBe(true);
     });
 
-    it('Password reset error handling: failure in email delivery rolls back and removes created reset token', async () => {
+    it('Password reset error handling invalidates an undelivered OTP challenge', async () => {
       const db = getDatabasePool();
-      // Count existing tokens
-      const beforeCount = await db.queryOne<{ cnt: number }>('SELECT COUNT(*) as cnt FROM password_reset_tokens');
+      const beforeCount = await db.queryOne<{ cnt: number }>(
+        "SELECT COUNT(*) as cnt FROM auth_otp_challenges WHERE purpose = 'password_reset'"
+      );
       
       // Temporarily mock emailService to throw
       const { emailService } = await import('../src/shared/services/email.service.js');
-      const originalSend = emailService.sendPasswordResetEmail;
-      emailService.sendPasswordResetEmail = async () => {
-        throw new Error('SMTP Connection Timeout');
-      };
+      const originalSend = emailService.sendOtpEmail;
+      emailService.sendOtpEmail = async () => { throw new Error('SMTP Connection Timeout'); };
 
       try {
         const { AuthService } = await import('../src/modules/auth/auth.service.js');
         const authService = new AuthService();
-        await expect(authService.requestPasswordReset('john.doe@fitnessplatform.com')).rejects.toThrow('SMTP Connection Timeout');
+        await expect(authService.requestPasswordResetOtp('john.doe@fitnessplatform.com')).rejects.toThrow('SMTP Connection Timeout');
         
-        // Ensure no leftover token exists in DB
-        const afterCount = await db.queryOne<{ cnt: number }>('SELECT COUNT(*) as cnt FROM password_reset_tokens');
-        expect(afterCount?.cnt).toBe(beforeCount?.cnt);
+        const afterCount = await db.queryOne<{ cnt: number }>(
+          "SELECT COUNT(*) as cnt FROM auth_otp_challenges WHERE purpose = 'password_reset'"
+        );
+        expect(afterCount?.cnt).toBe((beforeCount?.cnt || 0) + 1);
+        const invalidated = await db.queryOne<{ consumed_at: string | null }>(
+          "SELECT consumed_at FROM auth_otp_challenges WHERE purpose = 'password_reset' ORDER BY created_at DESC LIMIT 1"
+        );
+        expect(invalidated?.consumed_at).not.toBeNull();
       } finally {
-        emailService.sendPasswordResetEmail = originalSend;
+        emailService.sendOtpEmail = originalSend;
       }
     });
 
-    it('POST /api/v1/auth/forgot-password (alias) requests password reset token', async () => {
+    it('POST /api/v1/auth/forgot-password (alias) requests an OTP password reset', async () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/auth/forgot-password',
         payload: { email: 'john.doe@fitnessplatform.com' },
       });
-      expect(res.statusCode).toBe(202);
+      expect(res.statusCode).toBe(200);
       expect(res.json().success).toBe(true);
+      expect(res.json().data.challengeId).toBeDefined();
     });
   });
 
@@ -1038,7 +1040,6 @@ describe('Fitness Platform REST API Suite', () => {
           setType: 'working',
           weightKg: 85.0,
           reps: 8,
-          rir: 2,
         },
       });
       expect(setRes.statusCode).toBe(200);

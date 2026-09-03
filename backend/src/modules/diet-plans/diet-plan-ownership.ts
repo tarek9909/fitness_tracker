@@ -18,7 +18,7 @@ export function assertCanViewDietPlan(
     return;
   }
 
-  if (plan.owner_user_id === user.userId) {
+  if (Number(plan.owner_user_id) === Number(user.userId)) {
     return;
   }
 
@@ -38,7 +38,7 @@ export function assertCanModifyDietPlan(
     return;
   }
 
-  if (plan.owner_user_id === user.userId) {
+  if (Number(plan.owner_user_id) === Number(user.userId)) {
     return;
   }
 

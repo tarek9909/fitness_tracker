@@ -89,33 +89,5 @@ export class AuthRepository {
     await this.db.execute(sql, [userId]);
   }
 
-  async createPasswordResetToken(userId: number, tokenHash: string, expiresAt: Date): Promise<void> {
-    const expiresAtStr = expiresAt.toISOString().slice(0, 19).replace('T', ' ');
-    await this.db.execute(
-      'INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)',
-      [userId, tokenHash, expiresAtStr]
-    );
-  }
-
-  async resetPassword(tokenHash: string, newPasswordHash: string): Promise<boolean> {
-    return this.db.withTransaction(async (conn) => {
-      const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
-      const token = await conn.queryOne<{ id: number; user_id: number; expires_at: string; used_at: string | null }>(
-        'SELECT * FROM password_reset_tokens WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?',
-        [tokenHash, nowStr]
-      );
-      if (!token) return false;
-
-      await conn.execute(
-        'UPDATE password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [token.id]
-      );
-      await conn.execute(
-        'UPDATE users SET password_hash = ? WHERE id = ?',
-        [newPasswordHash, token.user_id]
-      );
-      return true;
-    });
-  }
 }
 

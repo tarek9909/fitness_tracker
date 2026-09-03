@@ -293,8 +293,16 @@ describe('Self-Service Configuration & Security Test Suite', () => {
       });
       expect(verRes.statusCode).toBe(200);
       const days = verRes.json().data.days;
-      expect(days.length).toBe(7);
-      dayId = days[0].id;
+      expect(days.length).toBe(0);
+
+      const dayCreateRes = await app.inject({
+        method: 'POST',
+        url: `/api/v1/me/workout-plans/${myWorkoutPlanId}/versions/${myVersionId}/days`,
+        headers: { authorization: `Bearer ${userToken}` },
+        payload: { weekdayNumber: 1, name: 'Chest & Triceps Day', isRestDay: false },
+      });
+      expect(dayCreateRes.statusCode).toBe(201);
+      dayId = dayCreateRes.json().data.id;
 
       const dayUpdateRes = await app.inject({
         method: 'PUT',

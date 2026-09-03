@@ -561,7 +561,6 @@ Administrators can:
 * Change rest period
 * Add notes
 * Add instructions
-* Configure RIR
 * Enable/disable exercises
 
 ---
@@ -580,7 +579,6 @@ Each workout exercise should support:
 | Order        | Exercise order         |
 | Notes        | Technique instructions |
 | Video URL    | Optional video         |
-| RIR target   | Optional target        |
 | Active       | Exercise status        |
 
 ---
@@ -773,7 +771,6 @@ Each workout set can contain:
 ```text
 Weight
 Repetitions
-RIR
 Duration if applicable
 Notes
 Completed
@@ -2996,7 +2993,6 @@ Calories
 Macros
 Measurements
 Personal Records
-Exercise RIR
 Exercise Tempo
 Mood
 Energy

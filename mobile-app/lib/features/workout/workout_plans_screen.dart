@@ -455,8 +455,24 @@ class _WorkoutPlanDetailScreenState extends State<WorkoutPlanDetailScreen> {
       final data = res is Map<String, dynamic> && res['data'] != null
           ? res['data'] as Map<String, dynamic>
           : (res is Map<String, dynamic> ? res : null);
+      var normalized = _normalisePlan(data);
+      final versionId = normalized?['version'] is Map
+          ? (normalized!['version']['id'] as num?)?.toInt()
+          : null;
+      if (normalized != null && versionId != null) {
+        final versionRes = await widget.apiClient.get(
+          '/me/workout-plans/${widget.planId}/versions/$versionId',
+        );
+        final versionData = versionRes is Map<String, dynamic> && versionRes['data'] is Map
+            ? Map<String, dynamic>.from(versionRes['data'] as Map)
+            : null;
+        if (versionData != null) {
+          normalized = {...normalized, 'version': versionData};
+        }
+      }
+      if (!mounted) return;
       setState(() {
-        _plan = _normalisePlan(data);
+        _plan = normalized;
         _isLoading = false;
       });
     } catch (e) {
@@ -604,7 +620,7 @@ class _WorkoutPlanDetailScreenState extends State<WorkoutPlanDetailScreen> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<int>(
-                    value: selectedWeekday,
+                    initialValue: selectedWeekday,
                     dropdownColor: colors.surfaceElevated,
                     decoration: InputDecoration(
                       labelText: 'Scheduled Weekday',
@@ -742,7 +758,7 @@ class _WorkoutPlanDetailScreenState extends State<WorkoutPlanDetailScreen> {
                       )
                     else
                       DropdownButtonFormField<int>(
-                        value: selectedExId,
+                        initialValue: selectedExId,
                         dropdownColor: colors.surfaceElevated,
                         isExpanded: true,
                         decoration: InputDecoration(

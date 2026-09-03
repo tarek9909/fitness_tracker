@@ -653,7 +653,6 @@ Administrators can configure:
 * Minimum repetitions
 * Maximum repetitions
 * Rest
-* RIR
 * Instructions
 * Optional exercises
 
@@ -2552,7 +2551,6 @@ Implement:
 * Set logging
 * Weight
 * Reps
-* RIR
 * Complete exercise
 * Complete workout
 
@@ -3226,7 +3224,6 @@ The following must come from configuration:
 * Sets
 * Reps
 * Rest
-* RIR
 * Exercise notes
 * Diet meals
 * Meal times

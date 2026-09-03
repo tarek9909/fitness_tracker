@@ -19,17 +19,23 @@ class _FitnessConfigurationScreenState
   bool _isLoading = true;
   String? _errorMessage;
 
-  // Configuration state
-  Map<String, dynamic>? _config;
-
   // Controllers
+  final _firstNameCtrl = TextEditingController();
+  final _lastNameCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _dateOfBirthCtrl = TextEditingController();
   final _heightCtrl = TextEditingController();
-  String _fitnessGoal = 'general_fitness';
-  String _activityLevel = 'moderately_active';
+  final _timezoneCtrl = TextEditingController();
+  final _localeCtrl = TextEditingController();
+  String _gender = '';
+  String _unitSystem = 'metric';
+  String _goalType = 'maintain_weight';
 
   final _startWeightCtrl = TextEditingController();
   final _targetWeightCtrl = TextEditingController();
+  final _goalStartDateCtrl = TextEditingController();
   final _targetDateCtrl = TextEditingController();
+  final _goalNotesCtrl = TextEditingController();
 
   final _waterTargetCtrl = TextEditingController();
   final _quickAddsCtrl = TextEditingController();
@@ -44,13 +50,48 @@ class _FitnessConfigurationScreenState
     _loadConfiguration();
   }
 
+  String _displayWeight(double kilograms) {
+    final value = _unitSystem == 'imperial' ? kilograms * 2.20462 : kilograms;
+    return value.toStringAsFixed(1);
+  }
+
+  void _changeUnitSystem(String nextUnitSystem) {
+    if (nextUnitSystem == _unitSystem) return;
+
+    final height = double.tryParse(_heightCtrl.text.trim());
+    final startWeight = double.tryParse(_startWeightCtrl.text.trim());
+    final targetWeight = double.tryParse(_targetWeightCtrl.text.trim());
+    final switchingToImperial = nextUnitSystem == 'imperial';
+
+    setState(() {
+      if (height != null) {
+        _heightCtrl.text = (switchingToImperial ? height / 2.54 : height * 2.54).toStringAsFixed(1);
+      }
+      if (startWeight != null) {
+        _startWeightCtrl.text = (switchingToImperial ? startWeight * 2.20462 : startWeight / 2.20462).toStringAsFixed(1);
+      }
+      if (targetWeight != null) {
+        _targetWeightCtrl.text = (switchingToImperial ? targetWeight * 2.20462 : targetWeight / 2.20462).toStringAsFixed(1);
+      }
+      _unitSystem = nextUnitSystem;
+    });
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
+    _firstNameCtrl.dispose();
+    _lastNameCtrl.dispose();
+    _phoneCtrl.dispose();
+    _dateOfBirthCtrl.dispose();
     _heightCtrl.dispose();
+    _timezoneCtrl.dispose();
+    _localeCtrl.dispose();
     _startWeightCtrl.dispose();
     _targetWeightCtrl.dispose();
+    _goalStartDateCtrl.dispose();
     _targetDateCtrl.dispose();
+    _goalNotesCtrl.dispose();
     _waterTargetCtrl.dispose();
     _quickAddsCtrl.dispose();
     super.dispose();
@@ -68,38 +109,42 @@ class _FitnessConfigurationScreenState
           ? res['data'] as Map<String, dynamic>
           : (res is Map<String, dynamic> ? res : <String, dynamic>{});
 
-      _config = data;
-
       final profile = data['profile'] as Map<String, dynamic>?;
       if (profile != null) {
-        final height = profile['height_cm'] ?? profile['heightCm'];
-        if (height != null) {
-          _heightCtrl.text = height.toString();
-        }
-        final goal = profile['fitness_goal'] ?? profile['fitnessGoal'];
-        if (goal != null) {
-          _fitnessGoal = goal.toString();
-        }
-        final activity = profile['activity_level'] ?? profile['activityLevel'];
-        if (activity != null) {
-          _activityLevel = activity.toString();
+        _firstNameCtrl.text = '${profile['firstName'] ?? profile['first_name'] ?? ''}';
+        _lastNameCtrl.text = '${profile['lastName'] ?? profile['last_name'] ?? ''}';
+        _phoneCtrl.text = '${profile['phone'] ?? ''}';
+        _dateOfBirthCtrl.text = '${profile['dateOfBirth'] ?? profile['date_of_birth'] ?? ''}';
+        _timezoneCtrl.text = '${profile['timezone'] ?? ''}';
+        _localeCtrl.text = '${profile['locale'] ?? ''}';
+        _gender = '${profile['gender'] ?? ''}';
+        _unitSystem = profile['unitSystem'] == 'imperial' || profile['unit_system'] == 'imperial'
+            ? 'imperial'
+            : 'metric';
+        final height = profile['heightCm'] ?? profile['height_cm'];
+        final heightValue = height is num ? height.toDouble() : double.tryParse('$height');
+        if (heightValue != null) {
+          _heightCtrl.text = _unitSystem == 'imperial'
+              ? (heightValue / 2.54).toStringAsFixed(1)
+              : heightValue.toString();
         }
       }
 
       final weightGoal = data['weightGoal'] as Map<String, dynamic>?;
       if (weightGoal != null) {
+        final goal = '${weightGoal['goal_type'] ?? weightGoal['goalType'] ?? ''}';
+        if (['lose_weight', 'gain_weight', 'build_muscle', 'maintain_weight'].contains(goal)) {
+          _goalType = goal;
+        }
         final startW = weightGoal['starting_weight_kg'] ?? weightGoal['start_weight_kg'] ?? weightGoal['startWeightKg'];
-        if (startW != null) {
-          _startWeightCtrl.text = startW.toString();
-        }
+        final startKg = startW is num ? startW.toDouble() : double.tryParse('$startW');
+        if (startKg != null) _startWeightCtrl.text = _displayWeight(startKg);
         final targetW = weightGoal['target_weight_kg'] ?? weightGoal['targetWeightKg'];
-        if (targetW != null) {
-          _targetWeightCtrl.text = targetW.toString();
-        }
-        final targetD = weightGoal['target_date'] ?? weightGoal['targetDate'];
-        if (targetD != null) {
-          _targetDateCtrl.text = targetD.toString();
-        }
+        final targetKg = targetW is num ? targetW.toDouble() : double.tryParse('$targetW');
+        if (targetKg != null) _targetWeightCtrl.text = _displayWeight(targetKg);
+        _goalStartDateCtrl.text = '${weightGoal['start_date'] ?? weightGoal['startDate'] ?? ''}';
+        _targetDateCtrl.text = '${weightGoal['target_date'] ?? weightGoal['targetDate'] ?? ''}';
+        _goalNotesCtrl.text = '${weightGoal['notes'] ?? ''}';
       }
 
       final water = data['waterTarget'] as Map<String, dynamic>?;
@@ -116,7 +161,7 @@ class _FitnessConfigurationScreenState
             .toList();
         _quickAddsCtrl.text = amounts.join(', ');
       } else {
-        _quickAddsCtrl.text = '250, 500, 750, 1000';
+        _quickAddsCtrl.clear();
       }
 
       final cardio = data['cardioTargets'] as List<dynamic>?;
@@ -140,23 +185,41 @@ class _FitnessConfigurationScreenState
 
   Future<void> _saveProfileAndWeight() async {
     try {
-      // 1. Update profile metrics
-      await widget.apiClient.patch('/me', body: {
-        if (_heightCtrl.text.trim().isNotEmpty)
-          'heightCm': double.tryParse(_heightCtrl.text.trim()),
-        'fitnessGoal': _fitnessGoal,
-        'activityLevel': _activityLevel,
-      });
+      final heightInput = double.tryParse(_heightCtrl.text.trim());
+      final startInput = double.tryParse(_startWeightCtrl.text.trim());
+      final targetInput = double.tryParse(_targetWeightCtrl.text.trim());
 
-      // 2. Update weight goal if filled
-      final startW = double.tryParse(_startWeightCtrl.text.trim());
-      final targetW = double.tryParse(_targetWeightCtrl.text.trim());
-      if (startW != null && targetW != null) {
+      // Persist the complete self-service profile.
+      final profileBody = <String, dynamic>{
+        'firstName': _firstNameCtrl.text.trim(),
+        'lastName': _lastNameCtrl.text.trim(),
+        'phone': _phoneCtrl.text.trim().isNotEmpty ? _phoneCtrl.text.trim() : null,
+        'dateOfBirth': _dateOfBirthCtrl.text.trim().isNotEmpty ? _dateOfBirthCtrl.text.trim() : null,
+        if (heightInput != null)
+          'heightCm': _unitSystem == 'imperial' ? heightInput * 2.54 : heightInput,
+        'gender': _gender.isNotEmpty ? _gender : null,
+        'unitSystem': _unitSystem,
+      };
+      if (_timezoneCtrl.text.trim().isNotEmpty) {
+        profileBody['timezone'] = _timezoneCtrl.text.trim();
+      }
+      if (_localeCtrl.text.trim().isNotEmpty) {
+        profileBody['locale'] = _localeCtrl.text.trim();
+      }
+      await widget.apiClient.patch('/me', body: profileBody);
+
+      // Update the goal only when both weights are explicitly provided.
+      if (startInput != null && targetInput != null) {
         await widget.apiClient.put('/me/goals/weight', body: {
-          'startWeightKg': startW,
-          'targetWeightKg': targetW,
+          'goalType': _goalType,
+          'startWeightKg': _unitSystem == 'imperial' ? startInput / 2.20462 : startInput,
+          'targetWeightKg': _unitSystem == 'imperial' ? targetInput / 2.20462 : targetInput,
+          if (_goalStartDateCtrl.text.trim().isNotEmpty)
+            'startDate': _goalStartDateCtrl.text.trim(),
           if (_targetDateCtrl.text.trim().isNotEmpty)
             'targetDate': _targetDateCtrl.text.trim(),
+          if (_goalNotesCtrl.text.trim().isNotEmpty)
+            'notes': _goalNotesCtrl.text.trim(),
         });
       }
 
@@ -213,9 +276,33 @@ class _FitnessConfigurationScreenState
   }
 
   Future<void> _showAddCardioDialog() async {
-    final minCtrl = TextEditingController(text: '30');
-    final freqCtrl = TextEditingController(text: '3');
-    String type = 'running';
+    final minCtrl = TextEditingController();
+    final freqCtrl = TextEditingController();
+    List<dynamic> activities = const [];
+    try {
+      final response = await widget.apiClient.get('/me/cardio/activities');
+      activities = response is Map<String, dynamic> && response['data'] is List<dynamic>
+          ? response['data'] as List<dynamic>
+          : response is List<dynamic>
+              ? response
+              : const [];
+    } catch (_) {
+      if (mounted) {
+        showPremiumSnackBar(context, 'Unable to load cardio activities', isError: true);
+      }
+      return;
+    }
+    if (activities.isEmpty) {
+      if (mounted) {
+        showPremiumSnackBar(context, 'No cardio activities are available', isError: true);
+      }
+      return;
+    }
+
+    int? selectedActivityId = (activities.first is Map)
+        ? (activities.first['id'] as num?)?.toInt()
+        : null;
+    if (!mounted) return;
 
     await showPremiumDialog(
       context: context,
@@ -235,8 +322,8 @@ class _FitnessConfigurationScreenState
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  DropdownButtonFormField<String>(
-                    value: type,
+                  DropdownButtonFormField<int>(
+                    initialValue: selectedActivityId,
                     dropdownColor: colors.surfaceElevated,
                     decoration: InputDecoration(
                       labelText: 'Activity Type',
@@ -248,15 +335,20 @@ class _FitnessConfigurationScreenState
                         borderSide: BorderSide(color: colors.border),
                       ),
                     ),
-                    items: const [
-                      DropdownMenuItem(value: 'running', child: Text('Running / Jogging')),
-                      DropdownMenuItem(value: 'cycling', child: Text('Cycling')),
-                      DropdownMenuItem(value: 'swimming', child: Text('Swimming')),
-                      DropdownMenuItem(value: 'walking', child: Text('Brisk Walking')),
-                      DropdownMenuItem(value: 'rowing', child: Text('Rowing')),
-                    ],
+                    items: activities
+                        .whereType<Map>()
+                        .map((activity) {
+                          final id = (activity['id'] as num?)?.toInt();
+                          if (id == null) return null;
+                          return DropdownMenuItem<int>(
+                            value: id,
+                            child: Text('${activity['name'] ?? 'Cardio activity'}'),
+                          );
+                        })
+                        .whereType<DropdownMenuItem<int>>()
+                        .toList(),
                     onChanged: (val) {
-                      if (val != null) setDialogState(() => type = val);
+                      if (val != null) setDialogState(() => selectedActivityId = val);
                     },
                   ),
                   const SizedBox(height: 12),
@@ -267,7 +359,7 @@ class _FitnessConfigurationScreenState
                   ),
                   const SizedBox(height: 12),
                   PremiumTextField(
-                    label: 'Weekly Frequency (sessions)',
+                    label: 'Weekly Frequency (1-7 sessions)',
                     controller: freqCtrl,
                     keyboardType: TextInputType.number,
                   ),
@@ -282,14 +374,19 @@ class _FitnessConfigurationScreenState
                 PremiumButton(
                   text: 'Add Target',
                   onPressed: () async {
-                    final mins = int.tryParse(minCtrl.text.trim()) ?? 30;
-                    final freq = int.tryParse(freqCtrl.text.trim()) ?? 3;
+                    final mins = int.tryParse(minCtrl.text.trim());
+                    final freq = int.tryParse(freqCtrl.text.trim());
+                    if (selectedActivityId == null || mins == null || mins < 1 || freq == null || freq < 1 || freq > 7) {
+                      showPremiumSnackBar(context, 'Enter a valid activity, duration, and weekly frequency', isError: true);
+                      return;
+                    }
                     Navigator.pop(ctx);
                     try {
                       await widget.apiClient.post('/me/goals/cardio', body: {
-                        'activityName': type,
-                        'targetMinutes': mins,
-                        'frequencyPerWeek': freq,
+                        'cardioActivityId': selectedActivityId,
+                        'minDurationMinutes': mins,
+                        'maxDurationMinutes': mins,
+                        'weekdays': List<int>.generate(freq, (index) => index + 1),
                       });
                       if (mounted) {
                         showPremiumSnackBar(context, 'Cardio goal added');
@@ -344,7 +441,7 @@ class _FitnessConfigurationScreenState
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: category,
+                    initialValue: category,
                     dropdownColor: colors.surfaceElevated,
                     decoration: InputDecoration(
                       labelText: 'Category',
@@ -463,7 +560,7 @@ class _FitnessConfigurationScreenState
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('PHYSICAL METRICS & LEVEL',
+                              Text('PROFILE & PHYSICAL METRICS',
                                   style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w800,
@@ -471,16 +568,37 @@ class _FitnessConfigurationScreenState
                                       color: colors.textSecondary)),
                               const SizedBox(height: 12),
                               PremiumTextField(
-                                label: 'Height (cm)',
+                                label: 'First Name',
+                                controller: _firstNameCtrl,
+                              ),
+                              const SizedBox(height: 12),
+                              PremiumTextField(
+                                label: 'Last Name',
+                                controller: _lastNameCtrl,
+                              ),
+                              const SizedBox(height: 12),
+                              PremiumTextField(
+                                label: 'Phone (optional)',
+                                controller: _phoneCtrl,
+                                keyboardType: TextInputType.phone,
+                              ),
+                              const SizedBox(height: 12),
+                              PremiumTextField(
+                                label: 'Date of Birth (YYYY-MM-DD)',
+                                controller: _dateOfBirthCtrl,
+                              ),
+                              const SizedBox(height: 12),
+                              PremiumTextField(
+                                label: _unitSystem == 'imperial' ? 'Height (inches)' : 'Height (cm)',
                                 controller: _heightCtrl,
                                 keyboardType: TextInputType.number,
                               ),
                               const SizedBox(height: 12),
                               DropdownButtonFormField<String>(
-                                value: _fitnessGoal,
+                                initialValue: _unitSystem,
                                 dropdownColor: colors.surfaceElevated,
                                 decoration: InputDecoration(
-                                  labelText: 'Primary Fitness Goal',
+                                  labelText: 'Unit System',
                                   labelStyle: TextStyle(color: colors.textSecondary),
                                   filled: true,
                                   fillColor: colors.surfaceElevated,
@@ -490,21 +608,19 @@ class _FitnessConfigurationScreenState
                                   ),
                                 ),
                                 items: const [
-                                  DropdownMenuItem(value: 'lose_weight', child: Text('Fat Loss / Weight Reduction')),
-                                  DropdownMenuItem(value: 'build_muscle', child: Text('Hypertrophy / Muscle Gain')),
-                                  DropdownMenuItem(value: 'maintenance', child: Text('Body Recomposition / Maintenance')),
-                                  DropdownMenuItem(value: 'general_fitness', child: Text('General Health & Mobility')),
+                                  DropdownMenuItem(value: 'metric', child: Text('Metric (kg / cm)')),
+                                  DropdownMenuItem(value: 'imperial', child: Text('Imperial (lb / inches)')),
                                 ],
                                 onChanged: (val) {
-                                  if (val != null) setState(() => _fitnessGoal = val);
+                                  if (val != null) _changeUnitSystem(val);
                                 },
                               ),
                               const SizedBox(height: 12),
                               DropdownButtonFormField<String>(
-                                value: _activityLevel,
+                                initialValue: _gender.isEmpty ? null : _gender,
                                 dropdownColor: colors.surfaceElevated,
                                 decoration: InputDecoration(
-                                  labelText: 'Daily Activity Level',
+                                  labelText: 'Gender (optional)',
                                   labelStyle: TextStyle(color: colors.textSecondary),
                                   filled: true,
                                   fillColor: colors.surfaceElevated,
@@ -514,14 +630,26 @@ class _FitnessConfigurationScreenState
                                   ),
                                 ),
                                 items: const [
-                                  DropdownMenuItem(value: 'sedentary', child: Text('Sedentary (Desk Job)')),
-                                  DropdownMenuItem(value: 'lightly_active', child: Text('Lightly Active (1-2 workouts/wk)')),
-                                  DropdownMenuItem(value: 'moderately_active', child: Text('Moderately Active (3-5 workouts/wk)')),
-                                  DropdownMenuItem(value: 'very_active', child: Text('Very Active (6-7 workouts/wk)')),
+                                  DropdownMenuItem(value: 'male', child: Text('Male')),
+                                  DropdownMenuItem(value: 'female', child: Text('Female')),
+                                  DropdownMenuItem(value: 'other', child: Text('Other')),
+                                  DropdownMenuItem(value: 'prefer_not_to_say', child: Text('Prefer not to say')),
                                 ],
                                 onChanged: (val) {
-                                  if (val != null) setState(() => _activityLevel = val);
+                                  setState(() => _gender = val ?? '');
                                 },
+                              ),
+                              const SizedBox(height: 12),
+                              PremiumTextField(
+                                label: 'Timezone (IANA, optional)',
+                                hint: 'e.g. Asia/Beirut',
+                                controller: _timezoneCtrl,
+                              ),
+                              const SizedBox(height: 12),
+                              PremiumTextField(
+                                label: 'Locale (optional)',
+                                hint: 'e.g. en',
+                                controller: _localeCtrl,
                               ),
                             ],
                           ),
@@ -542,7 +670,7 @@ class _FitnessConfigurationScreenState
                                 children: [
                                   Expanded(
                                     child: PremiumTextField(
-                                      label: 'Starting (kg)',
+                                      label: _unitSystem == 'imperial' ? 'Starting (lb)' : 'Starting (kg)',
                                       controller: _startWeightCtrl,
                                       keyboardType: TextInputType.number,
                                     ),
@@ -550,7 +678,7 @@ class _FitnessConfigurationScreenState
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: PremiumTextField(
-                                      label: 'Target (kg)',
+                                      label: _unitSystem == 'imperial' ? 'Target (lb)' : 'Target (kg)',
                                       controller: _targetWeightCtrl,
                                       keyboardType: TextInputType.number,
                                     ),
@@ -558,10 +686,46 @@ class _FitnessConfigurationScreenState
                                 ],
                               ),
                               const SizedBox(height: 12),
+                              DropdownButtonFormField<String>(
+                                initialValue: _goalType,
+                                dropdownColor: colors.surfaceElevated,
+                                decoration: InputDecoration(
+                                  labelText: 'Main Goal Type',
+                                  labelStyle: TextStyle(color: colors.textSecondary),
+                                  filled: true,
+                                  fillColor: colors.surfaceElevated,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(AppRadii.lg),
+                                    borderSide: BorderSide(color: colors.border),
+                                  ),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(value: 'lose_weight', child: Text('Lose Weight')),
+                                  DropdownMenuItem(value: 'gain_weight', child: Text('Gain Weight')),
+                                  DropdownMenuItem(value: 'build_muscle', child: Text('Build Muscle')),
+                                  DropdownMenuItem(value: 'maintain_weight', child: Text('Maintain Weight')),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) setState(() => _goalType = val);
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              PremiumTextField(
+                                label: 'Goal Start Date (YYYY-MM-DD)',
+                                controller: _goalStartDateCtrl,
+                              ),
+                              const SizedBox(height: 12),
                               PremiumTextField(
                                 label: 'Target Date (YYYY-MM-DD)',
                                 hint: 'e.g. 2026-12-31',
                                 controller: _targetDateCtrl,
+                              ),
+                              const SizedBox(height: 12),
+                              PremiumTextField(
+                                label: 'Goal Notes (optional)',
+                                hint: 'Add context or milestones for this goal',
+                                controller: _goalNotesCtrl,
+                                maxLines: 3,
                               ),
                             ],
                           ),

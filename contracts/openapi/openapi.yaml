@@ -163,7 +163,7 @@ paths:
 
   /auth/forgot-password:
     post:
-      summary: Request password reset token (alias)
+      summary: Request an OTP password reset (compatibility alias)
       tags: [Auth]
       requestBody:
         required: true
@@ -175,12 +175,12 @@ paths:
               properties:
                 email: { type: string, format: email }
       responses:
-        '202':
-          description: Reset request accepted
+        '200':
+          description: OTP challenge created
 
   /auth/request-password-reset:
     post:
-      summary: Request password reset token
+      summary: Request an OTP password reset (compatibility alias)
       tags: [Auth]
       requestBody:
         required: true
@@ -192,12 +192,12 @@ paths:
               properties:
                 email: { type: string, format: email }
       responses:
-        '202':
-          description: Reset request accepted
+        '200':
+          description: OTP challenge created
 
   /auth/reset-password:
     post:
-      summary: Reset password with token
+      summary: Verify an OTP password reset (compatibility alias)
       tags: [Auth]
       requestBody:
         required: true
@@ -205,10 +205,11 @@ paths:
           application/json:
             schema:
               type: object
-              required: [token, password]
+              required: [challengeId, otp, newPassword]
               properties:
-                token: { type: string }
-                password: { type: string, minLength: 6 }
+                challengeId: { type: string }
+                otp: { type: string, pattern: '^[0-9]{6}$' }
+                newPassword: { type: string, minLength: 8 }
       responses:
         '200':
           description: Password reset successful
@@ -2490,6 +2491,379 @@ paths:
       responses:
         '200':
           description: Settings updated
+
+  /admin/diet-plans/{id}:
+    patch:
+      tags: [Admin Diet Plans]
+      summary: Update an admin diet plan
+      responses:
+        '200': { description: Diet plan updated }
+    delete:
+      tags: [Admin Diet Plans]
+      summary: Archive an admin diet plan
+      responses:
+        '200': { description: Diet plan archived }
+
+  /exercises:
+    get:
+      tags: [Exercises]
+      summary: List active exercises available to the authenticated user
+      responses:
+        '200': { description: Exercise list }
+
+  /auth/password-reset/request:
+    post:
+      tags: [Authentication]
+      summary: Request an OTP password-reset challenge
+      responses:
+        '200': { description: Enumeration-resistant OTP challenge response }
+
+  /auth/password-reset/verify:
+    post:
+      tags: [Authentication]
+      summary: Verify a password-reset OTP and set the new password
+      responses:
+        '200': { description: Password reset completed }
+
+  /me/fitness-configuration:
+    get:
+      tags: [Self Service]
+      summary: Read the authenticated user's complete fitness configuration
+      responses:
+        '200': { description: Profile, goals, targets, reminders, and active plans }
+
+  /me/goals/cardio:
+    get:
+      tags: [Self Service Goals]
+      summary: List the authenticated user's cardio targets
+      responses:
+        '200': { description: Cardio targets }
+    post:
+      tags: [Self Service Goals]
+      summary: Create a cardio target
+      responses:
+        '201': { description: Cardio target created }
+
+  /me/goals/cardio/{targetId}:
+    delete:
+      tags: [Self Service Goals]
+      summary: Delete an owned cardio target
+      responses:
+        '200': { description: Cardio target deleted }
+
+  /me/goals/weight:
+    put:
+      tags: [Self Service Goals]
+      summary: Replace the authenticated user's weight goal
+      responses:
+        '200': { description: Weight goal saved }
+
+  /me/goals/water:
+    put:
+      tags: [Self Service Goals]
+      summary: Set the authenticated user's water target
+      responses:
+        '200': { description: Water target saved }
+
+  /me/goals/water-quick-add:
+    put:
+      tags: [Self Service Goals]
+      summary: Replace the authenticated user's water quick-add options
+      responses:
+        '200': { description: Quick-add options saved }
+
+  /me/reminders:
+    get:
+      tags: [Self Service]
+      summary: List the authenticated user's reminders
+      responses:
+        '200': { description: Reminder rules }
+    post:
+      tags: [Self Service]
+      summary: Create a reminder for the authenticated user
+      responses:
+        '201': { description: Reminder created }
+
+  /me/reminders/{id}:
+    put:
+      tags: [Self Service]
+      summary: Replace an owned reminder
+      responses:
+        '200': { description: Reminder updated }
+    delete:
+      tags: [Self Service]
+      summary: Delete an owned reminder
+      responses:
+        '200': { description: Reminder deleted }
+
+  /me/security/password-change/request:
+    post:
+      tags: [Security]
+      summary: Send an OTP for an authenticated password change
+      responses:
+        '200': { description: Password-change OTP challenge }
+
+  /me/security/password-change/verify:
+    post:
+      tags: [Security]
+      summary: Verify the password-change OTP and change the password
+      responses:
+        '200': { description: Password changed and sessions revoked }
+
+  /me/security/email-change/request:
+    post:
+      tags: [Security]
+      summary: Send current-email and new-email OTPs
+      responses:
+        '200': { description: Dual email-change OTP challenge }
+
+  /me/security/email-change/verify:
+    post:
+      tags: [Security]
+      summary: Verify both email-change OTPs and update the email
+      responses:
+        '200': { description: Email changed and sessions revoked }
+
+  /me/diet-plans:
+    get:
+      tags: [Self Service Diet Plans]
+      summary: List owned and public diet plans
+      responses:
+        '200': { description: Diet plan list }
+    post:
+      tags: [Self Service Diet Plans]
+      summary: Create a private diet plan from scratch
+      responses:
+        '201': { description: Private diet plan created }
+
+  /me/diet-plans/{id}:
+    get:
+      tags: [Self Service Diet Plans]
+      summary: Get a diet plan with its versions
+      responses:
+        '200': { description: Diet plan details }
+    put:
+      tags: [Self Service Diet Plans]
+      summary: Replace an owned diet plan
+      responses:
+        '200': { description: Diet plan updated }
+    patch:
+      tags: [Self Service Diet Plans]
+      summary: Update an owned diet plan
+      responses:
+        '200': { description: Diet plan updated }
+    delete:
+      tags: [Self Service Diet Plans]
+      summary: Archive an owned diet plan
+      responses:
+        '200': { description: Diet plan archived }
+
+  /me/diet-plans/{id}/clone:
+    post:
+      tags: [Self Service Diet Plans]
+      summary: Clone a visible diet plan into a private draft
+      responses:
+        '201': { description: Private diet plan clone }
+
+  /me/diet-plans/{id}/activate:
+    post:
+      tags: [Self Service Diet Plans]
+      summary: Activate a published diet plan on a selected effective date
+      responses:
+        '200': { description: Assignment created }
+
+  /me/diet-plans/{id}/versions/{versionId}:
+    get:
+      tags: [Self Service Diet Plans]
+      summary: Get a diet version with meals and options
+      responses:
+        '200': { description: Diet version details }
+
+  /me/diet-plans/{id}/versions/{versionId}/publish:
+    post:
+      tags: [Self Service Diet Plans]
+      summary: Publish an owned diet version
+      responses:
+        '200': { description: Diet version published }
+
+  /me/diet-plans/{id}/versions/{versionId}/meals:
+    post:
+      tags: [Self Service Diet Plans]
+      summary: Add a meal to an owned draft diet version
+      responses:
+        '201': { description: Meal created }
+
+  /me/diet-plans/{id}/meals/{mealId}:
+    put:
+      tags: [Self Service Diet Plans]
+      summary: Replace an owned diet meal
+      responses:
+        '200': { description: Meal updated }
+    patch:
+      tags: [Self Service Diet Plans]
+      summary: Update an owned diet meal
+      responses:
+        '200': { description: Meal updated }
+    delete:
+      tags: [Self Service Diet Plans]
+      summary: Delete an owned diet meal
+      responses:
+        '200': { description: Meal deleted }
+
+  /me/diet-plans/{id}/meals/{mealId}/option-groups:
+    post:
+      tags: [Self Service Diet Plans]
+      summary: Add an option group to an owned draft meal
+      responses:
+        '201': { description: Option group created }
+
+  /me/diet-plans/{id}/meals/{mealId}/groups:
+    post:
+      tags: [Self Service Diet Plans]
+      summary: Compatibility alias for adding an option group
+      responses:
+        '201': { description: Option group created }
+
+  /me/diet-plans/{id}/option-groups/{groupId}:
+    put:
+      tags: [Self Service Diet Plans]
+      summary: Update an owned diet option group
+      responses:
+        '200': { description: Option group updated }
+    delete:
+      tags: [Self Service Diet Plans]
+      summary: Delete an owned diet option group
+      responses:
+        '200': { description: Option group deleted }
+
+  /me/diet-plans/{id}/option-groups/{groupId}/options:
+    post:
+      tags: [Self Service Diet Plans]
+      summary: Add a food option to an owned draft group
+      responses:
+        '201': { description: Food option created }
+
+  /me/diet-plans/{id}/options/{optionId}:
+    put:
+      tags: [Self Service Diet Plans]
+      summary: Update an owned diet food option
+      responses:
+        '200': { description: Food option updated }
+    delete:
+      tags: [Self Service Diet Plans]
+      summary: Delete an owned diet food option
+      responses:
+        '200': { description: Food option deleted }
+
+  /me/workout-plans:
+    get:
+      tags: [Self Service Workout Plans]
+      summary: List owned and public workout plans
+      responses:
+        '200': { description: Workout plan list }
+    post:
+      tags: [Self Service Workout Plans]
+      summary: Create a private workout plan from scratch
+      responses:
+        '201': { description: Private workout plan created }
+
+  /me/workout-plans/{id}:
+    get:
+      tags: [Self Service Workout Plans]
+      summary: Get a workout plan with its versions
+      responses:
+        '200': { description: Workout plan details }
+    put:
+      tags: [Self Service Workout Plans]
+      summary: Replace an owned workout plan
+      responses:
+        '200': { description: Workout plan updated }
+    patch:
+      tags: [Self Service Workout Plans]
+      summary: Update an owned workout plan
+      responses:
+        '200': { description: Workout plan updated }
+    delete:
+      tags: [Self Service Workout Plans]
+      summary: Archive an owned workout plan
+      responses:
+        '200': { description: Workout plan archived }
+
+  /me/workout-plans/{id}/clone:
+    post:
+      tags: [Self Service Workout Plans]
+      summary: Clone a visible workout plan into a private draft
+      responses:
+        '201': { description: Private workout plan clone }
+
+  /me/workout-plans/{id}/activate:
+    post:
+      tags: [Self Service Workout Plans]
+      summary: Activate a published workout plan on a selected effective date
+      responses:
+        '200': { description: Assignment created }
+
+  /me/workout-plans/{id}/versions/{versionId}:
+    get:
+      tags: [Self Service Workout Plans]
+      summary: Get a workout version with days and exercises
+      responses:
+        '200': { description: Workout version details }
+
+  /me/workout-plans/{id}/versions/{versionId}/publish:
+    post:
+      tags: [Self Service Workout Plans]
+      summary: Publish an owned workout version
+      responses:
+        '200': { description: Workout version published }
+
+  /me/workout-plans/{id}/versions/{versionId}/days:
+    post:
+      tags: [Self Service Workout Plans]
+      summary: Add a training day to an owned draft version
+      responses:
+        '201': { description: Workout day created }
+
+  /me/workout-plans/{id}/days/{dayId}:
+    put:
+      tags: [Self Service Workout Plans]
+      summary: Replace an owned workout day
+      responses:
+        '200': { description: Workout day updated }
+    patch:
+      tags: [Self Service Workout Plans]
+      summary: Update an owned workout day
+      responses:
+        '200': { description: Workout day updated }
+    delete:
+      tags: [Self Service Workout Plans]
+      summary: Delete an owned workout day
+      responses:
+        '200': { description: Workout day deleted }
+
+  /me/workout-plans/{id}/days/{dayId}/exercises:
+    post:
+      tags: [Self Service Workout Plans]
+      summary: Add an exercise to an owned draft workout day
+      responses:
+        '201': { description: Plan exercise created }
+
+  /me/workout-plans/{id}/exercises/{planExerciseId}:
+    put:
+      tags: [Self Service Workout Plans]
+      summary: Replace an owned plan exercise
+      responses:
+        '200': { description: Plan exercise updated }
+    patch:
+      tags: [Self Service Workout Plans]
+      summary: Update an owned plan exercise
+      responses:
+        '200': { description: Plan exercise updated }
+    delete:
+      tags: [Self Service Workout Plans]
+      summary: Delete an owned plan exercise
+      responses:
+        '200': { description: Plan exercise deleted }
 
 components:
   securitySchemes:

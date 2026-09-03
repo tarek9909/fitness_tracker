@@ -41,16 +41,20 @@ export class WorkoutPlanService {
         createdBy: data.createdBy,
       }, conn);
 
-      // Create 7 days template (Mon-Sun)
-      const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      for (let i = 1; i <= 7; i++) {
-        await this.repo.createDay({
-          workoutPlanVersionId: versionId,
-          weekdayNumber: i,
-          name: dayNames[i - 1],
-          isRestDay: i === 3 || i === 6 || i === 7 ? 1 : 0,
-          orderIndex: i,
-        }, conn);
+      // Private self-service plans start empty so every day and rest-day
+      // choice is explicitly entered by the user. Admin-authored plans keep
+      // the established weekly template for backwards compatibility.
+      if (data.ownerUserId === undefined) {
+        const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        for (let i = 1; i <= 7; i++) {
+          await this.repo.createDay({
+            workoutPlanVersionId: versionId,
+            weekdayNumber: i,
+            name: dayNames[i - 1],
+            isRestDay: i === 3 || i === 6 || i === 7 ? 1 : 0,
+            orderIndex: i,
+          }, conn);
+        }
       }
 
       return planId;
@@ -260,14 +264,14 @@ export class WorkoutPlanService {
   }
 
   async addDay(versionId: number, data: { weekdayNumber: number; name: string; isRestDay?: boolean; notes?: string }) {
-    await this.db.withTransaction(async (conn) => {
+    const dayId = await this.db.withTransaction(async (conn) => {
       const version = await conn.queryOne<any>('SELECT status FROM workout_plan_versions WHERE id = ?', [versionId]);
       if (!version) throw new NotFoundError('Workout plan version not found');
       if (version.status === 'published') {
         throw new ConflictError('Published plan versions are immutable. Create a new version draft to make changes.', 'PLAN_VERSION_IMMUTABLE');
       }
 
-      await conn.execute(
+      const result = await conn.execute(
         `INSERT INTO workout_plan_days (workout_plan_version_id, weekday, name, is_rest_day, notes, day_order)
          VALUES (?, ?, ?, ?, ?, ?)`,
         [
@@ -279,8 +283,18 @@ export class WorkoutPlanService {
           data.weekdayNumber,
         ]
       );
+      return result.insertId;
     });
-    return this.getVersionDetails(versionId);
+    return {
+      id: dayId,
+      workout_plan_version_id: versionId,
+      weekday: data.weekdayNumber,
+      name: data.name,
+      is_rest_day: data.isRestDay ? 1 : 0,
+      notes: data.notes || null,
+      day_order: data.weekdayNumber,
+      exercises: [],
+    };
   }
 
   async updateDay(dayId: number, data: { name?: string; isRestDay?: boolean; notes?: string }) {

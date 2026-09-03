@@ -1190,12 +1190,6 @@ If reps are configured:
 repsMax >= repsMin
 ```
 
-RIR:
-
-```text
-0–10
-```
-
 Rest:
 
 ```text
@@ -1817,7 +1811,6 @@ Rep range
 
 Rest
 
-RIR
 ```
 
 into session records.
@@ -1837,7 +1830,6 @@ Example:
   "setType": "working",
   "weightKg": 100,
   "reps": 12,
-  "rir": 2
 }
 ```
 
@@ -1854,7 +1846,6 @@ Allow:
 ```text
 weight
 reps
-RIR
 ```
 
 ### `reps_only`

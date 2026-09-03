@@ -124,13 +124,15 @@ export class OtpService {
     challengeId: string;
     purpose: OtpPurpose;
     otp: string;
+    expectedUserId?: number;
   }): Promise<{ valid: boolean; userId: number | null; destinationEmail: string }> {
-    const { challengeId, purpose, otp } = options;
+    const { challengeId, purpose, otp, expectedUserId } = options;
     const db = getDatabasePool();
 
     const challenge = await db.queryOne<OtpChallengeRecord>(
-      `SELECT * FROM auth_otp_challenges WHERE id = ? AND purpose = ?`,
-      [challengeId, purpose]
+      `SELECT * FROM auth_otp_challenges
+       WHERE id = ? AND purpose = ?${expectedUserId !== undefined ? ' AND user_id = ?' : ''}`,
+      expectedUserId !== undefined ? [challengeId, purpose, expectedUserId] : [challengeId, purpose]
     );
 
     if (!challenge) {
