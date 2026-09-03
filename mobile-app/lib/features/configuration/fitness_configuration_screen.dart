@@ -72,39 +72,48 @@ class _FitnessConfigurationScreenState
 
       final profile = data['profile'] as Map<String, dynamic>?;
       if (profile != null) {
-        if (profile['height_cm'] != null) {
-          _heightCtrl.text = profile['height_cm'].toString();
+        final height = profile['height_cm'] ?? profile['heightCm'];
+        if (height != null) {
+          _heightCtrl.text = height.toString();
         }
-        if (profile['fitness_goal'] != null) {
-          _fitnessGoal = profile['fitness_goal'].toString();
+        final goal = profile['fitness_goal'] ?? profile['fitnessGoal'];
+        if (goal != null) {
+          _fitnessGoal = goal.toString();
         }
-        if (profile['activity_level'] != null) {
-          _activityLevel = profile['activity_level'].toString();
+        final activity = profile['activity_level'] ?? profile['activityLevel'];
+        if (activity != null) {
+          _activityLevel = activity.toString();
         }
       }
 
       final weightGoal = data['weightGoal'] as Map<String, dynamic>?;
       if (weightGoal != null) {
-        if (weightGoal['starting_weight_kg'] != null) {
-          _startWeightCtrl.text = weightGoal['starting_weight_kg'].toString();
+        final startW = weightGoal['starting_weight_kg'] ?? weightGoal['start_weight_kg'] ?? weightGoal['startWeightKg'];
+        if (startW != null) {
+          _startWeightCtrl.text = startW.toString();
         }
-        if (weightGoal['target_weight_kg'] != null) {
-          _targetWeightCtrl.text = weightGoal['target_weight_kg'].toString();
+        final targetW = weightGoal['target_weight_kg'] ?? weightGoal['targetWeightKg'];
+        if (targetW != null) {
+          _targetWeightCtrl.text = targetW.toString();
         }
-        if (weightGoal['target_date'] != null) {
-          _targetDateCtrl.text = weightGoal['target_date'].toString();
+        final targetD = weightGoal['target_date'] ?? weightGoal['targetDate'];
+        if (targetD != null) {
+          _targetDateCtrl.text = targetD.toString();
         }
       }
 
       final water = data['waterTarget'] as Map<String, dynamic>?;
       if (water != null) {
-        final target = water['daily_target_ml'] ?? water['dailyTargetMl'];
+        final target = water['target_ml'] ?? water['daily_target_ml'] ?? water['dailyTargetMl'] ?? water['targetMl'];
         if (target != null) _waterTargetCtrl.text = target.toString();
       }
 
-      final quickAdds = data['waterQuickAdds'] as List<dynamic>?;
+      final quickAdds = (data['waterQuickAdd'] ?? data['waterQuickAdds']) as List<dynamic>?;
       if (quickAdds != null && quickAdds.isNotEmpty) {
-        final amounts = quickAdds.map((q) => q['amount_ml'] ?? q['amountMl']).toList();
+        final amounts = quickAdds
+            .map((q) => q is Map ? (q['amount_ml'] ?? q['amountMl']) : q)
+            .where((a) => a != null)
+            .toList();
         _quickAddsCtrl.text = amounts.join(', ');
       } else {
         _quickAddsCtrl.text = '250, 500, 750, 1000';

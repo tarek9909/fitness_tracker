@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AuthService } from './auth.service.js';
 import { env } from '../../config/env.js';
 import { generateCsrfToken, setCsrfCookie } from '../../middleware/csrf.js';
+import { recordAuditEvent } from '../../shared/utils/audit-utils.js';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -172,6 +173,9 @@ export class AuthController {
   async passwordResetRequest(request: FastifyRequest, reply: FastifyReply) {
     const body = z.object({ email: z.string().email() }).parse(request.body);
     const result = await this.service.requestPasswordResetOtp(body.email);
+    await recordAuditEvent(request, 'security.password_reset_otp_requested', 'auth_otp_challenge', result.challengeId, {
+      purpose: 'password_reset',
+    });
     return reply.status(200).send({
       success: true,
       data: {
@@ -188,6 +192,9 @@ export class AuthController {
       newPassword: z.string().min(8).max(128),
     }).parse(request.body);
     await this.service.verifyPasswordResetOtp(body.challengeId, body.otp, body.newPassword);
+    await recordAuditEvent(request, 'security.password_reset_completed', 'auth_otp_challenge', body.challengeId, {
+      purpose: 'password_reset',
+    });
     return reply.status(200).send({
       success: true,
       data: { message: 'Password has been successfully reset. Please log in with your new password.' },
@@ -197,6 +204,9 @@ export class AuthController {
   async passwordChangeRequest(request: FastifyRequest, reply: FastifyReply) {
     const userId = (request as any).user.userId;
     const result = await this.service.requestPasswordChangeOtp(userId);
+    await recordAuditEvent(request, 'security.password_change_otp_requested', 'auth_otp_challenge', result.challengeId, {
+      purpose: 'password_change',
+    });
     return reply.status(200).send({
       success: true,
       data: {
@@ -221,6 +231,7 @@ export class AuthController {
       body.currentPassword,
       body.newPassword
     );
+    await recordAuditEvent(request, 'security.password_changed', 'user', userId, { purpose: 'password_change' });
     return reply.status(200).send({
       success: true,
       data: { message: 'Password has been successfully changed.' },
@@ -231,6 +242,10 @@ export class AuthController {
     const userId = (request as any).user.userId;
     const body = z.object({ newEmail: z.string().email() }).parse(request.body);
     const result = await this.service.requestEmailChange(userId, body.newEmail);
+    await recordAuditEvent(request, 'security.email_change_otp_requested', 'user', userId, {
+      purpose: 'email_change',
+      newEmailDomain: body.newEmail.toLowerCase().split('@')[1],
+    });
     return reply.status(200).send({
       success: true,
       data: {
@@ -254,6 +269,10 @@ export class AuthController {
       body.newEmailOtp,
       body.password
     );
+    await recordAuditEvent(request, 'security.email_changed', 'user', userId, {
+      purpose: 'email_change',
+      newEmailDomain: result.email.split('@')[1],
+    });
     return reply.status(200).send({
       success: true,
       data: {

@@ -346,12 +346,16 @@ export class GoalsRepository {
 }
 
 const createWeightGoalSchema = z.object({
-  goalType: z.string().optional().nullable(),
+  goalType: z.enum(['lose_weight', 'gain_weight', 'build_muscle', 'maintain_weight']).optional().nullable(),
   startWeightKg: z.number().min(20).max(500),
   targetWeightKg: z.number().min(20).max(500),
   startDate: z.string().refine(isDateOnly, 'Use YYYY-MM-DD').optional(),
   targetDate: z.string().refine(isDateOnly, 'Use YYYY-MM-DD').optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
+}).superRefine((data, ctx) => {
+  if (data.startDate && data.targetDate && data.targetDate < data.startDate) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['targetDate'], message: 'targetDate cannot be before startDate' });
+  }
 });
 
 const createWaterTargetSchema = z.object({
@@ -418,11 +422,14 @@ export class GoalsController {
     const params = request.params as { userId: string };
     const userId = parsePositiveInt(params.userId, 'userId');
     const body = createWeightGoalSchema.parse(request.body);
+    const user = await this.usersRepo.findById(userId);
+    if (!user) throw new NotFoundError('User not found');
     const id = await this.repo.createWeightGoal({
       userId,
+      goalType: body.goalType,
       startWeightKg: body.startWeightKg,
       targetWeightKg: body.targetWeightKg,
-      startDate: body.startDate,
+      startDate: body.startDate || getUserLocalDate(user.timezone || 'UTC'),
       targetDate: body.targetDate,
       notes: body.notes,
     });

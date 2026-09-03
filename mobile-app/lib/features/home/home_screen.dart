@@ -14,12 +14,16 @@ class HomeScreen extends StatefulWidget {
   final ApiClient apiClient;
   final AuthSession authSession;
   final LocalCache? localCache;
+  final bool showAppBar;
+  final VoidCallback? onOpenProfile;
 
   const HomeScreen({
     super.key,
     required this.apiClient,
     required this.authSession,
     this.localCache,
+    this.showAppBar = true,
+    this.onOpenProfile,
   });
 
   @override
@@ -223,36 +227,148 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = widget.authSession.currentUser;
 
     if (_isLoading) {
-      return PremiumScaffold(
-        body: Center(
-          child: CircularProgressIndicator(color: colors.primary),
-        ),
+      final loadingWidget = Center(
+        child: CircularProgressIndicator(color: colors.primary),
       );
+      return widget.showAppBar
+          ? PremiumScaffold(body: loadingWidget)
+          : loadingWidget;
     }
 
     if (_error != null || _plan == null) {
-      return PremiumScaffold(
-        body: ErrorStateWidget(
-          message: _error ?? 'Could not load daily plan',
-          onRetry: _fetchTodayPlan,
-        ),
+      final errorWidget = ErrorStateWidget(
+        message: _error ?? 'Could not load daily plan',
+        onRetry: _fetchTodayPlan,
       );
+      return widget.showAppBar
+          ? PremiumScaffold(body: errorWidget)
+          : errorWidget;
+    }
+
+    final content = RefreshIndicator(
+      onRefresh: _fetchTodayPlan,
+      color: colors.primary,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_activeSession != null) ...[
+              _buildResumeWorkoutBanner(colors),
+              const SizedBox(height: 16),
+            ],
+            if (_staleMessage != null) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: colors.amberMuted,
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                  border: Border.all(
+                    color: colors.amber.withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Text(
+                  _staleMessage!,
+                  style: TextStyle(
+                    color: colors.amber,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Greeting Section
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _plan!.date,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: colors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Good morning, ${user?.firstName ?? "Alex"}.',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                    color: colors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Overall Daily Progress Card (Adherence Ring with Ambient Glow)
+            _buildAdherenceCard(colors),
+            const SizedBox(height: 20),
+
+            // Weight Journey
+            _buildWeightJourney(colors),
+            const SizedBox(height: 20),
+
+            // Today's Progress Bento
+            _buildProgressBento(colors),
+            const SizedBox(height: 20),
+
+            // Today's Tasks Checklist
+            _buildTasksList(colors),
+            const SizedBox(height: 20),
+
+            // Detailed Workout Card (TRAINING SESSION)
+            _buildWorkoutCard(colors),
+            const SizedBox(height: 16),
+
+            // Detailed Cardio Conditioning Card
+            _buildCardioCard(colors),
+            const SizedBox(height: 16),
+
+            // Meals & Nutrition Detailed Card
+            _buildNutritionCard(colors),
+            const SizedBox(height: 16),
+
+            // Hydration Detailed Card
+            _buildWaterCard(colors),
+            const SizedBox(height: 16),
+
+            // Morning Body Weight Detailed Card
+            _buildWeightCard(colors),
+          ],
+        ),
+      ),
+    );
+
+    if (!widget.showAppBar) {
+      return content;
     }
 
     return PremiumScaffold(
       appBar: PremiumAppBar(
         title: Row(
           children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: colors.surfaceElevated,
-                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-              ),
-              child: ClipOval(
-                child: Icon(Icons.person, size: 20, color: colors.textSecondary),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: widget.onOpenProfile,
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: colors.surfaceElevated,
+                  border:
+                      Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                ),
+                child: ClipOval(
+                  child: Icon(Icons.person,
+                      size: 20, color: colors.textSecondary),
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -281,112 +397,16 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _fetchTodayPlan,
-        color: colors.primary,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_activeSession != null) ...[
-                _buildResumeWorkoutBanner(colors),
-                const SizedBox(height: 16),
-              ],
-              if (_staleMessage != null) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: colors.amberMuted,
-                    borderRadius: BorderRadius.circular(AppRadii.md),
-                    border: Border.all(
-                      color: colors.amber.withValues(alpha: 0.35),
-                    ),
-                  ),
-                  child: Text(
-                    _staleMessage!,
-                    style: TextStyle(
-                      color: colors.amber,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // Greeting Section
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _plan!.date,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: colors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Good morning, ${user?.firstName ?? "Alex"}.',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                      color: colors.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Overall Daily Progress Card (Adherence Ring with Ambient Glow)
-              _buildAdherenceCard(colors),
-              const SizedBox(height: 20),
-
-              // Weight Journey
-              _buildWeightJourney(colors),
-              const SizedBox(height: 20),
-
-              // Today's Progress Bento
-              _buildProgressBento(colors),
-              const SizedBox(height: 20),
-
-              // Today's Tasks Checklist
-              _buildTasksList(colors),
-              const SizedBox(height: 20),
-
-              // Detailed Workout Card (TRAINING SESSION)
-              _buildWorkoutCard(colors),
-              const SizedBox(height: 16),
-
-              // Detailed Cardio Conditioning Card
-              _buildCardioCard(colors),
-              const SizedBox(height: 16),
-
-              // Meals & Nutrition Detailed Card
-              _buildNutritionCard(colors),
-              const SizedBox(height: 16),
-
-              // Hydration Detailed Card
-              _buildWaterCard(colors),
-              const SizedBox(height: 16),
-
-              // Morning Body Weight Detailed Card
-              _buildWeightCard(colors),
-            ],
-          ),
-        ),
-      ),
+      body: content,
     );
   }
 
   Widget _buildResumeWorkoutBanner(AppThemeColors colors) {
     final sessionName =
         _activeSession['workout_name_snapshot'] as String? ?? 'Workout Session';
-    final sessionId = _activeSession['id'] as int;
+    final sessionId = (_activeSession['id'] is num)
+        ? (_activeSession['id'] as num).toInt()
+        : int.tryParse(_activeSession['id']?.toString() ?? '0') ?? 0;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -758,6 +778,18 @@ class _HomeScreenState extends State<HomeScreen> {
             (m) => m['log'] != null && m['log']['status'] == 'completed')
         .length;
     final cardio = _plan!.cardio;
+    final cardioTarget = cardio['target'] is Map ? cardio['target'] : null;
+    final num targetCardioMinutes = num.tryParse((cardio['targetMinutes'] ??
+            cardio['target_minutes'] ??
+            cardioTarget?['min_duration_minutes'] ??
+            cardioTarget?['target_minutes_min'] ??
+            0)
+        .toString()) ?? 0;
+    final num completedCardioMinutes = num.tryParse((cardio['completedMinutes'] ??
+            cardio['completed_minutes'] ??
+            cardio['totalMinutes'] ??
+            0)
+        .toString()) ?? 0;
     final water = _plan!.water;
 
     return Column(
@@ -911,7 +943,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${cardio['completedMinutes'] ?? cardio['completed_minutes'] ?? 0}/${cardio['targetMinutes'] ?? cardio['target_minutes'] ?? 0}m',
+                      '${completedCardioMinutes.toInt()}/${targetCardioMinutes.toInt()}m',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
@@ -919,9 +951,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     Text(
-                      ((cardio['completedMinutes'] ?? cardio['completed_minutes'] ?? 0) as num) >=
-                              ((cardio['targetMinutes'] ?? cardio['target_minutes'] ?? 0) as num) &&
-                          ((cardio['targetMinutes'] ?? cardio['target_minutes'] ?? 0) as num) > 0
+                      completedCardioMinutes >= targetCardioMinutes && targetCardioMinutes > 0
                           ? 'Goal completed'
                           : 'In progress...',
                       style: TextStyle(fontSize: 11, color: colors.cyan),
@@ -1226,13 +1256,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildCardioCard(AppThemeColors colors) {
     final cardio = _plan!.cardio;
-    final targetMinutes = cardio['targetMinutes'] ?? cardio['target_minutes'];
-    final completedMinutes = cardio['completedMinutes'] ??
-        cardio['completed_minutes'] ??
-        cardio['totalMinutes'] ??
-        0;
-    final activityName =
-        cardio['activityName'] ?? cardio['activity_name'] ?? 'Cardio Session';
+    final cardioTarget = cardio['target'] is Map ? cardio['target'] : null;
+    final num? targetMinutes = num.tryParse((cardio['targetMinutes'] ??
+            cardio['target_minutes'] ??
+            cardioTarget?['min_duration_minutes'] ??
+            cardioTarget?['target_minutes_min'] ??
+            '')
+        .toString());
+    final num completedMinutes = num.tryParse((cardio['completedMinutes'] ??
+            cardio['completed_minutes'] ??
+            cardio['totalMinutes'] ??
+            0)
+        .toString()) ?? 0;
+    final activityName = (cardio['activityName'] ??
+            cardio['activity_name'] ??
+            cardioTarget?['activity_name'] ??
+            'Cardio Session')
+        .toString();
     final hasTarget = targetMinutes != null && targetMinutes > 0;
     final isDone = hasTarget && completedMinutes >= targetMinutes;
 
@@ -1271,7 +1311,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: StatusBadge(
                     label: isDone
                         ? 'Goal Met'
-                        : '$completedMinutes / $targetMinutes min',
+                        : '${completedMinutes.toInt()} / ${targetMinutes.toInt()} min',
                     color: isDone ? colors.primary : colors.rose,
                   ),
                 ),

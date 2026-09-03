@@ -36,6 +36,20 @@ class EmailService {
     }
   }
 
+  async verifyTransport(): Promise<boolean> {
+    if (env.emailProvider === 'none') {
+      throw new ValidationError('Email delivery provider is not configured on this environment.');
+    }
+    if (env.emailProvider === 'mock' || env.nodeEnv === 'test') {
+      return true;
+    }
+    if (!this.transporter) {
+      throw new ValidationError('SMTP transport is not configured.');
+    }
+    await this.transporter.verify();
+    return true;
+  }
+
   async sendPasswordResetEmail(email: string, token: string): Promise<void> {
     if (env.emailProvider === 'none') {
       throw new ValidationError('Password reset email delivery provider is not configured on this environment.');

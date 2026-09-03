@@ -64,7 +64,7 @@ class DailyWaterModel {
   final int targetMl;
   final int remainingMl;
   final int completionPercent;
-  final List<dynamic> quickAdds;
+  final List<int> quickAdds;
 
   DailyWaterModel({
     required this.totalMl,
@@ -75,12 +75,34 @@ class DailyWaterModel {
   });
 
   factory DailyWaterModel.fromJson(Map<String, dynamic> json) {
+    final rawQuickAdds = json['quickAdds'] as List<dynamic>? ?? [];
+    final parsedQuickAdds = <int>[];
+    for (final q in rawQuickAdds) {
+      if (q is int) {
+        parsedQuickAdds.add(q);
+      } else if (q is num) {
+        parsedQuickAdds.add(q.toInt());
+      } else if (q is Map) {
+        final amt = q['amount_ml'] ?? q['amountMl'];
+        if (amt is num) {
+          parsedQuickAdds.add(amt.toInt());
+        } else if (amt is String) {
+          final parsed = int.tryParse(amt);
+          if (parsed != null) parsedQuickAdds.add(parsed);
+        }
+      }
+    }
+    final rawTotal = json['totalMl'] ?? json['total_water_ml'] ?? 0;
+    final rawTarget = json['targetMl'] ?? json['target_ml'] ?? 0;
+    final rawRem = json['remainingMl'] ?? 0;
+    final rawPct = json['completionPercent'] ?? 0;
+
     return DailyWaterModel(
-      totalMl: json['totalMl'] ?? json['total_water_ml'] ?? 0,
-      targetMl: json['targetMl'] ?? json['target_ml'] ?? 0,
-      remainingMl: json['remainingMl'] ?? 0,
-      completionPercent: json['completionPercent'] ?? 0,
-      quickAdds: json['quickAdds'] ?? [],
+      totalMl: rawTotal is num ? rawTotal.toInt() : (int.tryParse(rawTotal.toString()) ?? 0),
+      targetMl: rawTarget is num ? rawTarget.toInt() : (int.tryParse(rawTarget.toString()) ?? 0),
+      remainingMl: rawRem is num ? rawRem.toInt() : (int.tryParse(rawRem.toString()) ?? 0),
+      completionPercent: rawPct is num ? rawPct.toInt() : (int.tryParse(rawPct.toString()) ?? 0),
+      quickAdds: parsedQuickAdds,
     );
   }
 }
@@ -97,11 +119,13 @@ class DailyWeightModel {
   });
 
   factory DailyWeightModel.fromJson(Map<String, dynamic> json) {
+    final rawCurrent = json['current'];
     return DailyWeightModel(
-      current:
-          json['current'] != null ? (json['current'] as num).toDouble() : null,
-      logged: json['logged'] ?? false,
-      goal: json['goal'],
+      current: rawCurrent != null
+          ? (rawCurrent is num ? rawCurrent.toDouble() : double.tryParse(rawCurrent.toString()))
+          : null,
+      logged: json['logged'] == true || json['logged'] == 1,
+      goal: json['goal'] is Map ? Map<String, dynamic>.from(json['goal']) : null,
     );
   }
 }
@@ -139,33 +163,40 @@ class DailyPlanModel {
     final summary = json['summary'] != null
         ? Map<String, dynamic>.from(json['summary'])
         : <String, dynamic>{};
-    final taskList = (json['tasks'] as List<dynamic>? ?? [])
+    final rawTasks = json['tasks'] as List<dynamic>? ?? [];
+    final taskList = rawTasks
+        .whereType<Map>()
         .map((t) => DailyTaskModel.fromJson(Map<String, dynamic>.from(t)))
         .toList();
 
+    final rawWeekday = json['weekday'] ?? 1;
+    final rawCompTasks = summary['completedTasks'] ?? 0;
+    final rawTotalTasks = summary['totalTasks'] ?? 0;
+    final rawAdherence = summary['overallAdherencePct'] ?? 0;
+
     return DailyPlanModel(
-      date: json['date'] ?? '',
-      weekday: json['weekday'] ?? 1,
-      timezone: json['timezone'] ?? 'UTC',
-      weight: DailyWeightModel.fromJson(json['weight'] != null
+      date: json['date']?.toString() ?? '',
+      weekday: rawWeekday is num ? rawWeekday.toInt() : (int.tryParse(rawWeekday.toString()) ?? 1),
+      timezone: json['timezone']?.toString() ?? 'UTC',
+      weight: DailyWeightModel.fromJson(json['weight'] is Map
           ? Map<String, dynamic>.from(json['weight'])
           : {}),
-      water: DailyWaterModel.fromJson(json['water'] != null
+      water: DailyWaterModel.fromJson(json['water'] is Map
           ? Map<String, dynamic>.from(json['water'])
           : {}),
-      diet: json['diet'] != null
+      diet: json['diet'] is Map
           ? Map<String, dynamic>.from(json['diet'])
           : <String, dynamic>{},
-      workout: json['workout'] != null
+      workout: json['workout'] is Map
           ? Map<String, dynamic>.from(json['workout'])
           : null,
-      cardio: json['cardio'] != null
+      cardio: json['cardio'] is Map
           ? Map<String, dynamic>.from(json['cardio'])
           : <String, dynamic>{},
       tasks: taskList,
-      completedTasks: summary['completedTasks'] ?? 0,
-      totalTasks: summary['totalTasks'] ?? 0,
-      overallAdherencePct: summary['overallAdherencePct'] ?? 0,
+      completedTasks: rawCompTasks is num ? rawCompTasks.toInt() : (int.tryParse(rawCompTasks.toString()) ?? 0),
+      totalTasks: rawTotalTasks is num ? rawTotalTasks.toInt() : (int.tryParse(rawTotalTasks.toString()) ?? 0),
+      overallAdherencePct: rawAdherence is num ? rawAdherence.toInt() : (int.tryParse(rawAdherence.toString()) ?? 0),
     );
   }
 }

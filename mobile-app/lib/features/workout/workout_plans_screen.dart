@@ -408,6 +408,35 @@ class _WorkoutPlanDetailScreenState extends State<WorkoutPlanDetailScreen> {
   String? _errorMessage;
   Map<String, dynamic>? _plan;
 
+  Map<String, dynamic>? _normalisePlan(Map<String, dynamic>? data) {
+    if (data == null) return null;
+    final normalized = Map<String, dynamic>.from(data);
+    if (normalized['version'] is Map<String, dynamic> ||
+        normalized['currentVersion'] is Map<String, dynamic>) {
+      return normalized;
+    }
+    final versions = normalized['versions'] as List<dynamic>? ?? const [];
+    Map<String, dynamic>? selected;
+    for (final raw in versions) {
+      if (raw is! Map) continue;
+      final version = Map<String, dynamic>.from(raw);
+      selected ??= version;
+      if (version['status'] == 'draft') {
+        selected = version;
+        break;
+      }
+    }
+    normalized['version'] = selected;
+    return normalized;
+  }
+
+  int? get _currentVersionId {
+    final version = _plan?['version'] as Map<String, dynamic>? ??
+        _plan?['currentVersion'] as Map<String, dynamic>?;
+    final value = version?['id'];
+    return value is int ? value : int.tryParse('$value');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -427,7 +456,7 @@ class _WorkoutPlanDetailScreenState extends State<WorkoutPlanDetailScreen> {
           ? res['data'] as Map<String, dynamic>
           : (res is Map<String, dynamic> ? res : null);
       setState(() {
-        _plan = data;
+        _plan = _normalisePlan(data);
         _isLoading = false;
       });
     } catch (e) {
@@ -441,9 +470,13 @@ class _WorkoutPlanDetailScreenState extends State<WorkoutPlanDetailScreen> {
   }
 
   Future<void> _activatePlan() async {
+    final selectedDate = await _pickEffectiveDate();
+    if (selectedDate == null) return;
     try {
-      await widget.apiClient
-          .post('/me/workout-plans/${widget.planId}/activate');
+      await widget.apiClient.post(
+        '/me/workout-plans/${widget.planId}/activate',
+        body: {'effectiveFrom': selectedDate},
+      );
       if (mounted) {
         showPremiumSnackBar(context, 'Plan activated as your current agenda');
         _loadPlanDetails();
@@ -460,9 +493,11 @@ class _WorkoutPlanDetailScreenState extends State<WorkoutPlanDetailScreen> {
   }
 
   Future<void> _publishVersion() async {
+    final versionId = _currentVersionId;
+    if (versionId == null) return;
     try {
-      await widget.apiClient
-          .post('/me/workout-plans/${widget.planId}/publish');
+      await widget.apiClient.post(
+          '/me/workout-plans/${widget.planId}/versions/$versionId/publish');
       if (mounted) {
         showPremiumSnackBar(
             context, 'Version published! You can now activate this plan.');
@@ -477,6 +512,19 @@ class _WorkoutPlanDetailScreenState extends State<WorkoutPlanDetailScreen> {
         );
       }
     }
+  }
+
+  Future<String?> _pickEffectiveDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 5),
+    );
+    if (picked == null) return null;
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${picked.year}-${two(picked.month)}-${two(picked.day)}';
   }
 
   Future<void> _clonePlan() async {
@@ -598,11 +646,13 @@ class _WorkoutPlanDetailScreenState extends State<WorkoutPlanDetailScreen> {
                     if (name.isEmpty) return;
                     Navigator.pop(ctx);
                     try {
+                      final versionId = _currentVersionId;
+                      if (versionId == null) return;
                       await widget.apiClient.post(
-                        '/me/workout-plans/${widget.planId}/days',
+                        '/me/workout-plans/${widget.planId}/versions/$versionId/days',
                         body: {
                           'name': name,
-                          'weekday': selectedWeekday,
+                          'weekdayNumber': selectedWeekday,
                         },
                       );
                       if (mounted) {

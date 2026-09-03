@@ -22,6 +22,7 @@ export interface EnvConfig {
   refreshTokenSecret: string;
   refreshTokenTtlDays: number;
   cookieSecret: string;
+  otpPepper: string;
   cookieSameSite: 'strict' | 'lax';
   adminAllowedOrigins: string[];
   logLevel: string;
@@ -172,8 +173,12 @@ export function validateAndLoadEnv(source: Record<string, string | undefined> = 
   const accessTokenSecret = source.ACCESS_TOKEN_SECRET || defaultDevAccessSecret;
   const refreshTokenSecret = source.REFRESH_TOKEN_SECRET || defaultDevRefreshSecret;
   const cookieSecret = source.COOKIE_SECRET || defaultDevCookieSecret;
+  const otpPepper = source.OTP_PEPPER || 'development-only-otp-pepper-change-me';
 
   if (nodeEnvValue === 'production') {
+    if (isBlankValue(source.OTP_PEPPER) || isPlaceholderValue(source.OTP_PEPPER) || otpPepper.length < 32) {
+      throw new Error('FATAL: OTP_PEPPER must be set to a secure 32+ character non-default secret in production');
+    }
     if (isBlankValue(source.ACCESS_TOKEN_SECRET)) {
       throw new Error('FATAL: ACCESS_TOKEN_SECRET must be set to a secure 32+ character non-default secret in production');
     }
@@ -346,6 +351,7 @@ export function validateAndLoadEnv(source: Record<string, string | undefined> = 
     refreshTokenSecret,
     refreshTokenTtlDays,
     cookieSecret,
+    otpPepper,
     cookieSameSite,
     adminAllowedOrigins,
     logLevel: source.LOG_LEVEL || 'info',

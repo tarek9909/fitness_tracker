@@ -16,6 +16,7 @@ describe('Production Environment Configuration & Validation Suite', () => {
     SMTP_USER: 'smtp_user',
     SMTP_PASSWORD: 'smtp_password',
     SMTP_FROM: 'noreply@fitnessplatform.com',
+    OTP_PEPPER: 'production-otp-pepper-secret-64-characters-long-key-abc123',
     ACCESS_TOKEN_SECRET: 'production-access-token-secret-64-characters-long-key-abc123456789',
     REFRESH_TOKEN_SECRET: 'production-refresh-token-secret-64-characters-long-key-xyz987654321',
     COOKIE_SECRET: 'production-cookie-signing-secret-64-characters-long-key-qwe123456',

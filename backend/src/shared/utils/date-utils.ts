@@ -56,3 +56,12 @@ export function formatDateToIso(d: Date | string | null | undefined): string | n
   if (typeof d === 'string') return d;
   return d.toISOString();
 }
+
+export function shiftDate(dateStr: string, days: number): string {
+  const date = new Date(`${dateStr}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid date: ${dateStr}`);
+  }
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}

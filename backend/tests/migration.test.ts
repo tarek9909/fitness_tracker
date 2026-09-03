@@ -122,6 +122,38 @@ describe('Legacy Schema Migration & Data Backfill Test Suite', () => {
           )
         `);
 
+        // Legacy workout tables containing the removed RIR fields. The
+        // migration must drop only those fields and preserve the row.
+        legacyDb.run(`
+          CREATE TABLE workout_plan_exercises (
+            id INTEGER PRIMARY KEY,
+            target_sets INTEGER NOT NULL,
+            rir_target INTEGER NULL
+          )
+        `);
+        legacyDb.run(`
+          CREATE TABLE workout_plan_exercise_sets (
+            id INTEGER PRIMARY KEY,
+            set_number INTEGER NOT NULL,
+            rir_target INTEGER NULL
+          )
+        `);
+        legacyDb.run(`
+          CREATE TABLE workout_session_exercises (
+            id INTEGER PRIMARY KEY,
+            exercise_id INTEGER NOT NULL,
+            planned_rir_snapshot INTEGER NULL
+          )
+        `);
+        legacyDb.run(`
+          CREATE TABLE workout_sets (
+            id INTEGER PRIMARY KEY,
+            set_number INTEGER NOT NULL,
+            weight_kg REAL NULL,
+            rir INTEGER NULL
+          )
+        `);
+
         // Insert legacy test fixtures
         legacyDb.run(`
           INSERT INTO workout_sessions (id, user_id, session_date, status)
@@ -146,7 +178,11 @@ describe('Legacy Schema Migration & Data Backfill Test Suite', () => {
         legacyDb.run(`
           INSERT INTO notifications (id, user_id, category, notification_type, title, body, is_read)
           VALUES (1, 10, 'system', 'reminder', 'Drink Water', 'Time to hydrate athlete!', 1)
-        `, (err) => {
+        `);
+        legacyDb.run(`INSERT INTO workout_plan_exercises (id, target_sets, rir_target) VALUES (1, 3, 2)`);
+        legacyDb.run(`INSERT INTO workout_plan_exercise_sets (id, set_number, rir_target) VALUES (1, 1, 2)`);
+        legacyDb.run(`INSERT INTO workout_session_exercises (id, exercise_id, planned_rir_snapshot) VALUES (1, 9, 2)`);
+        legacyDb.run(`INSERT INTO workout_sets (id, set_number, weight_kg, rir) VALUES (1, 1, 80, 2)`, (err) => {
           if (err) reject(err);
           else resolve();
         });
@@ -203,6 +239,17 @@ describe('Legacy Schema Migration & Data Backfill Test Suite', () => {
     expect(notif).toBeDefined();
     expect(notif.message).toBe('Time to hydrate athlete!');
     expect(notif.status).toBe('read');
+
+    const rirColumns = await queryOne(`
+      SELECT COUNT(*) as count FROM pragma_table_info('workout_plan_exercises') WHERE name = 'rir_target'
+    `);
+    expect(rirColumns.count).toBe(0);
+    const preservedExercise = await queryOne('SELECT target_sets FROM workout_plan_exercises WHERE id = 1');
+    expect(preservedExercise.target_sets).toBe(3);
+    const setRirColumns = await queryOne(`
+      SELECT COUNT(*) as count FROM pragma_table_info('workout_sets') WHERE name = 'rir'
+    `);
+    expect(setRirColumns.count).toBe(0);
 
     await new Promise<void>((resolve, reject) => {
       verifyDb.close((err) => (err ? reject(err) : resolve()));

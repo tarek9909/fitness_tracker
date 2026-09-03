@@ -33,9 +33,9 @@ export class DietPlanRepository {
     name: string;
     description?: string | null;
     dailyCaloriesTarget?: number | null;
-    proteinGramsTarget?: number | null;
-    carbsGramsTarget?: number | null;
-    fatGramsTarget?: number | null;
+    dailyProteinTargetG?: number | null;
+    dailyCarbsTargetG?: number | null;
+    dailyFatTargetG?: number | null;
     createdBy?: number | null;
     ownerUserId?: number | null;
     visibility?: string;

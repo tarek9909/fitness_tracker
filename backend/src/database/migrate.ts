@@ -88,6 +88,24 @@ async function ensureColumnExists(
   }
 }
 
+async function mysqlColumnExists(db: DatabasePool, tableName: string, columnName: string): Promise<boolean> {
+  const result = await db.queryOne<{ count: number }>(
+    `SELECT COUNT(*) as count FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+    [tableName, columnName]
+  );
+  return (result?.count || 0) > 0;
+}
+
+async function mysqlConstraintExists(db: DatabasePool, tableName: string, constraintName: string): Promise<boolean> {
+  const result = await db.queryOne<{ count: number }>(
+    `SELECT COUNT(*) as count FROM information_schema.TABLE_CONSTRAINTS
+     WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_NAME = ?`,
+    [tableName, constraintName]
+  );
+  return (result?.count || 0) > 0;
+}
+
 export function getScheduledAtBackfillExpr(client: 'sqlite' | 'mysql' = env.dbClient): string {
   if (client === 'mysql') {
     return 'TIMESTAMP(task_date, scheduled_time)';
@@ -614,28 +632,26 @@ const migrations: Migration[] = [
           await db.execute(`ALTER TABLE workout_sets DROP COLUMN rir`);
         }
       } else {
-        // MySQL dialect: drop check constraints and columns if present
-        try {
+        // MySQL dialect: inspect before each DDL operation so migration failures
+        // are not hidden by broad exception handling.
+        if (await mysqlConstraintExists(db, 'workout_plan_exercises', 'chk_workout_rir')) {
           await db.execute(`ALTER TABLE workout_plan_exercises DROP CHECK chk_workout_rir`);
-        } catch { /* constraint may not exist */ }
-        try {
+        }
+        if (await mysqlColumnExists(db, 'workout_plan_exercises', 'rir_target')) {
           await db.execute(`ALTER TABLE workout_plan_exercises DROP COLUMN rir_target`);
-        } catch { /* column may already be dropped */ }
-
-        try {
+        }
+        if (await mysqlColumnExists(db, 'workout_plan_exercise_sets', 'rir_target')) {
           await db.execute(`ALTER TABLE workout_plan_exercise_sets DROP COLUMN rir_target`);
-        } catch { /* column may already be dropped */ }
-
-        try {
+        }
+        if (await mysqlColumnExists(db, 'workout_session_exercises', 'planned_rir_snapshot')) {
           await db.execute(`ALTER TABLE workout_session_exercises DROP COLUMN planned_rir_snapshot`);
-        } catch { /* column may already be dropped */ }
-
-        try {
+        }
+        if (await mysqlConstraintExists(db, 'workout_sets', 'chk_workout_set_rir')) {
           await db.execute(`ALTER TABLE workout_sets DROP CHECK chk_workout_set_rir`);
-        } catch { /* constraint may not exist */ }
-        try {
+        }
+        if (await mysqlColumnExists(db, 'workout_sets', 'rir')) {
           await db.execute(`ALTER TABLE workout_sets DROP COLUMN rir`);
-        } catch { /* column may already be dropped */ }
+        }
       }
     },
   },

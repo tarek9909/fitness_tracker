@@ -170,10 +170,10 @@ class _DietPlansScreenState extends State<DietPlansScreen> {
                         'description': descCtrl.text.trim().isNotEmpty
                             ? descCtrl.text.trim()
                             : null,
-                        'targetCalories': int.tryParse(calCtrl.text.trim()),
-                        'targetProteinG': int.tryParse(proCtrl.text.trim()),
-                        'targetCarbsG': int.tryParse(carbCtrl.text.trim()),
-                        'targetFatsG': int.tryParse(fatCtrl.text.trim()),
+                        'dailyCaloriesTarget': int.tryParse(calCtrl.text.trim()),
+                        'dailyProteinTargetG': int.tryParse(proCtrl.text.trim()),
+                        'dailyCarbsTargetG': int.tryParse(carbCtrl.text.trim()),
+                        'dailyFatTargetG': int.tryParse(fatCtrl.text.trim()),
                       });
                       if (mounted) {
                         showPremiumSnackBar(
@@ -448,6 +448,35 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
   String? _errorMessage;
   Map<String, dynamic>? _plan;
 
+  Map<String, dynamic>? _normalisePlan(Map<String, dynamic>? data) {
+    if (data == null) return null;
+    final normalized = Map<String, dynamic>.from(data);
+    if (normalized['version'] is Map<String, dynamic> ||
+        normalized['currentVersion'] is Map<String, dynamic>) {
+      return normalized;
+    }
+    final versions = normalized['versions'] as List<dynamic>? ?? const [];
+    Map<String, dynamic>? selected;
+    for (final raw in versions) {
+      if (raw is! Map) continue;
+      final version = Map<String, dynamic>.from(raw);
+      selected ??= version;
+      if (version['status'] == 'draft') {
+        selected = version;
+        break;
+      }
+    }
+    normalized['version'] = selected;
+    return normalized;
+  }
+
+  int? get _currentVersionId {
+    final version = _plan?['version'] as Map<String, dynamic>? ??
+        _plan?['currentVersion'] as Map<String, dynamic>?;
+    final value = version?['id'];
+    return value is int ? value : int.tryParse('$value');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -466,7 +495,7 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
           ? res['data'] as Map<String, dynamic>
           : (res is Map<String, dynamic> ? res : null);
       setState(() {
-        _plan = data;
+        _plan = _normalisePlan(data);
         _isLoading = false;
       });
     } catch (e) {
@@ -480,8 +509,13 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
   }
 
   Future<void> _activatePlan() async {
+    final selectedDate = await _pickEffectiveDate();
+    if (selectedDate == null) return;
     try {
-      await widget.apiClient.post('/me/diet-plans/${widget.planId}/activate');
+      await widget.apiClient.post(
+        '/me/diet-plans/${widget.planId}/activate',
+        body: {'effectiveFrom': selectedDate},
+      );
       if (mounted) {
         showPremiumSnackBar(context, 'Diet plan activated as your current agenda');
         _loadPlanDetails();
@@ -498,8 +532,11 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
   }
 
   Future<void> _publishVersion() async {
+    final versionId = _currentVersionId;
+    if (versionId == null) return;
     try {
-      await widget.apiClient.post('/me/diet-plans/${widget.planId}/publish');
+      await widget.apiClient.post(
+          '/me/diet-plans/${widget.planId}/versions/$versionId/publish');
       if (mounted) {
         showPremiumSnackBar(
             context, 'Diet version published! You can now activate this plan.');
@@ -514,6 +551,19 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
         );
       }
     }
+  }
+
+  Future<String?> _pickEffectiveDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 5),
+    );
+    if (picked == null) return null;
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${picked.year}-${two(picked.month)}-${two(picked.day)}';
   }
 
   Future<void> _clonePlan() async {
@@ -553,7 +603,6 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
   Future<void> _showAddMealDialog() async {
     final nameCtrl = TextEditingController();
     final timeCtrl = TextEditingController(text: '08:00');
-    final calCtrl = TextEditingController(text: '500');
 
     await showPremiumDialog(
       context: context,
@@ -586,12 +635,6 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
                 label: 'Suggested Time (HH:MM)',
                 controller: timeCtrl,
               ),
-              const SizedBox(height: 12),
-              PremiumTextField(
-                label: 'Target Calories (kcal)',
-                controller: calCtrl,
-                keyboardType: TextInputType.number,
-              ),
             ],
           ),
           actions: [
@@ -607,14 +650,15 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
                 if (name.isEmpty) return;
                 Navigator.pop(ctx);
                 try {
+                  final versionId = _currentVersionId;
+                  if (versionId == null) return;
                   await widget.apiClient.post(
-                    '/me/diet-plans/${widget.planId}/meals',
+                    '/me/diet-plans/${widget.planId}/versions/$versionId/meals',
                     body: {
                       'name': name,
-                      'mealTime': timeCtrl.text.trim().isNotEmpty
+                      'scheduledTime': timeCtrl.text.trim().isNotEmpty
                           ? timeCtrl.text.trim()
                           : null,
-                      'targetCalories': int.tryParse(calCtrl.text.trim()),
                     },
                   );
                   if (mounted) {
@@ -679,7 +723,12 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
                 try {
                   await widget.apiClient.post(
                     '/me/diet-plans/${widget.planId}/meals/$mealId/groups',
-                    body: {'name': name, 'selectionType': 'single'},
+                    body: {
+                      'name': name,
+                      'isRequired': false,
+                      'minSelections': 0,
+                      'maxSelections': 1,
+                    },
                   );
                   if (mounted) {
                     showPremiumSnackBar(context, 'Option group added');
@@ -707,7 +756,6 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
     bool loadingFoods = true;
     int? selectedFoodId;
     final portionCtrl = TextEditingController(text: '100');
-    final unitCtrl = TextEditingController(text: 'g');
 
     try {
       final res = await widget.apiClient.get('/foods');
@@ -796,13 +844,6 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
                             keyboardType: TextInputType.number,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: PremiumTextField(
-                            label: 'Unit',
-                            controller: unitCtrl,
-                          ),
-                        ),
                       ],
                     ),
                   ],
@@ -820,16 +861,22 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
                     if (selectedFoodId == null) return;
                     final portion =
                         double.tryParse(portionCtrl.text.trim()) ?? 100.0;
-                    final unit = unitCtrl.text.trim();
+                    final selectedFood = foodCatalog.cast<dynamic>().firstWhere(
+                      (food) => food is Map && food['id'] == selectedFoodId,
+                      orElse: () => null,
+                    );
+                    final servingUnitId = selectedFood is Map
+                        ? selectedFood['measurement_unit_id'] as int?
+                        : null;
 
                     Navigator.pop(ctx);
                     try {
                       await widget.apiClient.post(
-                        '/me/diet-plans/${widget.planId}/groups/$groupId/options',
+                        '/me/diet-plans/${widget.planId}/option-groups/$groupId/options',
                         body: {
                           'foodId': selectedFoodId,
-                          'servingAmount': portion,
-                          'servingUnit': unit.isNotEmpty ? unit : 'g',
+                          'servingQuantity': portion,
+                          if (servingUnitId != null) 'servingUnitId': servingUnitId,
                         },
                       );
                       if (mounted) {

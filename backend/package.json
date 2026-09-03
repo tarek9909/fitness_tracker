@@ -17,6 +17,7 @@
     "worker:reminders": "tsx src/workers/reminder.worker.ts",
     "start:worker": "node dist/workers/reminder.worker.js",
     "verify:mysql": "tsx src/scripts/verify-mysql-connection.ts",
+    "verify:smtp": "tsx src/scripts/verify-smtp.ts",
     "db": "tsx src/database/init-db.ts",
     "db:init": "tsx src/database/init-db.ts",
     "db:prod": "node dist/database/init-db.js",

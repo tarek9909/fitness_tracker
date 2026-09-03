@@ -4,6 +4,7 @@ import { getDatabasePool } from '../../database/pool.js';
 import { AppError } from '../errors/app-error.js';
 import { emailService } from './email.service.js';
 import { logger } from '../../config/logger.js';
+import { env } from '../../config/env.js';
 
 export type OtpPurpose =
   | 'password_reset'
@@ -25,8 +26,11 @@ export interface OtpChallengeRecord {
   created_at: string | Date;
 }
 
-function hashOtp(otp: string): string {
-  return crypto.createHash('sha256').update(otp.trim()).digest('hex');
+function hashOtp(challengeId: string, otp: string): string {
+  return crypto
+    .createHmac('sha256', env.otpPepper)
+    .update(`${challengeId}:${otp.trim()}`)
+    .digest('hex');
 }
 
 export class OtpService {
@@ -64,10 +68,20 @@ export class OtpService {
       }
     }
 
+    // A new request replaces the previous pending code after the cooldown.
+    // This prevents multiple valid codes from remaining active indefinitely.
+    if (recent) {
+      await db.execute(
+        `UPDATE auth_otp_challenges SET consumed_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND consumed_at IS NULL`,
+        [recent.id]
+      );
+    }
+
     // Generate cryptographically secure 6-digit OTP
     const otp = crypto.randomInt(100000, 1000000).toString();
-    const otpHash = hashOtp(otp);
     const challengeId = uuidv4();
+    const otpHash = hashOtp(challengeId, otp);
     const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
 
     await db.execute(
@@ -83,12 +97,21 @@ export class OtpService {
       'Generated OTP challenge, dispatching notification email'
     );
 
-    await emailService.sendOtpEmail({
-      to: destinationEmail.toLowerCase().trim(),
-      purpose,
-      otp,
-      expiryMinutes,
-    });
+    try {
+      await emailService.sendOtpEmail({
+        to: destinationEmail.toLowerCase().trim(),
+        purpose,
+        otp,
+        expiryMinutes,
+      });
+    } catch (error) {
+      // A code that was never delivered must not remain usable.
+      await db.execute(
+        `UPDATE auth_otp_challenges SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [challengeId]
+      );
+      throw error;
+    }
 
     return { challengeId, expiresAt };
   }
@@ -131,7 +154,11 @@ export class OtpService {
       );
     }
 
-    const incomingHash = hashOtp(otp);
+    if (!/^\d{6}$/.test(otp.trim())) {
+      throw new AppError('Verification code must contain exactly 6 digits.', 400, 'OTP_INVALID');
+    }
+
+    const incomingHash = hashOtp(challengeId, otp);
     const incomingBuf = Buffer.from(incomingHash, 'utf8');
     const targetBuf = Buffer.from(challenge.otp_hash, 'utf8');
 

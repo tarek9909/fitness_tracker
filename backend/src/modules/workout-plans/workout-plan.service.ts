@@ -1,6 +1,7 @@
 import { WorkoutPlanRepository } from './workout-plan.repository.js';
 import { NotFoundError, ConflictError, ValidationError } from '../../shared/errors/app-error.js';
 import { getDatabasePool } from '../../database/pool.js';
+import { shiftDate } from '../../shared/utils/date-utils.js';
 
 export class WorkoutPlanService {
   private repo = new WorkoutPlanRepository();
@@ -455,7 +456,7 @@ export class WorkoutPlanService {
     });
   }
 
-  async activatePlanForUser(userId: number, planId: number) {
+  async activatePlanForUser(userId: number, planId: number, effectiveFrom?: string) {
     const plan = await this.repo.findPlanById(planId);
     if (!plan) throw new NotFoundError('Workout plan not found');
 
@@ -469,35 +470,43 @@ export class WorkoutPlanService {
       throw new ValidationError('Workout plan must have a published version before it can be activated');
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const effectiveFromDate = effectiveFrom || new Date().toISOString().split('T')[0];
+    const effectiveUntil = shiftDate(effectiveFromDate, -1);
 
     return this.db.withTransaction(async (conn) => {
       await conn.execute(
         `UPDATE user_workout_assignments 
          SET status = 'completed', effective_until = ?, updated_at = CURRENT_TIMESTAMP 
-         WHERE user_id = ? AND status = 'active'`,
-        [todayStr, userId]
+         WHERE user_id = ? AND status = 'active' AND effective_from < ?`,
+        [effectiveUntil, userId, effectiveFromDate]
+      );
+
+      await conn.execute(
+        `UPDATE user_workout_assignments
+         SET status = 'cancelled', effective_until = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = ? AND status = 'active' AND effective_from >= ?`,
+        [effectiveUntil, userId, effectiveFromDate]
       );
 
       const res = await conn.execute(
         `INSERT INTO user_workout_assignments (
            user_id, workout_plan_version_id, assignment_source, effective_from, status
          ) VALUES (?, ?, 'self_service', ?, 'active')`,
-        [userId, publishedVersion.id, todayStr]
+        [userId, publishedVersion.id, effectiveFromDate]
       );
 
       await conn.execute(
         `UPDATE daily_tasks 
          SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP 
          WHERE user_id = ? AND task_type = 'workout' AND status = 'pending' AND task_date >= ?`,
-        [userId, todayStr]
+        [userId, effectiveFromDate]
       );
 
       return {
         assignmentId: res.insertId,
         workoutPlanId: planId,
         versionId: publishedVersion.id,
-        effectiveFrom: todayStr,
+        effectiveFrom: effectiveFromDate,
       };
     });
   }

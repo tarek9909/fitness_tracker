@@ -2,10 +2,12 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { WorkoutPlanService } from './workout-plan.service.js';
 import { AuthenticatedRequest } from '../../shared/types/index.js';
+import { ValidationError } from '../../shared/errors/app-error.js';
 import { recordAuditEvent } from '../../shared/utils/audit-utils.js';
 import { parsePositiveInt } from '../../shared/utils/request-utils.js';
 import { assertCanViewWorkoutPlan, assertCanModifyWorkoutPlan } from './workout-plan-ownership.js';
 import { getDatabasePool } from '../../database/pool.js';
+import { getUserLocalDate } from '../../shared/utils/date-utils.js';
 
 const createPlanSchema = z.object({
   name: z.string().min(1).max(150),
@@ -15,6 +17,10 @@ const createPlanSchema = z.object({
 
 const updatePlanSchema = createPlanSchema.partial().extend({
   isArchived: z.boolean().optional(),
+});
+
+const activatePlanSchema = z.object({
+  effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'effectiveFrom must be YYYY-MM-DD').optional(),
 });
 
 const cloneVersionSchema = z.object({
@@ -270,7 +276,15 @@ export class WorkoutPlanController {
     const planId = parsePositiveInt(params.id || params.planId!, 'planId');
     const plan = await this.service.getPlanById(planId);
     assertCanViewWorkoutPlan(plan, auth);
-    const result = await this.service.activatePlanForUser(auth.userId, planId);
+    const body = activatePlanSchema.parse(request.body || {});
+    const user = await this.db.queryOne<{ timezone?: string | null }>('SELECT timezone FROM users WHERE id = ?', [auth.userId]);
+    const today = getUserLocalDate(user?.timezone || 'UTC');
+    const effectiveFrom = body.effectiveFrom || today;
+    if (effectiveFrom < today) {
+      throw new ValidationError('A plan cannot be activated in the past.');
+    }
+    const result = await this.service.activatePlanForUser(auth.userId, planId, effectiveFrom);
+    await recordAuditEvent(request, 'workout_plan.activated', 'workout_plan', planId, { versionId: result.versionId, effectiveFrom });
     return reply.status(200).send({ success: true, data: result });
   }
 }

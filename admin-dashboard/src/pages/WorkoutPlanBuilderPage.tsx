@@ -799,7 +799,6 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
                   onChange={(val) => setExForm({ ...exForm, restSeconds: val })}
                 />
               </FormField>
-            </div>
 
             <FormField label="Technique & Cue Notes">
               <TextArea

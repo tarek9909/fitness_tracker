@@ -9,6 +9,7 @@ import { recordAuditEvent } from '../../shared/utils/audit-utils.js';
 import { getDatabasePool } from '../../database/pool.js';
 import { parsePositiveInt } from '../../shared/utils/request-utils.js';
 import { assertCanViewDietPlan, assertCanModifyDietPlan } from './diet-plan-ownership.js';
+import { getUserLocalDate, shiftDate } from '../../shared/utils/date-utils.js';
 
 export class DietPlanService {
   private repo = new DietPlanRepository();
@@ -33,9 +34,9 @@ export class DietPlanService {
     name: string;
     description?: string;
     dailyCaloriesTarget?: number;
-    proteinGramsTarget?: number;
-    carbsGramsTarget?: number;
-    fatGramsTarget?: number;
+    dailyProteinTargetG?: number;
+    dailyCarbsTargetG?: number;
+    dailyFatTargetG?: number;
     createdBy?: number;
     ownerUserId?: number;
     visibility?: string;
@@ -48,9 +49,9 @@ export class DietPlanService {
         title: 'Version 1 Draft',
         status: 'draft',
         dailyCaloriesTarget: data.dailyCaloriesTarget,
-        dailyProteinTargetG: data.proteinGramsTarget,
-        dailyCarbsTargetG: data.carbsGramsTarget,
-        dailyFatTargetG: data.fatGramsTarget,
+        dailyProteinTargetG: data.dailyProteinTargetG,
+        dailyCarbsTargetG: data.dailyCarbsTargetG,
+        dailyFatTargetG: data.dailyFatTargetG,
         createdBy: data.createdBy,
       }, conn);
       return planId;
@@ -76,9 +77,9 @@ export class DietPlanService {
         name: newPlanName,
         description: sourcePlan.description,
         dailyCaloriesTarget: sourceVersion.daily_calorie_target ?? sourceVersion.daily_calories_target,
-        proteinGramsTarget: sourceVersion.daily_protein_target_g,
-        carbsGramsTarget: sourceVersion.daily_carbs_target_g,
-        fatGramsTarget: sourceVersion.daily_fat_target_g,
+        dailyProteinTargetG: sourceVersion.daily_protein_target_g,
+        dailyCarbsTargetG: sourceVersion.daily_carbs_target_g,
+        dailyFatTargetG: sourceVersion.daily_fat_target_g,
         createdBy: targetUserId,
         ownerUserId: targetUserId,
         visibility: 'private',
@@ -147,7 +148,7 @@ export class DietPlanService {
     return this.getPlanById(planId);
   }
 
-  async activatePlanForUser(userId: number, planId: number) {
+  async activatePlanForUser(userId: number, planId: number, effectiveFrom?: string) {
     const plan = await this.repo.findPlanById(planId);
     if (!plan) throw new NotFoundError('Diet plan not found');
 
@@ -161,35 +162,43 @@ export class DietPlanService {
       throw new ValidationError('Diet plan must have a published version before it can be activated');
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const effectiveFromDate = effectiveFrom || new Date().toISOString().split('T')[0];
+    const effectiveUntil = shiftDate(effectiveFromDate, -1);
 
     return this.db.withTransaction(async (conn) => {
       await conn.execute(
         `UPDATE user_diet_assignments 
          SET status = 'completed', effective_until = ?, updated_at = CURRENT_TIMESTAMP 
-         WHERE user_id = ? AND status = 'active'`,
-        [todayStr, userId]
+         WHERE user_id = ? AND status = 'active' AND effective_from < ?`,
+        [effectiveUntil, userId, effectiveFromDate]
+      );
+
+      await conn.execute(
+        `UPDATE user_diet_assignments
+         SET status = 'cancelled', effective_until = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = ? AND status = 'active' AND effective_from >= ?`,
+        [effectiveUntil, userId, effectiveFromDate]
       );
 
       const res = await conn.execute(
         `INSERT INTO user_diet_assignments (
            user_id, diet_plan_version_id, assignment_source, effective_from, status
          ) VALUES (?, ?, 'self_service', ?, 'active')`,
-        [userId, publishedVersion.id, todayStr]
+        [userId, publishedVersion.id, effectiveFromDate]
       );
 
       await conn.execute(
         `UPDATE daily_tasks 
          SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP 
          WHERE user_id = ? AND task_type = 'diet' AND status = 'pending' AND task_date >= ?`,
-        [userId, todayStr]
+        [userId, effectiveFromDate]
       );
 
       return {
         assignmentId: res.insertId,
         dietPlanId: planId,
         versionId: publishedVersion.id,
-        effectiveFrom: todayStr,
+        effectiveFrom: effectiveFromDate,
       };
     });
   }
@@ -620,12 +629,13 @@ export class DietPlanService {
       if (data.foodId && (calories === null || proteinG === null || carbsG === null || fatG === null)) {
         const food = await conn.queryOne<any>('SELECT * FROM foods WHERE id = ?', [data.foodId]);
         if (food) {
-          const ratio = (data.servingQuantity || 100) / (food.serving_size || 100);
+          const referenceQuantity = Number(food.reference_quantity || 100);
+          const ratio = (data.servingQuantity || referenceQuantity) / referenceQuantity;
           if (calories === null) calories = Math.round((food.calories || 0) * ratio);
           if (proteinG === null) proteinG = Math.round((food.protein_g || 0) * ratio * 10) / 10;
           if (carbsG === null) carbsG = Math.round((food.carbs_g || 0) * ratio * 10) / 10;
           if (fatG === null) fatG = Math.round((food.fat_g || 0) * ratio * 10) / 10;
-          if (servingUnitId === null) servingUnitId = food.serving_unit_id;
+          if (servingUnitId === null) servingUnitId = food.reference_unit_id;
         }
       }
 
@@ -737,6 +747,9 @@ const createPlanSchema = z.object({
   name: z.string().min(1).max(150),
   description: z.string().max(2000).optional(),
   dailyCaloriesTarget: z.number().int().min(500).max(10000).optional(),
+  dailyProteinTargetG: z.number().min(0).max(1000).optional(),
+  dailyCarbsTargetG: z.number().min(0).max(1000).optional(),
+  dailyFatTargetG: z.number().min(0).max(1000).optional(),
 });
 
 const updatePlanSchema = createPlanSchema.partial().extend({
@@ -1068,7 +1081,17 @@ export class DietPlanController {
     const planId = parsePositiveInt(params.id, 'planId');
     const plan = await this.service.getPlanById(planId);
     assertCanViewDietPlan(plan, auth);
-    const result = await this.service.activatePlanForUser(auth.userId, planId);
+    const body = z.object({
+      effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'effectiveFrom must be YYYY-MM-DD').optional(),
+    }).parse(request.body || {});
+    const user = await this.db.queryOne<{ timezone?: string | null }>('SELECT timezone FROM users WHERE id = ?', [auth.userId]);
+    const today = getUserLocalDate(user?.timezone || 'UTC');
+    const effectiveFrom = body.effectiveFrom || today;
+    if (effectiveFrom < today) {
+      throw new ValidationError('A plan cannot be activated in the past.');
+    }
+    const result = await this.service.activatePlanForUser(auth.userId, planId, effectiveFrom);
+    await recordAuditEvent(request, 'diet_plan.activated', 'diet_plan', planId, { versionId: result.versionId, effectiveFrom });
     return reply.status(200).send({ success: true, data: result });
   }
 }

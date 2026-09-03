@@ -234,16 +234,18 @@ export class AuthService {
       throw new UnauthorizedError('Invalid password reset challenge', 'PASSWORD_RESET_INVALID');
     }
     const passwordHash = await bcrypt.hash(newPassword, 12);
-    await this.db.execute(
-      `UPDATE users 
-       SET password_hash = ?, security_version = security_version + 1, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = ?`,
-      [passwordHash, verification.userId]
-    );
-    await this.db.execute(
-      `UPDATE user_refresh_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = ? AND revoked_at IS NULL`,
-      [verification.userId]
-    );
+    await this.db.withTransaction(async (conn) => {
+      await conn.execute(
+        `UPDATE users
+         SET password_hash = ?, security_version = security_version + 1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [passwordHash, verification.userId]
+      );
+      await conn.execute(
+        `UPDATE user_refresh_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = ? AND revoked_at IS NULL`,
+        [verification.userId]
+      );
+    });
   }
 
   async requestPasswordChangeOtp(userId: number): Promise<{ challengeId: string }> {
@@ -281,16 +283,18 @@ export class AuthService {
       otp,
     });
     const passwordHash = await bcrypt.hash(newPassword, 12);
-    await this.db.execute(
-      `UPDATE users 
-       SET password_hash = ?, security_version = security_version + 1, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = ?`,
-      [passwordHash, userId]
-    );
-    await this.db.execute(
-      `UPDATE user_refresh_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = ? AND revoked_at IS NULL`,
-      [userId]
-    );
+    await this.db.withTransaction(async (conn) => {
+      await conn.execute(
+        `UPDATE users
+         SET password_hash = ?, security_version = security_version + 1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [passwordHash, userId]
+      );
+      await conn.execute(
+        `UPDATE user_refresh_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = ? AND revoked_at IS NULL`,
+        [userId]
+      );
+    });
   }
 
   async requestEmailChange(
@@ -380,20 +384,22 @@ export class AuthService {
     if (existing && existing.id !== userId) {
       throw new AppError('This email address is already in use by another account', 409, 'EMAIL_ALREADY_EXISTS');
     }
-    await this.db.execute(
-      `UPDATE users 
-       SET email = ?, email_verified_at = CURRENT_TIMESTAMP, security_version = security_version + 1, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = ?`,
-      [pendingReq.new_email, userId]
-    );
-    await this.db.execute(
-      `UPDATE user_email_change_requests SET status = 'completed', completed_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [pendingReq.id]
-    );
-    await this.db.execute(
-      `UPDATE user_refresh_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = ? AND revoked_at IS NULL`,
-      [userId]
-    );
+    await this.db.withTransaction(async (conn) => {
+      await conn.execute(
+        `UPDATE users
+         SET email = ?, email_verified_at = CURRENT_TIMESTAMP, security_version = security_version + 1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [pendingReq.new_email, userId]
+      );
+      await conn.execute(
+        `UPDATE user_email_change_requests SET status = 'completed', completed_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [pendingReq.id]
+      );
+      await conn.execute(
+        `UPDATE user_refresh_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = ? AND revoked_at IS NULL`,
+        [userId]
+      );
+    });
     return { email: pendingReq.new_email };
   }
 }

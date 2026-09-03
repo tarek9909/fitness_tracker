@@ -158,9 +158,12 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
     final screens = [
       HomeScreen(
-          apiClient: widget.apiClient,
-          authSession: widget.authSession,
-          localCache: widget.localCache),
+        apiClient: widget.apiClient,
+        authSession: widget.authSession,
+        localCache: widget.localCache,
+        showAppBar: false,
+        onOpenProfile: () => setState(() => _currentIndex = 4),
+      ),
       CardioScreen(apiClient: widget.apiClient),
       ProgressScreen(apiClient: widget.apiClient),
       NotificationsScreen(apiClient: widget.apiClient),
@@ -168,49 +171,62 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     ];
 
     return PremiumScaffold(
-      appBar: PremiumAppBar(
-        title: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: colors.surfaceElevated,
-                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      appBar: _currentIndex == 0
+          ? PremiumAppBar(
+              title: Row(
+                children: [
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => setState(() => _currentIndex = 4),
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: colors.surfaceElevated,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.15),
+                        ),
+                      ),
+                      child: ClipOval(
+                        child: Icon(Icons.person,
+                            size: 20, color: colors.textSecondary),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Kinetic Wellness',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
+                        letterSpacing: -0.3,
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              child: ClipOval(
-                child: Icon(Icons.person, size: 20, color: colors.textSecondary),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Kinetic Wellness',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18,
-                  letterSpacing: -0.3,
-                  color: colors.textPrimary,
+              actions: [
+                PremiumIconButton(
+                  icon: Icons.sync,
+                  color: colors.primary,
+                  tooltip: 'Sync Agenda',
+                  onPressed: () {
+                    widget.syncCoordinator.flushQueue();
+                  },
                 ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          PremiumIconButton(
-            icon: Icons.sync,
-            color: colors.primary,
-            tooltip: 'Sync Agenda',
-            onPressed: () {
-              widget.syncCoordinator.flushQueue();
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
+                const SizedBox(width: 8),
+              ],
+            )
+          : (_currentIndex == 4
+              ? const PremiumAppBar(
+                  titleText: 'Profile & Settings',
+                )
+              : null),
       body: Column(
         children: [
           _buildSyncStatusBanner(colors),
@@ -227,9 +243,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             label: 'Home',
           ),
           PremiumNavigationBarItem(
-            icon: Icons.event_note_outlined,
-            activeIcon: Icons.event_note,
-            label: 'Plan',
+            icon: Icons.directions_run_outlined,
+            activeIcon: Icons.directions_run,
+            label: 'Cardio',
           ),
           PremiumNavigationBarItem(
             icon: Icons.insights_outlined,
@@ -429,13 +445,24 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         // User Profile Header Card
         PremiumCard(
           padding: const EdgeInsets.all(AppSpacing.lg),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    FitnessConfigurationScreen(apiClient: widget.apiClient),
+              ),
+            );
+          },
           child: Row(
             children: [
               CircleAvatar(
                 radius: 28,
                 backgroundColor: colors.primaryMuted,
                 child: Text(
-                  user?.firstName.isNotEmpty == true ? user!.firstName[0] : 'U',
+                  user?.firstName.isNotEmpty == true
+                      ? user!.firstName[0].toUpperCase()
+                      : 'U',
                   style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
@@ -448,7 +475,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${user?.firstName} ${user?.lastName ?? ""}',
+                      '${user?.firstName ?? "User"} ${user?.lastName ?? ""}'.trim(),
                       style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
@@ -460,9 +487,25 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                       style: TextStyle(
                           fontSize: 13, color: colors.textSecondary),
                     ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(Icons.edit_outlined, size: 14, color: colors.primary),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Edit Profile & Goals',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: colors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
+              Icon(Icons.chevron_right, size: 20, color: colors.textMuted),
             ],
           ),
         ),

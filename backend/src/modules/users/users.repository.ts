@@ -376,7 +376,7 @@ export class UsersRepository {
         securityVersion: user.security_version,
       },
       weightGoal: weightGoal || null,
-      waterTarget: waterTarget || { daily_target_ml: 2500, target_ml: 2500 },
+      waterTarget: waterTarget || null,
       waterQuickAdd: waterQuickAdd || [],
       cardioTargets: cardioTargets || [],
       reminders: reminders || [],

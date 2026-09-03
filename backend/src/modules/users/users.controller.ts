@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { UsersService } from './users.service.js';
 import { AuthenticatedRequest } from '../../shared/types/index.js';
 import { ForbiddenError, ValidationError } from '../../shared/errors/app-error.js';
-import { parseBoundedPositiveInt, parsePositiveInt } from '../../shared/utils/request-utils.js';
+import { parseBoundedPositiveInt, parsePositiveInt, isDateOnly } from '../../shared/utils/request-utils.js';
 
 const createUserSchema = z.object({
   roleId: z.number().int().positive().optional(),
@@ -22,7 +22,7 @@ const updateUserSchema = z.object({
   firstName: z.string().min(1).optional(),
   lastName: z.string().optional(),
   phone: z.string().optional(),
-  dateOfBirth: z.string().nullable().optional(),
+  dateOfBirth: z.string().refine(isDateOnly, 'Use YYYY-MM-DD').nullable().optional(),
   heightCm: z.number().min(50).max(300).nullable().optional(),
   gender: z.enum(['male', 'female', 'other', 'prefer_not_to_say']).nullable().optional(),
   unitSystem: z.enum(['metric', 'imperial']).optional(),
