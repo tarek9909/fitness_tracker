@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../auth/auth-context';
-import { Sparkles, Shield, ArrowRight } from 'lucide-react';
+import { Shield, ArrowRight, Activity, AlertCircle } from 'lucide-react';
+import { Button, FormField, TextInput, Card } from '../components/ui';
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
@@ -17,7 +18,7 @@ export const LoginPage: React.FC = () => {
     try {
       await login(email, password);
     } catch (err: any) {
-      setError(err.message || 'Login failed');
+      setError(err.message || 'Authentication failed. Please verify your credentials.');
     } finally {
       setLoading(false);
     }
@@ -29,38 +30,35 @@ export const LoginPage: React.FC = () => {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'radial-gradient(circle at top, #1e293b 0%, #0a0e17 100%)',
+      background: 'radial-gradient(ellipse at 50% 15%, #152238 0%, #090d16 100%)',
       padding: '1.5rem',
     }}>
-      <div style={{
-        maxWidth: '440px',
+      <Card style={{
+        maxWidth: '420px',
         width: '100%',
-        background: 'rgba(17, 24, 39, 0.85)',
-        backdropFilter: 'blur(16px)',
-        border: '1px solid var(--border-color)',
-        borderRadius: 'var(--radius-lg)',
         padding: '2.5rem',
-        boxShadow: 'var(--shadow-lg)',
+        boxShadow: 'var(--shadow-elevated)',
+        border: '1px solid var(--border-color)',
       }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{
-            width: '54px',
-            height: '54px',
-            borderRadius: 'var(--radius-md)',
-            background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-cyan))',
+            width: '48px',
+            height: '48px',
+            borderRadius: 'var(--radius-lg)',
+            background: 'linear-gradient(135deg, var(--accent-primary), #059669)',
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: '1rem',
-            boxShadow: 'var(--shadow-glow)',
+            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
           }}>
-            <Sparkles size={28} color="#fff" />
+            <Activity size={24} color="#ffffff" strokeWidth={2.5} />
           </div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
             Fitness Platform
-          </h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-            Administrative Control & Management Console
+          </h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', marginTop: '0.25rem' }}>
+            Administrative Operations & Client Governance
           </p>
         </div>
 
@@ -69,75 +67,66 @@ export const LoginPage: React.FC = () => {
             padding: '0.75rem 1rem',
             marginBottom: '1.5rem',
             borderRadius: 'var(--radius-md)',
-            backgroundColor: 'rgba(244, 63, 94, 0.15)',
+            backgroundColor: 'var(--accent-rose-muted)',
             border: '1px solid rgba(244, 63, 94, 0.3)',
-            color: '#fb7185',
-            fontSize: '0.85rem',
+            color: 'var(--accent-rose)',
+            fontSize: '0.8125rem',
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
           }}>
-            <Shield size={16} />
+            <AlertCircle size={16} style={{ flexShrink: 0 }} />
             <span>{error}</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-              Administrator Email
-            </label>
-            <input
+          <FormField label="Administrator Email" required>
+            <TextInput
               type="email"
-              className="input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               placeholder="admin@fitnessplatform.com"
+              autoComplete="email"
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-              Password
-            </label>
-            <input
+          <FormField label="Password" required>
+            <TextInput
               type="password"
-              className="input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              placeholder="••••••••"
+              autoComplete="current-password"
             />
-          </div>
+          </FormField>
 
-          <button
+          <Button
             type="submit"
-            className="btn btn-primary"
-            disabled={loading}
+            variant="primary"
+            loading={loading}
             style={{ width: '100%', marginTop: '0.5rem', padding: '0.75rem' }}
           >
-            {loading ? 'Authenticating...' : (
-              <>
-                <span>Sign In to Dashboard</span>
-                <ArrowRight size={16} />
-              </>
-            )}
-          </button>
+            <span>Sign In to Console</span>
+            <ArrowRight size={16} />
+          </Button>
         </form>
 
         {isDev && (
           <div style={{
             marginTop: '2rem',
-            paddingTop: '1.5rem',
-            borderTop: '1px solid var(--border-color)',
+            paddingTop: '1.25rem',
+            borderTop: '1px solid var(--border-subtle)',
             fontSize: '0.75rem',
             color: 'var(--text-muted)',
             textAlign: 'center',
           }}>
-            [DEV MODE] Demo Credentials: <code>admin@fitnessplatform.com</code> / <code>Admin123!</code>
+            Demo credentials: <code style={{ color: 'var(--accent-cyan)' }}>admin@fitnessplatform.com</code>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 };

@@ -1,10 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { parseBoundedInteger } from '../utils/number-utils';
-import { 
-  Bell, Plus, Play, Trash2, Edit2, CheckCircle2, 
-  Clock, AlertCircle, RefreshCw, X 
+import {
+  Bell, Plus, Play, Trash2, Edit2, CheckCircle2,
+  Clock, AlertCircle, X
 } from 'lucide-react';
+import {
+  Card,
+  Button,
+  IconButton,
+  Badge,
+  Dialog,
+  FormField,
+  TextInput,
+  NumberInput,
+  Select,
+  EmptyState,
+  Skeleton,
+  ErrorView,
+  AlertBanner,
+  Checkbox,
+} from '../components/ui';
 
 interface ReminderRule {
   id: number;
@@ -29,6 +45,7 @@ export const RemindersPage: React.FC = () => {
   const [reminders, setReminders] = useState<ReminderRule[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [processing, setProcessing] = useState<boolean>(false);
+  const [submitting, setSubmitting] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Modal State
@@ -115,6 +132,7 @@ export const RemindersPage: React.FC = () => {
       return;
     }
 
+    setSubmitting(true);
     try {
       const payload: any = {
         title: title.trim(),
@@ -142,6 +160,8 @@ export const RemindersPage: React.FC = () => {
       await fetchReminders();
     } catch (err: any) {
       setFeedback({ type: 'error', message: err.message || 'Failed to save reminder rule' });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -182,474 +202,276 @@ export const RemindersPage: React.FC = () => {
     }
   };
 
+  const renderScheduleDetails = (r: ReminderRule) => {
+    const m = r.mode || r.trigger_mode || 'fixed_time';
+    if (m === 'fixed_time') {
+      return `Fixed: ${r.fixed_time ? r.fixed_time.substring(0, 5) : 'Not configured'}`;
+    }
+    if (m === 'relative_to_task') {
+      const offset = r.offset_minutes != null ? `${r.offset_minutes}m` : 'Not configured';
+      const grace = r.grace_period_minutes != null ? ` (Grace: ${r.grace_period_minutes}m)` : '';
+      return `Offset: ${offset}${grace}`;
+    }
+    if (m === 'interval') {
+      const interval = r.repeat_interval_minutes != null ? `${r.repeat_interval_minutes}m` : 'Not configured';
+      const max = r.max_repeats != null ? ` (Max: ${r.max_repeats}x)` : '';
+      return `Every ${interval}${max}`;
+    }
+    return 'Not configured';
+  };
+
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Bell size={24} color="var(--accent-primary, #3b82f6)" />
-            Reminder Rules Engine
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+            <Bell size={22} color="var(--accent-primary)" />
+            <span>Reminder Rules Engine</span>
           </h1>
-          <p style={{ color: 'var(--text-secondary, #94a3b8)', fontSize: '14px', marginTop: '4px' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.25rem' }}>
             Configure and schedule automated nudges, hydration alerts, and workout reminders.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <Button
+            variant="secondary"
             onClick={handleTriggerRun}
-            disabled={processing}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 16px',
-              borderRadius: '8px',
-              background: 'rgba(59, 130, 246, 0.15)',
-              color: 'var(--accent-primary, #3b82f6)',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
-              fontWeight: 600,
-              fontSize: '13px',
-              cursor: processing ? 'not-allowed' : 'pointer',
-            }}
+            loading={processing}
+            icon={<Play size={14} />}
           >
-            {processing ? <RefreshCw size={15} className="spin" /> : <Play size={15} />}
             Run Worker Now
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="primary"
             onClick={openCreateModal}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 16px',
-              borderRadius: '8px',
-              background: 'var(--accent-primary, #3b82f6)',
-              color: '#fff',
-              border: 'none',
-              fontWeight: 600,
-              fontSize: '13px',
-              cursor: 'pointer',
-            }}
+            icon={<Plus size={16} />}
           >
-            <Plus size={16} />
             Create Reminder
-          </button>
+          </Button>
         </div>
       </div>
 
-      {/* Feedback Toast */}
+      {/* Feedback Alert */}
       {feedback && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '12px 16px',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          background: feedback.type === 'success' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-          border: `1px solid ${feedback.type === 'success' ? '#22c55e' : '#ef4444'}`,
-          color: feedback.type === 'success' ? '#4ade80' : '#f87171',
-          fontSize: '14px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {feedback.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-            <span>{feedback.message}</span>
-          </div>
-          <button onClick={() => setFeedback(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>
-            <X size={16} />
-          </button>
-        </div>
+        <AlertBanner
+          type={feedback.type}
+          message={feedback.message}
+          onClose={() => setFeedback(null)}
+        />
       )}
 
-      {/* Reminders Table */}
-      <div style={{
-        background: 'var(--bg-secondary, #1e293b)',
-        borderRadius: '12px',
-        border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
-        overflow: 'hidden',
-      }}>
+      {/* Reminders Table Card */}
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary, #94a3b8)' }}>
-            <RefreshCw size={24} className="spin" style={{ marginBottom: '12px' }} />
-            <p>Loading reminder rules...</p>
+          <div style={{ padding: '1.5rem' }}>
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} style={{ padding: '1rem 0', borderBottom: '1px solid var(--border-subtle)', display: 'flex', gap: '1rem' }}>
+                <Skeleton width="30%" height="20px" />
+                <Skeleton width="15%" height="20px" />
+                <Skeleton width="20%" height="20px" />
+                <Skeleton width="15%" height="20px" />
+              </div>
+            ))}
           </div>
         ) : reminders.length === 0 ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary, #94a3b8)' }}>
-            <Clock size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
-            <p style={{ fontSize: '16px', fontWeight: 600 }}>No reminder rules configured</p>
-            <p style={{ fontSize: '13px', marginTop: '4px' }}>Click "Create Reminder" to establish an automated notification schedule.</p>
+          <div style={{ padding: '2rem' }}>
+            <EmptyState
+              icon={<Clock size={36} color="var(--text-muted)" />}
+              title="No reminder rules configured"
+              description="Establish an automated notification schedule for workouts, nutrition, or hydration nudges."
+              action={
+                <Button variant="primary" size="sm" onClick={openCreateModal} icon={<Plus size={14} />}>
+                  Create Reminder
+                </Button>
+              }
+            />
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
-            <thead>
-              <tr style={{ background: 'rgba(0, 0, 0, 0.2)', borderBottom: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))' }}>
-                <th style={{ padding: '14px 16px', fontWeight: 600, color: 'var(--text-secondary, #94a3b8)' }}>Rule Name</th>
-                <th style={{ padding: '14px 16px', fontWeight: 600, color: 'var(--text-secondary, #94a3b8)' }}>Category</th>
-                <th style={{ padding: '14px 16px', fontWeight: 600, color: 'var(--text-secondary, #94a3b8)' }}>Trigger Mode</th>
-                <th style={{ padding: '14px 16px', fontWeight: 600, color: 'var(--text-secondary, #94a3b8)' }}>Schedule / Details</th>
-                <th style={{ padding: '14px 16px', fontWeight: 600, color: 'var(--text-secondary, #94a3b8)' }}>Status</th>
-                <th style={{ padding: '14px 16px', fontWeight: 600, color: 'var(--text-secondary, #94a3b8)', textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reminders.map(r => {
-                const isAct = Boolean(r.is_active);
-                return (
-                  <tr key={r.id} style={{ borderBottom: '1px solid var(--border-color, rgba(255, 255, 255, 0.05))' }}>
-                    <td style={{ padding: '14px 16px', fontWeight: 600 }}>
-                      {r.title || r.name}
-                    </td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <span style={{
-                        padding: '3px 8px',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                        background: 'rgba(59, 130, 246, 0.15)',
-                        color: 'var(--accent-primary, #3b82f6)',
-                      }}>
-                        {r.category}
-                      </span>
-                    </td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <span style={{
-                        padding: '3px 8px',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        color: '#e2e8f0',
-                      }}>
-                        {r.mode || r.trigger_mode}
-                      </span>
-                    </td>
-                    <td style={{ padding: '14px 16px', color: 'var(--text-secondary, #94a3b8)', fontSize: '13px' }}>
-                      {(r.mode || r.trigger_mode) === 'fixed_time' && (
-                        <span>Fixed: {r.fixed_time ? r.fixed_time.substring(0, 5) : 'Not configured'}</span>
-                      )}
-                      {(r.mode || r.trigger_mode) === 'relative_to_task' && (
-                        <span>
-                          Offset: {r.offset_minutes != null ? `${r.offset_minutes}m` : 'Not configured'}
-                          {r.grace_period_minutes != null ? ` (Grace: ${r.grace_period_minutes}m)` : ''}
-                        </span>
-                      )}
-                      {(r.mode || r.trigger_mode) === 'interval' && (
-                        <span>
-                          Every {r.repeat_interval_minutes != null ? `${r.repeat_interval_minutes}m` : 'Not configured'}
-                          {r.max_repeats != null ? ` (Max: ${r.max_repeats}x)` : ''}
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <button
-                        onClick={() => handleToggle(r.id, isAct)}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '4px 10px',
-                          borderRadius: '20px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          border: 'none',
-                          background: isAct ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                          color: isAct ? '#4ade80' : '#f87171',
-                        }}
-                      >
-                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isAct ? '#22c55e' : '#ef4444' }} />
-                        {isAct ? 'Active' : 'Disabled'}
-                      </button>
-                    </td>
-                    <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: '8px' }}>
-                        <button
-                          onClick={() => openEditModal(r)}
-                          style={{
-                            padding: '6px',
-                            borderRadius: '6px',
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            border: 'none',
-                            color: 'var(--text-secondary, #94a3b8)',
-                            cursor: 'pointer',
-                          }}
-                          title="Edit rule"
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
+                  <th style={{ padding: '0.875rem 1.25rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rule Name</th>
+                  <th style={{ padding: '0.875rem 1rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Category</th>
+                  <th style={{ padding: '0.875rem 1rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Trigger Mode</th>
+                  <th style={{ padding: '0.875rem 1rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schedule / Details</th>
+                  <th style={{ padding: '0.875rem 1rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</th>
+                  <th style={{ padding: '0.875rem 1.25rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reminders.map((r) => {
+                  const isAct = Boolean(r.is_active);
+                  return (
+                    <tr key={r.id} style={{ borderBottom: '1px solid var(--border-subtle)' }} className="table-row-hover">
+                      <td style={{ padding: '0.875rem 1.25rem', fontWeight: 600 }}>
+                        {r.title || r.name}
+                      </td>
+                      <td style={{ padding: '0.875rem 1rem' }}>
+                        <Badge variant="info">
+                          {r.category.toUpperCase()}
+                        </Badge>
+                      </td>
+                      <td style={{ padding: '0.875rem 1rem' }}>
+                        <Badge variant="neutral">
+                          {(r.mode || r.trigger_mode || '').replace('_', ' ')}
+                        </Badge>
+                      </td>
+                      <td style={{ padding: '0.875rem 1rem', color: 'var(--text-secondary)', fontSize: '0.8125rem' }}>
+                        {renderScheduleDetails(r)}
+                      </td>
+                      <td style={{ padding: '0.875rem 1rem' }}>
+                        <Button
+                          type="button"
+                          variant="link"
+                          onClick={() => handleToggle(r.id, isAct)}
+                          style={{ padding: 0 }}
                         >
-                          <Edit2 size={15} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(r.id)}
-                          style={{
-                            padding: '6px',
-                            borderRadius: '6px',
-                            background: 'rgba(239, 68, 68, 0.1)',
-                            border: 'none',
-                            color: '#ef4444',
-                            cursor: 'pointer',
-                          }}
-                          title="Delete rule"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* Create / Edit Modal */}
-      {modalOpen && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0, 0, 0, 0.7)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 999,
-          padding: '16px',
-        }}>
-          <div style={{
-            background: 'var(--bg-secondary, #1e293b)',
-            borderRadius: '16px',
-            border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-            maxWidth: '520px',
-            width: '100%',
-            padding: '24px',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700 }}>
-                {editingReminder ? 'Edit Reminder Rule' : 'Create Reminder Rule'}
-              </h2>
-              <button onClick={() => setModalOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary, #94a3b8)', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveReminder} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Rule Title</label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
-                  placeholder="e.g. Afternoon Hydration Nudge"
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    background: 'rgba(0, 0, 0, 0.3)',
-                    border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                    color: '#fff',
-                    fontSize: '14px',
-                  }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Category</label>
-                  <select
-                    value={category}
-                    onChange={e => setCategory(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      background: 'rgba(0, 0, 0, 0.3)',
-                      border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                      color: '#fff',
-                      fontSize: '14px',
-                    }}
-                  >
-                    <option value="water">Water</option>
-                    <option value="workout">Workout</option>
-                    <option value="meal">Meal</option>
-                    <option value="weight">Weight Logging</option>
-                    <option value="cardio">Cardio</option>
-                    <option value="system">System / General</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Trigger Mode</label>
-                  <select
-                    value={mode}
-                    onChange={e => setMode(e.target.value as any)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      background: 'rgba(0, 0, 0, 0.3)',
-                      border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                      color: '#fff',
-                      fontSize: '14px',
-                    }}
-                  >
-                    <option value="fixed_time">Fixed Time</option>
-                    <option value="relative_to_task">Relative to Task</option>
-                    <option value="interval">Recurring Interval</option>
-                  </select>
-                </div>
-              </div>
-
-              {mode === 'fixed_time' && (
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Fixed Schedule Time (HH:MM:SS)</label>
-                  <input
-                    type="time"
-                    step="1"
-                    value={fixedTime}
-                    onChange={e => setFixedTime(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      background: 'rgba(0, 0, 0, 0.3)',
-                      border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                      color: '#fff',
-                      fontSize: '14px',
-                    }}
-                  />
-                </div>
-              )}
-
-              {mode === 'relative_to_task' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Offset Minutes</label>
-                    <input
-                      type="number"
-                      value={offsetMinutes}
-                      onChange={e => setOffsetMinutes(parseBoundedInteger(e.target.value, { min: -1440, max: 1440, fallback: 0 }))}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '8px',
-                        background: 'rgba(0, 0, 0, 0.3)',
-                        border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                        color: '#fff',
-                        fontSize: '14px',
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Grace Period (Mins)</label>
-                    <input
-                      type="number"
-                      value={gracePeriodMinutes}
-                      onChange={e => setGracePeriodMinutes(parseBoundedInteger(e.target.value, { min: 0, max: 1440, fallback: 0 }))}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '8px',
-                        background: 'rgba(0, 0, 0, 0.3)',
-                        border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                        color: '#fff',
-                        fontSize: '14px',
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {mode === 'interval' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Interval (Mins)</label>
-                    <input
-                      type="number"
-                      value={repeatIntervalMinutes}
-                      onChange={e => setRepeatIntervalMinutes(parseBoundedInteger(e.target.value, { min: 1, max: 1440, fallback: 60 }))}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '8px',
-                        background: 'rgba(0, 0, 0, 0.3)',
-                        border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                        color: '#fff',
-                        fontSize: '14px',
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Max Repeats</label>
-                    <input
-                      type="number"
-                      value={maxRepeats}
-                      onChange={e => setMaxRepeats(parseBoundedInteger(e.target.value, { min: 1, max: 100, fallback: 1 }))}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '8px',
-                        background: 'rgba(0, 0, 0, 0.3)',
-                        border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                        color: '#fff',
-                        fontSize: '14px',
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                <input
-                  type="checkbox"
-                  id="isActiveToggle"
-                  checked={isActive}
-                  onChange={e => setIsActive(e.target.checked)}
-                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                />
-                <label htmlFor="isActiveToggle" style={{ fontSize: '14px', cursor: 'pointer' }}>
-                  Enable reminder rule immediately
-                </label>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
-                <button
-                  type="button"
-                  onClick={() => setModalOpen(false)}
-                  style={{
-                    padding: '10px 16px',
-                    borderRadius: '8px',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    color: 'var(--text-secondary, #94a3b8)',
-                    border: 'none',
-                    fontWeight: 600,
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    background: 'var(--accent-primary, #3b82f6)',
-                    color: '#fff',
-                    border: 'none',
-                    fontWeight: 600,
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {editingReminder ? 'Save Changes' : 'Create Rule'}
-                </button>
-              </div>
-            </form>
+                          <Badge variant={isAct ? 'success' : 'danger'}>
+                            {isAct ? 'ACTIVE' : 'DISABLED'}
+                          </Badge>
+                        </Button>
+                      </td>
+                      <td style={{ padding: '0.875rem 1.25rem', textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', gap: '0.5rem' }}>
+                          <IconButton
+                            icon={<Edit2 size={14} />}
+                            label="Edit rule"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => openEditModal(r)}
+                          />
+                          <IconButton
+                            icon={<Trash2 size={14} />}
+                            label="Delete rule"
+                            size="sm"
+                            variant="danger"
+                            onClick={() => handleDelete(r.id)}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        </div>
-      )}
+        )}
+      </Card>
+
+      {/* Create / Edit Dialog */}
+      <Dialog
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editingReminder ? 'Edit Reminder Rule' : 'Create Reminder Rule'}
+        description="Configure rule triggers, offset windows, and repeat intervals."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setModalOpen(false)} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleSaveReminder} loading={submitting}>
+              {editingReminder ? 'Save Changes' : 'Create Rule'}
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleSaveReminder} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <FormField label="Rule Title" required>
+            <TextInput
+              required
+              placeholder="e.g. Afternoon Hydration Nudge"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </FormField>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <FormField label="Category">
+              <Select
+                options={[
+                  { value: 'water', label: 'Water' },
+                  { value: 'workout', label: 'Workout' },
+                  { value: 'meal', label: 'Meal' },
+                  { value: 'weight', label: 'Weight Logging' },
+                  { value: 'cardio', label: 'Cardio' },
+                  { value: 'system', label: 'System / General' },
+                ]}
+                value={category}
+                onChange={(val) => setCategory(val)}
+              />
+            </FormField>
+
+            <FormField label="Trigger Mode">
+              <Select
+                options={[
+                  { value: 'fixed_time', label: 'Fixed Time' },
+                  { value: 'relative_to_task', label: 'Relative to Task' },
+                  { value: 'interval', label: 'Recurring Interval' },
+                ]}
+                value={mode}
+                onChange={(val) => setMode(val as any)}
+              />
+            </FormField>
+          </div>
+
+          {mode === 'fixed_time' && (
+            <FormField label="Fixed Schedule Time (HH:MM:SS)" required>
+              <TextInput
+                type="time"
+                step="1"
+                required
+                value={fixedTime}
+                onChange={(e) => setFixedTime(e.target.value)}
+              />
+            </FormField>
+          )}
+
+          {mode === 'relative_to_task' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <FormField label="Offset Minutes" required>
+                <NumberInput
+                  value={offsetMinutes}
+                  onChange={(val) => setOffsetMinutes(parseBoundedInteger(val, { min: -1440, max: 1440, fallback: 0 }))}
+                />
+              </FormField>
+              <FormField label="Grace Period (Mins)">
+                <NumberInput
+                  value={gracePeriodMinutes}
+                  onChange={(val) => setGracePeriodMinutes(parseBoundedInteger(val, { min: 0, max: 1440, fallback: 0 }))}
+                />
+              </FormField>
+            </div>
+          )}
+
+          {mode === 'interval' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <FormField label="Interval (Mins)" required>
+                <NumberInput
+                  value={repeatIntervalMinutes}
+                  onChange={(val) => setRepeatIntervalMinutes(parseBoundedInteger(val, { min: 1, max: 1440, fallback: 60 }))}
+                />
+              </FormField>
+              <FormField label="Max Repeats">
+                <NumberInput
+                  value={maxRepeats}
+                  onChange={(val) => setMaxRepeats(parseBoundedInteger(val, { min: 1, max: 100, fallback: 1 }))}
+                />
+              </FormField>
+            </div>
+          )}
+
+          <div style={{ marginTop: '0.25rem' }}>
+            <Checkbox
+              id="isActiveToggle"
+              checked={isActive}
+              onChange={(e) => setIsActive(e.target.checked)}
+              label="Enable reminder rule immediately"
+            />
+          </div>
+        </form>
+      </Dialog>
     </div>
   );
 };

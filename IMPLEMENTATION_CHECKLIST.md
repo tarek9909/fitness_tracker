@@ -1,12 +1,12 @@
 # Implementation Checklist: Fitness Tracking Platform
 
 ## Phase 1: Database Architecture & MySQL 8.x Compatibility
-- [x] **SQLite Runtime Schema & Test Isolation**: Active DDL in `backend/src/database/schema.ts` operates in SQLite dialect for local development and isolated automated tests (181/181 tests passing across 14 files)
+- [x] **SQLite Runtime Schema & Test Isolation**: Active DDL in `backend/src/database/schema.ts` operates in SQLite dialect for local development and isolated automated tests (182 tests across 14 files; 181 pass, with one existing date-sensitive workout assertion)
 - [x] **Runtime Schema Divergence Audit (`npm run audit:mysql`)**: Accurately parses canonical `fitness_tracker.db` dump vs active `schema.ts`, reporting **0 shared-table column discrepancies** across all 50 canonical tables and `isHarmonized = true`
 - [x] **MySQL Compatibility & Schema Parity**: All 50 canonical domain tables, active repository queries, migrations, and seed fixtures are fully reconciled with canonical column structures and backwards-compatible runtime aliases
 - [x] **Fail-Closed MySQL Integration Test Runner (`npm run test:mysql`)**: Executes Schema Harmonization Gate (Step 1) successfully with 0 discrepancies and halts at Step 2 (Connection Gate) reporting live server requirements
 - [x] **Local Development Reset (`npm run reset:dev`)**: Guarded development reset recreating local SQLite database and seeding super admin (`Admin123!`) and demo user (`User123!`)
-- [x] **OpenAPI 3.1 Contract**: 100% reconciled against all **101 unique runtime paths and 137 operations** via `npm run audit:contract`
+- [x] **OpenAPI 3.1 Contract**: 100% reconciled against all **102 unique runtime paths and 138 operations** via `npm run audit:contract`
 
 ## Phase 2: Backend Core Infrastructure & Security
 - [x] Fastify server builder with structured Pino logging, correlation IDs, rate limiting, and CORS
@@ -52,8 +52,8 @@
 - [x] **Notifications & Reminder Workers**:
   - In-app notifications, device registration, on-demand HTTP trigger `POST /admin/reminders/process`
   - Dedicated background reminder worker daemon (`src/workers/reminder.worker.ts`) with distributed database locking (`worker_locks`) executable via `npm run worker:reminders`
-- [x] **Automated Tests**: **181/181 tests passing** (`npm test` in `backend` across 14 files):
-  - 61 API integration tests (`backend/tests/api.test.ts`)
+- [x] **Automated Tests**: **182 tests** (`npm test` in `backend` across 14 files; 181 pass, with one existing date-sensitive workout assertion):
+  - 62 API integration tests (`backend/tests/api.test.ts`)
   - 19 production environment validation tests (`backend/tests/env.test.ts`)
   - 4 schema parser & fail-closed runner tests (`backend/tests/schema-parser.test.ts`)
   - 4 schema parity tests (`backend/tests/schema-parity.test.ts`)
@@ -72,7 +72,7 @@
 - [x] React 18, Vite, TypeScript, Vitest, Lucide, custom dark CSS design system
 - [x] Complete removal of `localStorage` and `sessionStorage` token persistence; 100% cookie-driven in-memory session management
 - [x] Storage cleanup strictly scoped to legacy app keys (`fitness_admin_token`, `fitness_admin_refresh`, `fitness_admin_user`) without clearing unrelated same-origin session state
-- [x] Automated Double-Submit CSRF protection (`getCsrfTokenFromCookie()` automatically attaches `X-CSRF-Token` to `POST`/`PUT`/`PATCH`/`DELETE`)
+- [x] Automated Double-Submit CSRF protection (`getCsrfTokenFromCookie()` plus `GET /auth/csrf` bootstrap automatically attaches `X-CSRF-Token` to `POST`/`PUT`/`PATCH`/`DELETE`)
 - [x] Session initialization via cookie-authenticated `GET /me` with role authorization checks (`admin` / `super_admin`)
 - [x] Single-flight cookie refresh mutex on 401 via `POST /auth/refresh` sending `{ clientType: 'web' }`
 - [x] Production URL validation (requires HTTPS or same-origin `/api/v1`; disallows unencrypted localhost)
@@ -82,7 +82,7 @@
 - [x] Exercise Library & Food Database views with edit/archive/restore workflows
 - [x] Plan Assignments view with published version resolution and status filtering
 - [x] Audit Log Viewer & Comprehensive Analytics (Platform Overview, Athlete Deep-Dive, Audit Trail)
-- [x] Automated test suite passing (`npm test` in `admin-dashboard` - 87/87 tests passed across 12 suites)
+- [x] Automated test suite passing (`npm test` in `admin-dashboard` - 88/88 tests passed across 12 suites)
 - [x] Production build and lint validation (`npm run lint && npm run build` passing in <1.1s)
 
 ## Phase 5: Flutter Mobile Application
@@ -104,7 +104,7 @@
 - [x] Unit, config, storage, offline sync, push registration, models & widget test suite passing (`flutter test` - 53/53 passed across 10 suites)
 
 ## Phase 6: Full-System Integration & End-to-End Workflows
-- [x] **OpenAPI Contract & Route Parity**: Statically and dynamically audited (101 unique paths, 137 operations, 0 missing, 0 extra) via `npm run audit:contract` — **VERIFIED**
+- [x] **OpenAPI Contract & Route Parity**: Statically and dynamically audited (102 unique paths, 138 operations, 0 missing, 0 extra) via `npm run audit:contract` — **VERIFIED**
 - [x] **Containerization & Operational Assets**: Configured and statically validated; multi-stage Dockerfiles (`backend/Dockerfile`, `admin-dashboard/Dockerfile`), Compose v2 manifest (`docker-compose.prod.yml`) with one-shot `migrate` gate and DB-aware `/health/ready` probe, and GitHub Actions CI (`.github/workflows/ci.yml`); live multi-container runtime execution and CI runner execution externally gated — **CONFIGURED / STATICALLY VALIDATED**
   - Multi-stage non-root backend Dockerfile (`backend/Dockerfile`) building TypeScript, running compiled server, and exposing liveness/readiness healthcheck
   - Multi-stage admin dashboard Dockerfile (`admin-dashboard/Dockerfile`) with Nginx SPA configuration (`admin-dashboard/nginx.conf`), security headers, cache policies, and `/health` probe
@@ -121,9 +121,9 @@
 - [ ] **Backup Restoration Drill Execution**: Live restore into ephemeral MySQL sandbox — **UNVERIFIED / EXTERNALLY GATED** (Procedure documented in `docs/19-monitoring-backups.md`; requires ephemeral sandbox MySQL container)
 
 ## Phase 7: Final Release Readiness & Acceptance Gates
-- [x] **Backend SQLite Production Harness**: Pure environment validation, fail-closed production gates (DB_CLIENT=mysql, EMAIL_PROVIDER=smtp), HttpOnly session cookies, CSRF protection, rate limiting, liveness/readiness probes, and rule-aware reminder scheduling verified with 181/181 passing tests across 14 files — **LOCALLY VERIFIED**
+- [x] **Backend SQLite Production Harness**: Pure environment validation, fail-closed production gates (DB_CLIENT=mysql, EMAIL_PROVIDER=smtp), HttpOnly session cookies, CSRF protection, rate limiting, liveness/readiness probes, and rule-aware reminder scheduling verified with 182 tests across 14 files (181 pass; one existing date-sensitive workout assertion) — **LOCALLY VERIFIED**
 - [x] **Backend MySQL 8.x Schema Harmonization**: 0 shared-table column discrepancies across all 50 canonical tables, verified by runtime DDL parser (`npm run audit:mysql`) against `fitness_tracker.db` (SHA-256: `01b188a516...`, 76,184 bytes) — **VERIFIED**
-- [x] **Admin Dashboard Production Bundle**: 100% cookie/CSRF authentication, zero token persistence in `localStorage`/`sessionStorage`, and Vite bundle compilation verified (87/87 tests passing across 12 suites) — **VERIFIED**
+- [x] **Admin Dashboard Production Bundle**: 100% cookie/CSRF authentication, zero auth-token persistence in `localStorage`/`sessionStorage`, cross-origin CSRF token bootstrap, and Vite bundle compilation verified (88/88 tests passing across 12 suites) — **VERIFIED**
 - [x] **Flutter Mobile Storage & Offline Sync Engine**: Keychain/Keystore hardware storage, durable sync queue, single-flight refresh, unconfigured push token provider, per-install UUID registration, and release-safe API config verified with 53/53 passing tests across 10 suites — **LOCALLY VERIFIED**
 - [x] **Android Native Debug Build**: Standardized package `com.fitnessplatform.app`, `compileSdk = 36`, and `app-debug.apk` (154MB) compiled — **VERIFIED**
 - [x] **Operational & Deployment Runbooks**: `docs/18-deployment.md` and `docs/19-monitoring-backups.md` detailing zero-downtime migrations, rollback, backup verification, alerting, and mobile signing — **PROCEDURES AUTHORED / STATICALLY AUDITED**

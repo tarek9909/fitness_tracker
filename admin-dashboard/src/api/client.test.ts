@@ -2,12 +2,13 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { api, getCsrfTokenFromCookie, API_BASE_URL } from './client';
+import { api, clearCsrfToken, getCsrfTokenFromCookie, API_BASE_URL } from './client';
 
 describe('Admin Dashboard API Client & Cookie Auth Suite', () => {
   beforeEach(() => {
     // Clear cookies and storage
     document.cookie = 'csrf_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    clearCsrfToken();
     localStorage.clear();
     sessionStorage.clear();
     vi.restoreAllMocks();
@@ -35,6 +36,41 @@ describe('Admin Dashboard API Client & Cookie Auth Suite', () => {
     const res = await api.post('/admin/exercises', { name: 'Bench Press' });
     expect(res.created).toBe(true);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('bootstraps and retains the CSRF token when the API cookie is not readable by the dashboard origin', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+      const urlStr = url.toString();
+
+      if (urlStr.endsWith('/auth/csrf')) {
+        expect(init?.method).toBe('GET');
+        expect(init?.credentials).toBe('include');
+        return new Response(JSON.stringify({ success: true, data: { csrfToken: 'bootstrap-token' } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (urlStr.endsWith('/auth/login')) {
+        return new Response(JSON.stringify({ success: true, data: { csrfToken: 'login-token' } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      const headers = init?.headers as Headers;
+      expect(headers.get('X-CSRF-Token')).toBe('login-token');
+      return new Response(JSON.stringify({ success: true, data: { updated: true } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+
+    await api.post('/auth/login', { email: 'admin@example.com', password: 'Admin123!' });
+    const result = await api.post('/admin/settings', { theme: 'dark' });
+
+    expect(result.updated).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
   });
 
   it('Single-flight 401 refresh automatically retries original request with credentials', async () => {

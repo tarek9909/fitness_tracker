@@ -120,16 +120,19 @@ npm run worker:reminders
 > All 50 canonical domain tables in `src/database/schema.ts` have been harmonized with the root `fitness_tracker.db` MySQL dump (`npm run audit:mysql` reports 0 column discrepancies, `isHarmonized = true`).
 > `getDatabasePool()` wires `MySQLDatabasePool` on `DB_CLIENT=mysql`. Running in live MySQL mode requires a running MySQL 8.x server provisioned on `localhost:3306` with valid credentials in `.env`.
 
-### MySQL Tooling & Diagnostics:
+### MySQL Tooling, Migration & Setup:
 
 ```powershell
-# 1. Run dynamic DDL schema divergence audit (confirms 0 discrepancies)
+# 1. Initiate MySQL Database (Creates 'fitness_platform' DB and imports all 50 tables automatically)
+npm run db
+
+# 2. Run dynamic DDL schema divergence audit (confirms 0 discrepancies)
 npm run audit:mysql
 
-# 2. Run MySQL connection verification (checks host connectivity and credentials)
+# 3. Run MySQL connection verification (checks host connectivity and credentials)
 npm run verify:mysql
 
-# 3. Run live MySQL integration test suite (Step 1 passes, Step 2 tests connection)
+# 4. Run live MySQL integration test suite
 npm run test:mysql
 ```
 
@@ -152,13 +155,13 @@ npm run test:mysql
 All npm scripts defined in `package.json`:
 
 ```powershell
-# Run full automated test suite (181/181 tests passing across 14 files)
+# Run full automated test suite (182 tests across 14 files)
 npm test
 
 # Run Vitest in watch mode
 npm run test:watch
 
-# Run OpenAPI 3.1 contract parity audit (101 unique paths / 137 operations)
+# Run OpenAPI 3.1 contract parity audit (102 unique paths / 138 operations)
 npm run audit:contract
 
 # Typecheck without emitting code

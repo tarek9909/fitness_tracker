@@ -2,11 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { api } from '../api/client';
 import { formatDateOnly } from '../utils/date-utils';
 import { parseBoundedInteger, parseBoundedFloat } from '../utils/number-utils';
-import { 
-  User, Dumbbell, Utensils, Droplets, HeartPulse, 
+import {
+  User, Dumbbell, Utensils, Droplets, HeartPulse,
   Calendar, CheckCircle2, XCircle, ArrowLeft, RefreshCw,
   Scale, ShieldAlert, AlertTriangle, Smartphone, Plus, X, Edit3, AlertCircle, Trash2, Sliders, Layers
 } from 'lucide-react';
+import {
+  Button, IconButton, Dialog, FormField, TextInput, NumberInput, Select, AlertBanner, Badge
+} from '../components/ui';
 
 interface UserDetailPageProps {
   userId: number;
@@ -354,36 +357,19 @@ export const UserDetailPage: React.FC<UserDetailPageProps> = ({ userId, onBack }
   if (error || !dossier) {
     return (
       <div style={{ padding: '24px' }}>
-        <button
+        <Button
           onClick={onBack}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 16px',
-            borderRadius: '8px',
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: 'none',
-            color: '#fff',
-            cursor: 'pointer',
-            marginBottom: '16px',
-          }}
+          variant="secondary"
+          size="sm"
+          icon={<ArrowLeft size={16} />}
+          style={{ marginBottom: '16px' }}
         >
-          <ArrowLeft size={16} /> Back to Users
-        </button>
-        <div style={{
-          padding: '24px',
-          borderRadius: '12px',
-          background: 'rgba(239, 68, 68, 0.1)',
-          border: '1px solid #ef4444',
-          color: '#f87171',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <AlertTriangle size={20} />
-            <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Error Loading Dossier</h3>
-          </div>
-          <p>{error || 'User not found'}</p>
-        </div>
+          Back to Users
+        </Button>
+        <AlertBanner
+          type="error"
+          message={error || 'User not found'}
+        />
       </div>
     );
   }
@@ -402,88 +388,44 @@ export const UserDetailPage: React.FC<UserDetailPageProps> = ({ userId, onBack }
     <div style={{ padding: '24px' }}>
       {/* Top Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-        <button
+        <Button
           onClick={onBack}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 16px',
-            borderRadius: '8px',
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: 'none',
-            color: '#fff',
-            fontWeight: 600,
-            fontSize: '13px',
-            cursor: 'pointer',
-          }}
+          variant="secondary"
+          size="sm"
+          icon={<ArrowLeft size={16} />}
         >
-          <ArrowLeft size={16} /> Back to Users List
-        </button>
+          Back to Users List
+        </Button>
 
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button
+          <Button
             onClick={fetchDossier}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 14px',
-              borderRadius: '8px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: 'none',
-              color: 'var(--text-secondary, #94a3b8)',
-              fontSize: '13px',
-              cursor: 'pointer',
-            }}
+            variant="secondary"
+            size="sm"
+            icon={<RefreshCw size={14} />}
           >
-            <RefreshCw size={14} /> Refresh
-          </button>
-          <button
+            Refresh
+          </Button>
+          <Button
             onClick={handleToggleStatus}
             disabled={togglingStatus}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 16px',
-              borderRadius: '8px',
-              background: isActive ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)',
-              color: isActive ? '#f87171' : '#4ade80',
-              border: `1px solid ${isActive ? '#ef4444' : '#22c55e'}`,
-              fontWeight: 600,
-              fontSize: '13px',
-              cursor: togglingStatus ? 'not-allowed' : 'pointer',
-            }}
+            variant={isActive ? 'danger' : 'primary'}
+            size="sm"
+            icon={<ShieldAlert size={15} />}
           >
-            <ShieldAlert size={15} />
             {isActive ? 'Disable Account' : 'Activate Account'}
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Feedback Toast */}
       {feedback && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '12px 16px',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          background: feedback.type === 'success' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-          border: `1px solid ${feedback.type === 'success' ? '#22c55e' : '#ef4444'}`,
-          color: feedback.type === 'success' ? '#4ade80' : '#f87171',
-          fontSize: '14px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {feedback.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-            <span>{feedback.message}</span>
-          </div>
-          <button onClick={() => setFeedback(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>
-            <X size={16} />
-          </button>
-        </div>
+        <AlertBanner
+          type={feedback.type}
+          message={feedback.message}
+          onClose={() => setFeedback(null)}
+          style={{ marginBottom: '20px' }}
+        />
       )}
 
       {/* User Header Profile Card */}
@@ -643,96 +585,46 @@ export const UserDetailPage: React.FC<UserDetailPageProps> = ({ userId, onBack }
             </p>
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <button
+            <Button
               onClick={() => setWaterModalOpen(true)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '8px',
-                background: 'rgba(96, 165, 250, 0.15)',
-                color: '#60a5fa',
-                border: '1px solid rgba(96, 165, 250, 0.3)',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
+              variant="secondary"
+              size="sm"
+              icon={<Droplets size={14} />}
             >
-              <Droplets size={14} /> Water Target
-            </button>
-            <button
+              Water Target
+            </Button>
+            <Button
               onClick={() => setQuickAddModalOpen(true)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '8px',
-                background: 'rgba(56, 189, 248, 0.15)',
-                color: '#38bdf8',
-                border: '1px solid rgba(56, 189, 248, 0.3)',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
+              variant="secondary"
+              size="sm"
+              icon={<Layers size={14} />}
             >
-              <Layers size={14} /> Water Quick-Adds
-            </button>
-            <button
+              Water Quick-Adds
+            </Button>
+            <Button
               onClick={() => setWeightModalOpen(true)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '8px',
-                background: 'rgba(52, 211, 153, 0.15)',
-                color: '#34d399',
-                border: '1px solid rgba(52, 211, 153, 0.3)',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
+              variant="secondary"
+              size="sm"
+              icon={<Scale size={14} />}
             >
-              <Scale size={14} /> Weight Goal
-            </button>
-            <button
+              Weight Goal
+            </Button>
+            <Button
               onClick={() => setCardioModalOpen(true)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '8px',
-                background: 'rgba(244, 63, 94, 0.15)',
-                color: '#f43f5e',
-                border: '1px solid rgba(244, 63, 94, 0.3)',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
+              variant="secondary"
+              size="sm"
+              icon={<Plus size={14} />}
             >
-              <Plus size={14} /> Add Cardio Target
-            </button>
-            <button
+              Add Cardio Target
+            </Button>
+            <Button
               onClick={() => setAdherenceModalOpen(true)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '8px',
-                background: 'rgba(168, 85, 247, 0.15)',
-                color: '#a855f7',
-                border: '1px solid rgba(168, 85, 247, 0.3)',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
+              variant="secondary"
+              size="sm"
+              icon={<Sliders size={14} />}
             >
-              <Sliders size={14} /> Adherence Weights
-            </button>
+              Adherence Weights
+            </Button>
           </div>
         </div>
 
@@ -742,12 +634,11 @@ export const UserDetailPage: React.FC<UserDetailPageProps> = ({ userId, onBack }
           <div style={{ padding: '16px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#60a5fa' }}>Water Quick-Add Presets</span>
-              <button
+              <IconButton
+                icon={<Edit3 size={14} />}
                 onClick={() => setQuickAddModalOpen(true)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-secondary, #94a3b8)', cursor: 'pointer' }}
-              >
-                <Edit3 size={14} />
-              </button>
+                label="Edit Water Quick-Adds"
+              />
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {goals.waterQuickAdd && goals.waterQuickAdd.length > 0
@@ -778,12 +669,11 @@ export const UserDetailPage: React.FC<UserDetailPageProps> = ({ userId, onBack }
           <div style={{ padding: '16px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#c084fc' }}>Adherence Weights (Total: 100%)</span>
-              <button
+              <IconButton
+                icon={<Edit3 size={14} />}
                 onClick={() => setAdherenceModalOpen(true)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-secondary, #94a3b8)', cursor: 'pointer' }}
-              >
-                <Edit3 size={14} />
-              </button>
+                label="Edit Adherence Weights"
+              />
             </div>
             {/* Visual Distribution Bar */}
             <div style={{ display: 'flex', height: '8px', borderRadius: '4px', overflow: 'hidden', marginBottom: '10px' }}>
@@ -806,12 +696,11 @@ export const UserDetailPage: React.FC<UserDetailPageProps> = ({ userId, onBack }
           <div style={{ padding: '16px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#34d399' }}>Body Weight Milestones</span>
-              <button
+              <IconButton
+                icon={<Edit3 size={14} />}
                 onClick={() => setWeightModalOpen(true)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-secondary, #94a3b8)', cursor: 'pointer' }}
-              >
-                <Edit3 size={14} />
-              </button>
+                label="Edit Body Weight Goal"
+              />
             </div>
             {goals.weight ? (
               <div style={{ fontSize: '12px' }}>
@@ -870,19 +759,12 @@ export const UserDetailPage: React.FC<UserDetailPageProps> = ({ userId, onBack }
                         <span style={{ fontWeight: 700, color: '#f8fafc', fontSize: '14px' }}>
                           {ct.activity_name || 'General Cardio'}
                         </span>
-                        <button
+                        <IconButton
+                          icon={<Trash2 size={14} />}
                           onClick={() => handleDeleteCardioTarget(ct.id)}
-                          title="Remove Cardio Target"
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#ef4444',
-                            cursor: 'pointer',
-                            padding: '2px',
-                          }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                          label="Remove Cardio Target"
+                          style={{ color: '#ef4444' }}
+                        />
                       </div>
                       <p style={{ fontSize: '12px', color: '#f43f5e', fontWeight: 600, marginTop: '2px' }}>
                         {ct.min_duration_minutes || ct.target_minutes_min}
@@ -1102,497 +984,426 @@ export const UserDetailPage: React.FC<UserDetailPageProps> = ({ userId, onBack }
       {/* --- MODALS --- */}
 
       {/* 1. Water Target Modal */}
-      {waterModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '16px' }}>
-          <div style={{ background: 'var(--bg-secondary, #1e293b)', borderRadius: '16px', maxWidth: '440px', width: '100%', padding: '24px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Set Daily Water Target</h2>
-              <button onClick={() => setWaterModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={20} /></button>
-            </div>
-            <form onSubmit={handleSaveWaterTarget} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Daily Target (ml)</label>
-                <input type="number" value={waterTargetMl} onChange={e => setWaterTargetMl(e.target.value === '' ? '' : parseBoundedInteger(e.target.value, { min: 500, max: 10000, fallback: 0 }))} required min={500} max={10000} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Effective From Date</label>
-                <input type="date" value={waterEffectiveFrom} onChange={e => setWaterEffectiveFrom(e.target.value)} required style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
-                <button type="button" onClick={() => setWaterModalOpen(false)} style={{ padding: '8px 16px', borderRadius: '8px', background: 'transparent', color: '#94a3b8', border: 'none', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={savingWater} style={{ padding: '8px 20px', borderRadius: '8px', background: 'var(--accent-primary, #3b82f6)', color: '#fff', border: 'none', fontWeight: 600, cursor: savingWater ? 'not-allowed' : 'pointer' }}>{savingWater ? 'Saving...' : 'Save Target'}</button>
-              </div>
-            </form>
+      <Dialog
+        isOpen={waterModalOpen}
+        onClose={() => setWaterModalOpen(false)}
+        title="Set Daily Water Target"
+      >
+        <form onSubmit={handleSaveWaterTarget} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <FormField label="Daily Target (ml)" required>
+            <NumberInput
+              value={waterTargetMl}
+              onChange={val => setWaterTargetMl(val === '' ? '' : parseBoundedInteger(String(val), { min: 500, max: 10000, fallback: 0 }))}
+              required
+              min={500}
+              max={10000}
+            />
+          </FormField>
+          <FormField label="Effective From Date" required>
+            <TextInput
+              type="date"
+              value={waterEffectiveFrom}
+              onChange={e => setWaterEffectiveFrom(e.target.value)}
+              required
+            />
+          </FormField>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
+            <Button type="button" variant="secondary" onClick={() => setWaterModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" loading={savingWater}>
+              Save Target
+            </Button>
           </div>
-        </div>
-      )}
+        </form>
+      </Dialog>
 
       {/* 2. Water Quick-Add Presets Modal */}
-      {quickAddModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '16px' }}>
-          <div style={{ background: 'var(--bg-secondary, #1e293b)', borderRadius: '16px', maxWidth: '440px', width: '100%', padding: '24px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Configure Water Quick-Adds</h2>
-              <button onClick={() => setQuickAddModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={20} /></button>
-            </div>
-            <form onSubmit={handleSaveQuickAdd} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Active Quick-Add Amounts</label>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                  {quickAddList.map((amt) => (
-                    <span
-                      key={amt}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 12px',
-                        borderRadius: '8px',
-                        background: 'rgba(56, 189, 248, 0.15)',
-                        border: '1px solid rgba(56, 189, 248, 0.3)',
-                        color: '#38bdf8',
-                        fontWeight: 600,
-                        fontSize: '13px',
-                      }}
-                    >
-                      +{amt} ml
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveQuickAddAmount(amt)}
-                        style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
-                      >
-                        <X size={14} />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Add Preset (ml)</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input
-                    type="number"
-                    min={50}
-                    max={5000}
-                    placeholder="e.g. 330"
-                    value={newQuickAddInput}
-                    onChange={e => setNewQuickAddInput(e.target.value)}
-                    style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddQuickAddAmount}
-                    style={{ padding: '10px 16px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.1)', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer' }}
-                  >
-                    Add
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
-                <button type="button" onClick={() => setQuickAddModalOpen(false)} style={{ padding: '8px 16px', borderRadius: '8px', background: 'transparent', color: '#94a3b8', border: 'none', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={savingQuickAdd || quickAddList.length === 0} style={{ padding: '8px 20px', borderRadius: '8px', background: 'var(--accent-primary, #3b82f6)', color: '#fff', border: 'none', fontWeight: 600, cursor: savingQuickAdd ? 'not-allowed' : 'pointer' }}>{savingQuickAdd ? 'Saving...' : 'Save Quick-Adds'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 3. Weight Goal Modal */}
-      {weightModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '16px' }}>
-          <div style={{ background: 'var(--bg-secondary, #1e293b)', borderRadius: '16px', maxWidth: '480px', width: '100%', padding: '24px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Set Body Weight Goal</h2>
-              <button onClick={() => setWeightModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={20} /></button>
-            </div>
-            <form onSubmit={handleSaveWeightGoal} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Starting Weight (kg)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 82.5"
-                    value={startWeightKg}
-                    onChange={e => setStartWeightKg(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                    required
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Target Weight (kg)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 78.0"
-                    value={targetWeightKg}
-                    onChange={e => setTargetWeightKg(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                    required
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                  />
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Start Date</label>
-                  <input type="date" value={weightStartDate} onChange={e => setWeightStartDate(e.target.value)} required style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Target Date (Optional)</label>
-                  <input type="date" value={weightTargetDate} onChange={e => setWeightTargetDate(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }} />
-                </div>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Goal Notes</label>
-                <input type="text" value={weightNotes} onChange={e => setWeightNotes(e.target.value)} placeholder="e.g. 12-week lean bulk" style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
-                <button type="button" onClick={() => setWeightModalOpen(false)} style={{ padding: '8px 16px', borderRadius: '8px', background: 'transparent', color: '#94a3b8', border: 'none', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={savingWeight} style={{ padding: '8px 20px', borderRadius: '8px', background: 'var(--accent-primary, #3b82f6)', color: '#fff', border: 'none', fontWeight: 600, cursor: savingWeight ? 'not-allowed' : 'pointer' }}>{savingWeight ? 'Saving...' : 'Save Goal'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 4. Cardio Target Modal */}
-      {cardioModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '16px' }}>
-          <div style={{ background: 'var(--bg-secondary, #1e293b)', borderRadius: '16px', maxWidth: '560px', width: '100%', padding: '24px', border: '1px solid rgba(255, 255, 255, 0.1)', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Configure Cardio Target</h2>
-              <button onClick={() => setCardioModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={20} /></button>
-            </div>
-            <form onSubmit={handleSaveCardioTarget} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Cardio Activity</label>
-                <select
-                  value={cardioActivityId}
-                  onChange={e => setCardioActivityId(e.target.value === '' ? '' : Number(e.target.value))}
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                >
-                  <option value="">General Cardio (Any)</option>
-                  {cardioActivities.map(act => (
-                    <option key={act.id} value={act.id}>{act.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Weekdays Checkboxes */}
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Scheduled Weekdays</label>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {WEEKDAYS.map(w => {
-                    const isSelected = cardioWeekdays.includes(w.id);
-                    return (
-                      <button
-                        key={w.id}
-                        type="button"
-                        onClick={() => toggleWeekday(w.id)}
-                        style={{
-                          padding: '6px 12px',
-                          borderRadius: '8px',
-                          background: isSelected ? 'var(--accent-primary, #3b82f6)' : 'rgba(0, 0, 0, 0.3)',
-                          border: `1px solid ${isSelected ? '#3b82f6' : 'rgba(255, 255, 255, 0.1)'}`,
-                          color: '#fff',
-                          fontWeight: 600,
-                          fontSize: '12px',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {w.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Duration range */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Min Duration (mins)</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={1440}
-                    value={cardioMinDuration}
-                    onChange={e => setCardioMinDuration(parseInt(e.target.value, 10) || 1)}
-                    required
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Max Duration (Optional)</label>
-                  <input
-                    type="number"
-                    min={cardioMinDuration}
-                    max={1440}
-                    placeholder="e.g. 45"
-                    value={cardioMaxDuration}
-                    onChange={e => setCardioMaxDuration(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                  />
-                </div>
-              </div>
-
-              {/* Speed range */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Min Speed (km/h)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 8.0"
-                    value={cardioSpeedMin}
-                    onChange={e => setCardioSpeedMin(e.target.value)}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Max Speed (km/h)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 11.5"
-                    value={cardioSpeedMax}
-                    onChange={e => setCardioSpeedMax(e.target.value)}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                  />
-                </div>
-              </div>
-
-              {/* Incline range */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Min Incline (%)</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    placeholder="e.g. 1.0"
-                    value={cardioInclineMin}
-                    onChange={e => setCardioInclineMin(e.target.value)}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Max Incline (%)</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    placeholder="e.g. 4.0"
-                    value={cardioInclineMax}
-                    onChange={e => setCardioInclineMax(e.target.value)}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                  />
-                </div>
-              </div>
-
-              {/* Distance range */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Min Distance (km)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 3.0"
-                    value={cardioDistMin}
-                    onChange={e => setCardioDistMin(e.target.value)}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Max Distance (km)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 5.0"
-                    value={cardioDistMax}
-                    onChange={e => setCardioDistMax(e.target.value)}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                  />
-                </div>
-              </div>
-
-              {/* Effective Dates */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Effective From</label>
-                  <input
-                    type="date"
-                    value={cardioEffectiveFrom}
-                    onChange={e => setCardioEffectiveFrom(e.target.value)}
-                    required
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Effective Until (Optional)</label>
-                  <input
-                    type="date"
-                    value={cardioEffectiveUntil}
-                    onChange={e => setCardioEffectiveUntil(e.target.value)}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Target Notes</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Zone 2 aerobic threshold training"
-                  value={cardioNotes}
-                  onChange={e => setCardioNotes(e.target.value)}
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
-                <button type="button" onClick={() => setCardioModalOpen(false)} style={{ padding: '8px 16px', borderRadius: '8px', background: 'transparent', color: '#94a3b8', border: 'none', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={savingCardio} style={{ padding: '8px 20px', borderRadius: '8px', background: 'var(--accent-primary, #3b82f6)', color: '#fff', border: 'none', fontWeight: 600, cursor: savingCardio ? 'not-allowed' : 'pointer' }}>{savingCardio ? 'Saving...' : 'Create Target'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 5. Adherence Weights Modal */}
-      {adherenceModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '16px' }}>
-          <div style={{ background: 'var(--bg-secondary, #1e293b)', borderRadius: '16px', maxWidth: '480px', width: '100%', padding: '24px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div>
-                <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Configure Adherence Weights</h2>
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary, #94a3b8)', marginTop: '2px' }}>
-                  Define component contribution to the client's daily adherence score.
-                </p>
-              </div>
-              <button onClick={() => setAdherenceModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={20} /></button>
-            </div>
-
-            {/* Total Indicator Badge */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '10px 14px',
-              borderRadius: '8px',
-              marginBottom: '16px',
-              background: isAdherenceValid ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-              border: `1px solid ${isAdherenceValid ? '#22c55e' : '#ef4444'}`,
-              color: isAdherenceValid ? '#4ade80' : '#f87171',
-              fontWeight: 700,
-              fontSize: '14px',
-            }}>
-              <span>Total Weight:</span>
-              <span>{adherenceSum}% {isAdherenceValid ? '✓ (Valid)' : '✗ (Must equal 100%)'}</span>
-            </div>
-
-            <form onSubmit={handleSaveAdherenceWeights} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
-                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>
-                  <span>Diet Plan Adherence</span>
-                  <span style={{ color: '#4ade80' }}>{dietWeight}%</span>
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={dietWeight}
-                  onChange={e => setDietWeight(parseBoundedFloat(e.target.value, { min: 0, max: 100, fallback: 0 }))}
-                  required
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>
-                  <span>Workout Plan Adherence</span>
-                  <span style={{ color: '#38bdf8' }}>{workoutWeight}%</span>
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={workoutWeight}
-                  onChange={e => setWorkoutWeight(parseBoundedFloat(e.target.value, { min: 0, max: 100, fallback: 0 }))}
-                  required
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>
-                  <span>Cardio Target Adherence</span>
-                  <span style={{ color: '#f43f5e' }}>{cardioWeight}%</span>
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={cardioWeight}
-                  onChange={e => setCardioWeight(parseBoundedFloat(e.target.value, { min: 0, max: 100, fallback: 0 }))}
-                  required
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>
-                  <span>Water Target Adherence</span>
-                  <span style={{ color: '#60a5fa' }}>{waterWeight}%</span>
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={waterWeight}
-                  onChange={e => setWaterWeight(parseBoundedFloat(e.target.value, { min: 0, max: 100, fallback: 0 }))}
-                  required
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>
-                  <span>Weight Logging Adherence</span>
-                  <span style={{ color: '#fbbf24' }}>{weightLoggingWeight}%</span>
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={weightLoggingWeight}
-                  onChange={e => setWeightLoggingWeight(parseBoundedFloat(e.target.value, { min: 0, max: 100, fallback: 0 }))}
-                  required
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#fff' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
-                <button type="button" onClick={() => setAdherenceModalOpen(false)} style={{ padding: '8px 16px', borderRadius: '8px', background: 'transparent', color: '#94a3b8', border: 'none', cursor: 'pointer' }}>Cancel</button>
-                <button
-                  type="submit"
-                  disabled={savingAdherence || !isAdherenceValid}
+      <Dialog
+        isOpen={quickAddModalOpen}
+        onClose={() => setQuickAddModalOpen(false)}
+        title="Configure Water Quick-Adds"
+      >
+        <form onSubmit={handleSaveQuickAdd} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Active Quick-Add Amounts</label>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+              {quickAddList.map((amt) => (
+                <span
+                  key={amt}
                   style={{
-                    padding: '8px 20px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
                     borderRadius: '8px',
-                    background: isAdherenceValid ? 'var(--accent-primary, #3b82f6)' : 'rgba(255, 255, 255, 0.1)',
-                    color: isAdherenceValid ? '#fff' : '#64748b',
-                    border: 'none',
+                    background: 'rgba(56, 189, 248, 0.15)',
+                    border: '1px solid rgba(56, 189, 248, 0.3)',
+                    color: '#38bdf8',
                     fontWeight: 600,
-                    cursor: (savingAdherence || !isAdherenceValid) ? 'not-allowed' : 'pointer',
+                    fontSize: '13px',
                   }}
                 >
-                  {savingAdherence ? 'Saving...' : 'Save Weights'}
-                </button>
-              </div>
-            </form>
+                  +{amt} ml
+                  <IconButton
+                    icon={<X size={14} />}
+                    onClick={() => handleRemoveQuickAddAmount(amt)}
+                    label={`Remove ${amt} ml`}
+                    style={{ color: '#f87171', padding: 0 }}
+                  />
+                </span>
+              ))}
+            </div>
           </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Add Preset (ml)</label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <NumberInput
+                min={50}
+                max={5000}
+                placeholder="e.g. 330"
+                value={newQuickAddInput === '' ? '' : Number(newQuickAddInput)}
+                onChange={val => setNewQuickAddInput(val === '' ? '' : String(val))}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleAddQuickAddAmount}
+              >
+                Add
+              </Button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
+            <Button type="button" variant="secondary" onClick={() => setQuickAddModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" loading={savingQuickAdd} disabled={quickAddList.length === 0}>
+              Save Quick-Adds
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+
+      {/* 3. Weight Goal Modal */}
+      <Dialog
+        isOpen={weightModalOpen}
+        onClose={() => setWeightModalOpen(false)}
+        title="Set Body Weight Goal"
+      >
+        <form onSubmit={handleSaveWeightGoal} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <FormField label="Starting Weight (kg)" required>
+              <NumberInput
+                step={0.1}
+                placeholder="e.g. 82.5"
+                value={startWeightKg}
+                onChange={val => setStartWeightKg(val === '' ? '' : Number(val))}
+                required
+              />
+            </FormField>
+            <FormField label="Target Weight (kg)" required>
+              <NumberInput
+                step={0.1}
+                placeholder="e.g. 78.0"
+                value={targetWeightKg}
+                onChange={val => setTargetWeightKg(val === '' ? '' : Number(val))}
+                required
+              />
+            </FormField>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <FormField label="Start Date" required>
+              <TextInput
+                type="date"
+                value={weightStartDate}
+                onChange={e => setWeightStartDate(e.target.value)}
+                required
+              />
+            </FormField>
+            <FormField label="Target Date (Optional)">
+              <TextInput
+                type="date"
+                value={weightTargetDate}
+                onChange={e => setWeightTargetDate(e.target.value)}
+              />
+            </FormField>
+          </div>
+          <FormField label="Goal Notes">
+            <TextInput
+              value={weightNotes}
+              onChange={e => setWeightNotes(e.target.value)}
+              placeholder="e.g. 12-week lean bulk"
+            />
+          </FormField>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
+            <Button type="button" variant="secondary" onClick={() => setWeightModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" loading={savingWeight}>
+              Save Goal
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+
+      {/* 4. Cardio Target Modal */}
+      <Dialog
+        isOpen={cardioModalOpen}
+        onClose={() => setCardioModalOpen(false)}
+        title="Configure Cardio Target"
+      >
+        <form onSubmit={handleSaveCardioTarget} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Cardio Activity</label>
+            <Select
+              options={[
+                { value: '', label: 'General Cardio (Any)' },
+                ...cardioActivities.map(act => ({
+                  value: act.id,
+                  label: act.name,
+                })),
+              ]}
+              value={cardioActivityId}
+              onChange={val => setCardioActivityId(val === '' ? '' : Number(val))}
+              placeholder="Choose Cardio Activity..."
+              searchable
+            />
+          </div>
+
+          {/* Weekdays Checkboxes */}
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Scheduled Weekdays</label>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {WEEKDAYS.map(w => {
+                const isSelected = cardioWeekdays.includes(w.id);
+                return (
+                  <Button
+                    key={w.id}
+                    type="button"
+                    variant={isSelected ? 'primary' : 'secondary'}
+                    size="sm"
+                    onClick={() => toggleWeekday(w.id)}
+                  >
+                    {w.name}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Duration range */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <FormField label="Min Duration (mins)" required>
+              <NumberInput
+                min={1}
+                max={1440}
+                value={cardioMinDuration}
+                onChange={val => setCardioMinDuration(val === '' ? '' : Number(val))}
+                required
+              />
+            </FormField>
+            <FormField label="Max Duration (Optional)">
+              <NumberInput
+                min={cardioMinDuration === '' ? 1 : Number(cardioMinDuration)}
+                max={1440}
+                placeholder="e.g. 45"
+                value={cardioMaxDuration}
+                onChange={val => setCardioMaxDuration(val === '' ? '' : Number(val))}
+              />
+            </FormField>
+          </div>
+
+          {/* Speed range */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <FormField label="Min Speed (km/h)">
+              <TextInput
+                placeholder="e.g. 8.0"
+                value={cardioSpeedMin}
+                onChange={e => setCardioSpeedMin(e.target.value)}
+              />
+            </FormField>
+            <FormField label="Max Speed (km/h)">
+              <TextInput
+                placeholder="e.g. 11.5"
+                value={cardioSpeedMax}
+                onChange={e => setCardioSpeedMax(e.target.value)}
+              />
+            </FormField>
+          </div>
+
+          {/* Incline range */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <FormField label="Min Incline (%)">
+              <TextInput
+                placeholder="e.g. 1.0"
+                value={cardioInclineMin}
+                onChange={e => setCardioInclineMin(e.target.value)}
+              />
+            </FormField>
+            <FormField label="Max Incline (%)">
+              <TextInput
+                placeholder="e.g. 4.0"
+                value={cardioInclineMax}
+                onChange={e => setCardioInclineMax(e.target.value)}
+              />
+            </FormField>
+          </div>
+
+          {/* Distance range */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <FormField label="Min Distance (km)">
+              <TextInput
+                placeholder="e.g. 3.0"
+                value={cardioDistMin}
+                onChange={e => setCardioDistMin(e.target.value)}
+              />
+            </FormField>
+            <FormField label="Max Distance (km)">
+              <TextInput
+                placeholder="e.g. 5.0"
+                value={cardioDistMax}
+                onChange={e => setCardioDistMax(e.target.value)}
+              />
+            </FormField>
+          </div>
+
+          {/* Effective Dates */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <FormField label="Effective From" required>
+              <TextInput
+                type="date"
+                value={cardioEffectiveFrom}
+                onChange={e => setCardioEffectiveFrom(e.target.value)}
+                required
+              />
+            </FormField>
+            <FormField label="Effective Until (Optional)">
+              <TextInput
+                type="date"
+                value={cardioEffectiveUntil}
+                onChange={e => setCardioEffectiveUntil(e.target.value)}
+              />
+            </FormField>
+          </div>
+
+          <FormField label="Target Notes">
+            <TextInput
+              placeholder="e.g. Zone 2 aerobic threshold training"
+              value={cardioNotes}
+              onChange={e => setCardioNotes(e.target.value)}
+            />
+          </FormField>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
+            <Button type="button" variant="secondary" onClick={() => setCardioModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" loading={savingCardio}>
+              Create Target
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+
+      {/* 5. Adherence Weights Modal */}
+      <Dialog
+        isOpen={adherenceModalOpen}
+        onClose={() => setAdherenceModalOpen(false)}
+        title="Configure Adherence Weights"
+      >
+        <div>
+          <p style={{ fontSize: '12px', color: 'var(--text-secondary, #94a3b8)', marginBottom: '16px' }}>
+            Define component contribution to the client's daily adherence score.
+          </p>
+
+          {/* Total Indicator Badge */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '10px 14px',
+            borderRadius: '8px',
+            marginBottom: '16px',
+            background: isAdherenceValid ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+            border: `1px solid ${isAdherenceValid ? '#22c55e' : '#ef4444'}`,
+            color: isAdherenceValid ? '#4ade80' : '#f87171',
+            fontWeight: 700,
+            fontSize: '14px',
+          }}>
+            <span>Total Weight:</span>
+            <span>{adherenceSum}% {isAdherenceValid ? '✓ (Valid)' : '✗ (Must equal 100%)'}</span>
+          </div>
+
+          <form onSubmit={handleSaveAdherenceWeights} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <FormField label={`Diet Plan Adherence (${dietWeight}%)`} required>
+              <NumberInput
+                min={0}
+                max={100}
+                value={dietWeight}
+                onChange={val => setDietWeight(val === '' ? 0 : parseBoundedFloat(String(val), { min: 0, max: 100, fallback: 0 }))}
+                required
+              />
+            </FormField>
+
+            <FormField label={`Workout Plan Adherence (${workoutWeight}%)`} required>
+              <NumberInput
+                min={0}
+                max={100}
+                value={workoutWeight}
+                onChange={val => setWorkoutWeight(val === '' ? 0 : parseBoundedFloat(String(val), { min: 0, max: 100, fallback: 0 }))}
+                required
+              />
+            </FormField>
+
+            <FormField label={`Cardio Target Adherence (${cardioWeight}%)`} required>
+              <NumberInput
+                min={0}
+                max={100}
+                value={cardioWeight}
+                onChange={val => setCardioWeight(val === '' ? 0 : parseBoundedFloat(String(val), { min: 0, max: 100, fallback: 0 }))}
+                required
+              />
+            </FormField>
+
+            <FormField label={`Water Target Adherence (${waterWeight}%)`} required>
+              <NumberInput
+                min={0}
+                max={100}
+                value={waterWeight}
+                onChange={val => setWaterWeight(val === '' ? 0 : parseBoundedFloat(String(val), { min: 0, max: 100, fallback: 0 }))}
+                required
+              />
+            </FormField>
+
+            <FormField label={`Weight Logging Adherence (${weightLoggingWeight}%)`} required>
+              <NumberInput
+                min={0}
+                max={100}
+                value={weightLoggingWeight}
+                onChange={val => setWeightLoggingWeight(val === '' ? 0 : parseBoundedFloat(String(val), { min: 0, max: 100, fallback: 0 }))}
+                required
+              />
+            </FormField>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
+              <Button type="button" variant="secondary" onClick={() => setAdherenceModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                loading={savingAdherence}
+                disabled={!isAdherenceValid}
+              >
+                Save Weights
+              </Button>
+            </div>
+          </form>
         </div>
-      )}
+      </Dialog>
     </div>
   );
 };

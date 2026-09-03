@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/premium_widgets.dart';
 
 class ProgressScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -47,38 +48,23 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppThemeColors.of(context);
+
     if (_isLoading) {
-      return const Scaffold(
+      return PremiumScaffold(
         body:
-            Center(child: CircularProgressIndicator(color: AppColors.primary)),
+            Center(child: CircularProgressIndicator(color: colors.primary)),
       );
     }
 
     if (_errorMessage != null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Progress & Analytics')),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.cloud_off, size: 48, color: AppColors.rose),
-                const SizedBox(height: 16),
-                Text(
-                  'Failed to load progress analytics: $_errorMessage',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: _fetchProgress,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
+      return PremiumScaffold(
+        appBar: const PremiumAppBar(
+          titleText: 'Progress & Analytics',
+        ),
+        body: ErrorStateWidget(
+          message: _errorMessage!,
+          onRetry: _fetchProgress,
         ),
       );
     }
@@ -87,126 +73,196 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final cardio = _progress?['cardio'];
     final weight = _progress?['weight'];
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Progress & Analytics')),
+    return PremiumScaffold(
+      appBar: const PremiumAppBar(
+        titleText: 'Progress & Analytics',
+      ),
       body: RefreshIndicator(
         onRefresh: _fetchProgress,
-        color: AppColors.primary,
+        color: colors.primary,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppSpacing.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Workout Volume Card
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.fitness_center, color: AppColors.cyan),
-                          SizedBox(width: 8),
-                          Text('WORKOUT SESSIONS',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: AppColors.cyan)),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '${workouts?['completedSessions'] ?? 0} Workouts Completed',
-                        style: const TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${workouts?['totalSets'] ?? 0} working sets logged',
-                        style: const TextStyle(
-                            color: AppColors.textSecondary, fontSize: 13),
-                      ),
-                    ],
+              const SectionHeader(
+                title: 'Performance Overview',
+                subtitle: 'Aggregated analytics across training disciplines',
+              ),
+              const SizedBox(height: 8),
+
+              // KPI Row
+              Row(
+                children: [
+                  Expanded(
+                    child: MetricCard(
+                      title: 'Workouts',
+                      value: '${workouts?['completedSessions'] ?? 0}',
+                      subtitle: '${workouts?['totalSets'] ?? 0} working sets',
+                      icon: Icons.fitness_center,
+                      accentColor: colors.cyan,
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: MetricCard(
+                      title: 'Cardio',
+                      value: '${cardio?['totalMinutes'] ?? 0}m',
+                      subtitle: '${cardio?['totalCalories'] ?? 0} kcal burned',
+                      icon: Icons.directions_run,
+                      accentColor: colors.amber,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
 
-              // Cardio Card
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.directions_run, color: AppColors.amber),
-                          SizedBox(width: 8),
-                          Text('CARDIO CONDITIONING',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: AppColors.amber)),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '${cardio?['totalMinutes'] ?? 0} Total Minutes',
-                        style: const TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${cardio?['totalCalories'] ?? 0} active kcal burned',
-                        style: const TextStyle(
-                            color: AppColors.textSecondary, fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Weight Card
-              if (weight != null)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              // Detailed Workout Volume Card
+              PremiumCard(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Row(
+                        Row(
                           children: [
-                            Icon(Icons.trending_down, color: AppColors.primary),
-                            SizedBox(width: 8),
-                            Text('BODY COMPOSITION',
+                            Icon(Icons.fitness_center,
+                                color: colors.cyan, size: 18),
+                            const SizedBox(width: 8),
+                            Text('RESISTANCE TRAINING',
                                 style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                    color: AppColors.primary)),
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12,
+                                    letterSpacing: 0.5,
+                                    color: colors.cyan)),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          weight['currentWeightKg'] != null
-                              ? '${weight['currentWeightKg']} kg Current'
-                              : 'No Weight Logged',
-                          style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          weight['targetWeightKg'] != null
-                              ? 'Goal: ${weight['targetWeightKg']} kg (${weight['weightLostKg'] ?? 0} kg lost)'
-                              : 'No weight goal configured',
-                          style: const TextStyle(
-                              color: AppColors.textSecondary, fontSize: 13),
+                        StatusBadge(
+                          label:
+                              '${workouts?['completedSessions'] ?? 0} Sessions',
+                          color: colors.cyan,
                         ),
                       ],
                     ),
+                    const SizedBox(height: 14),
+                    Text(
+                      '${workouts?['completedSessions'] ?? 0} Workouts Completed',
+                      style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: colors.textPrimary),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${workouts?['totalSets'] ?? 0} completed working sets tracked across all muscle groups',
+                      style: TextStyle(
+                          color: colors.textSecondary, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Detailed Cardio Card
+              PremiumCard(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.directions_run,
+                                color: colors.amber, size: 18),
+                            const SizedBox(width: 8),
+                            Text('CARDIO CONDITIONING',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12,
+                                    letterSpacing: 0.5,
+                                    color: colors.amber)),
+                          ],
+                        ),
+                        StatusBadge(
+                          label: '${cardio?['totalMinutes'] ?? 0} min',
+                          color: colors.amber,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      '${cardio?['totalMinutes'] ?? 0} Total Cardio Minutes',
+                      style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: colors.textPrimary),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${cardio?['totalCalories'] ?? 0} active kcal burned across logged sessions',
+                      style: TextStyle(
+                          color: colors.textSecondary, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Detailed Weight Card
+              if (weight != null)
+                PremiumCard(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.trending_down,
+                                  color: colors.primary, size: 18),
+                              const SizedBox(width: 8),
+                              Text('BODY COMPOSITION',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 12,
+                                      letterSpacing: 0.5,
+                                      color: colors.primary)),
+                            ],
+                          ),
+                          StatusBadge(
+                            label: weight['currentWeightKg'] != null
+                                ? '${weight['currentWeightKg']} kg'
+                                : 'Pending',
+                            color: colors.primary,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        weight['currentWeightKg'] != null
+                            ? '${weight['currentWeightKg']} kg Current'
+                            : 'No Weight Logged',
+                        style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: colors.textPrimary),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        weight['targetWeightKg'] != null
+                            ? 'Goal: ${weight['targetWeightKg']} kg (${weight['weightLostKg'] ?? 0} kg total delta)'
+                            : 'No target body weight goal currently assigned',
+                        style: TextStyle(
+                            color: colors.textSecondary, fontSize: 13),
+                      ),
+                    ],
                   ),
                 ),
             ],

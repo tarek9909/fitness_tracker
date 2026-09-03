@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/premium_widgets.dart';
 
 class MealLoggingScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -107,25 +108,28 @@ class _MealLoggingScreenState extends State<MealLoggingScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('${widget.meal['name']} logged successfully!')),
+        showPremiumSnackBar(
+          context,
+          '${widget.meal['name']} logged successfully!',
+          isSuccess: true,
         );
         Navigator.pop(context);
       }
     } on OfflineOperationQueued catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Meal log saved offline. Will sync when online.')),
+        showPremiumSnackBar(
+          context,
+          'Meal log saved offline. Will sync when online.',
         );
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to log meal: $e')),
+        showPremiumSnackBar(
+          context,
+          'Failed to log meal: $e',
+          isError: true,
         );
       }
     }
@@ -133,42 +137,48 @@ class _MealLoggingScreenState extends State<MealLoggingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppThemeColors.of(context);
     final groups = (widget.meal['optionGroups'] as List<dynamic>? ?? []);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Log ${widget.meal['name']}'),
+    return PremiumScaffold(
+      appBar: PremiumAppBar(
+        titleText: 'Log ${widget.meal['name']}',
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border),
-              ),
+            PremiumCard(
+              padding: const EdgeInsets.all(AppSpacing.md),
               child: Row(
                 children: [
-                  const Icon(Icons.restaurant, color: AppColors.amber),
-                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: colors.amberMuted,
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                    ),
+                    child: Icon(Icons.restaurant,
+                        color: colors.amber, size: 22),
+                  ),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           widget.meal['name'],
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16),
+                          style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                              color: colors.textPrimary),
                         ),
-                        const SizedBox(height: 4),
-                        const Text(
+                        const SizedBox(height: 2),
+                        Text(
                           'Select your status and food choices for this meal.',
                           style: TextStyle(
-                              fontSize: 13, color: AppColors.textSecondary),
+                              fontSize: 13, color: colors.textSecondary),
                         ),
                       ],
                     ),
@@ -179,44 +189,66 @@ class _MealLoggingScreenState extends State<MealLoggingScreen> {
             const SizedBox(height: 16),
 
             // Status Selector
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('MEAL STATUS',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                            color: AppColors.cyan)),
-                    const SizedBox(height: 12),
-                    SegmentedButton<String>(
-                      segments: const [
-                        ButtonSegment(
-                          value: 'completed',
-                          label: Text('Completed'),
-                          icon: Icon(Icons.check_circle_outline, size: 16),
-                        ),
-                        ButtonSegment(
-                          value: 'partial',
-                          label: Text('Partial'),
-                          icon: Icon(Icons.incomplete_circle, size: 16),
-                        ),
-                        ButtonSegment(
-                          value: 'skipped',
-                          label: Text('Skipped'),
-                          icon: Icon(Icons.cancel_outlined, size: 16),
-                        ),
-                      ],
-                      selected: {_status},
-                      onSelectionChanged: (val) {
-                        setState(() => _status = val.first);
-                      },
+            PremiumCard(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('MEAL STATUS',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                          color: colors.textSecondary)),
+                  const SizedBox(height: 12),
+                  SegmentedButton<String>(
+                    style: ButtonStyle(
+                      backgroundColor:
+                          WidgetStateProperty.resolveWith<Color>((states) {
+                        if (states.contains(WidgetState.selected)) {
+                          return colors.primary;
+                        }
+                        return colors.surfaceElevated;
+                      }),
+                      foregroundColor:
+                          WidgetStateProperty.resolveWith<Color>((states) {
+                        if (states.contains(WidgetState.selected)) {
+                          return Colors.white;
+                        }
+                        return colors.textSecondary;
+                      }),
+                      side: WidgetStateProperty.all(
+                          BorderSide(color: colors.border)),
                     ),
-                  ],
-                ),
+                    segments: const [
+                      ButtonSegment(
+                        value: 'completed',
+                        label: Text('Completed',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 13)),
+                        icon: Icon(Icons.check_circle_outline, size: 16),
+                      ),
+                      ButtonSegment(
+                        value: 'partial',
+                        label: Text('Partial',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 13)),
+                        icon: Icon(Icons.incomplete_circle, size: 16),
+                      ),
+                      ButtonSegment(
+                        value: 'skipped',
+                        label: Text('Skipped',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 13)),
+                        icon: Icon(Icons.cancel_outlined, size: 16),
+                      ),
+                    ],
+                    selected: {_status},
+                    onSelectionChanged: (val) {
+                      setState(() => _status = val.first);
+                    },
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 16),
@@ -226,21 +258,23 @@ class _MealLoggingScreenState extends State<MealLoggingScreen> {
                 padding: const EdgeInsets.all(12),
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: AppColors.rose.withValues(alpha: 0.15),
+                  color: colors.roseMuted,
                   border:
-                      Border.all(color: AppColors.rose.withValues(alpha: 0.3)),
-                  borderRadius: BorderRadius.circular(12),
+                      Border.all(color: colors.rose.withValues(alpha: 0.3)),
+                  borderRadius: BorderRadius.circular(AppRadii.md),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline,
-                        color: AppColors.rose, size: 20),
+                    Icon(Icons.error_outline,
+                        color: colors.rose, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _validationError!,
-                        style: const TextStyle(
-                            color: AppColors.rose, fontSize: 13),
+                        style: TextStyle(
+                            color: colors.rose,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600),
                       ),
                     ),
                   ],
@@ -250,19 +284,23 @@ class _MealLoggingScreenState extends State<MealLoggingScreen> {
             if (_status != 'skipped') ...[
               ...groups.map((group) {
                 final gId = group['id'] as int;
-                final opts = (group['options'] as List<dynamic>? ?? []);
+                final gName = group['name'] as String? ?? 'Food Choice';
+                final isOptional =
+                    group['is_optional'] == 1 || group['is_optional'] == true;
                 final maxSelections = (group['max_selections'] ??
                     group['maxSelections'] ??
                     1) as int;
                 final minSelections = (group['min_selections'] ??
                     group['minSelections'] ??
-                    (group['is_optional'] == 1 ? 0 : 1)) as int;
+                    (isOptional ? 0 : 1)) as int;
+                final isMulti = maxSelections > 1;
+                final opts = (group['options'] as List<dynamic>? ?? []);
                 final selectedSet = _selectedOptions[gId] ?? {};
 
-                return Card(
+                return Container(
                   margin: const EdgeInsets.only(bottom: 16),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
+                  child: PremiumCard(
+                    padding: const EdgeInsets.all(AppSpacing.md),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -270,58 +308,51 @@ class _MealLoggingScreenState extends State<MealLoggingScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              group['name'] ?? 'Food Group',
-                              style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.cyan),
+                              gName,
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: colors.textPrimary),
                             ),
-                            Text(
-                              maxSelections > 1
-                                  ? 'Select $minSelections–$maxSelections'
-                                  : (minSelections == 0
-                                      ? 'Optional'
-                                      : 'Required (1)'),
-                              style: const TextStyle(
-                                  fontSize: 11, color: AppColors.textMuted),
+                            StatusBadge(
+                              label: isMulti
+                                  ? 'Select up to $maxSelections'
+                                  : (minSelections > 0
+                                      ? 'Required'
+                                      : 'Optional'),
+                              color: minSelections > 0
+                                  ? colors.primary
+                                  : colors.cyan,
                             ),
                           ],
                         ),
                         const SizedBox(height: 12),
-                        if (maxSelections > 1)
+                        if (isMulti)
                           ...opts.map((opt) {
                             final optId = opt['id'] as int;
-                            final isSelected = selectedSet.contains(optId);
+                            final isChecked = selectedSet.contains(optId);
 
                             return Container(
                               margin: const EdgeInsets.only(bottom: 8),
                               decoration: BoxDecoration(
-                                color: isSelected
-                                    ? AppColors.primary.withValues(alpha: 0.12)
-                                    : AppColors.surface,
-                                borderRadius: BorderRadius.circular(10),
+                                color: isChecked
+                                    ? colors.primaryMuted
+                                    : colors.surfaceElevated,
+                                borderRadius:
+                                    BorderRadius.circular(AppRadii.md),
                                 border: Border.all(
-                                    color: isSelected
-                                        ? AppColors.primary
-                                        : AppColors.border),
+                                    color: isChecked
+                                        ? colors.primary
+                                            .withValues(alpha: 0.4)
+                                        : colors.border),
                               ),
-                              child: CheckboxListTile(
-                                value: isSelected,
-                                activeColor: AppColors.primary,
-                                title: Text(
-                                  opt['custom_label'] ??
-                                      opt['food_name'] ??
-                                      'Choice',
-                                  style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600),
-                                ),
-                                subtitle: Text(
-                                  '${opt['calories'] ?? 0} kcal  •  ${opt['protein_g'] ?? 0}g Protein',
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textSecondary),
-                                ),
+                              child: PremiumCheckboxTile(
+                                value: isChecked,
+                                title: opt['custom_label'] ??
+                                    opt['food_name'] ??
+                                    'Choice',
+                                subtitle:
+                                    '${opt['calories'] ?? 0} kcal  •  ${opt['protein_g'] ?? 0}g Protein',
                                 onChanged: (bool? checked) {
                                   setState(() {
                                     final current = _selectedOptions
@@ -339,56 +370,45 @@ class _MealLoggingScreenState extends State<MealLoggingScreen> {
                             );
                           })
                         else
-                          RadioGroup<int>(
-                            groupValue: selectedSet.isNotEmpty
-                                ? selectedSet.first
-                                : null,
-                            onChanged: (val) {
-                              if (val != null) {
-                                setState(() {
-                                  _selectedOptions[gId] = {val};
-                                });
-                              }
-                            },
-                            child: Column(
-                              children: opts.map<Widget>((opt) {
-                                final optId = opt['id'] as int;
-                                final isSelected = selectedSet.contains(optId);
+                          Column(
+                            children: opts.map<Widget>((opt) {
+                              final optId = opt['id'] as int;
+                              final isSelected = selectedSet.contains(optId);
 
-                                return Container(
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? AppColors.primary
-                                            .withValues(alpha: 0.12)
-                                        : AppColors.surface,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                        color: isSelected
-                                            ? AppColors.primary
-                                            : AppColors.border),
-                                  ),
-                                  child: RadioListTile<int>(
-                                    value: optId,
-                                    activeColor: AppColors.primary,
-                                    title: Text(
-                                      opt['custom_label'] ??
-                                          opt['food_name'] ??
-                                          'Choice',
-                                      style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600),
-                                    ),
-                                    subtitle: Text(
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? colors.primaryMuted
+                                      : colors.surfaceElevated,
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadii.md),
+                                  border: Border.all(
+                                      color: isSelected
+                                          ? colors.primary
+                                              .withValues(alpha: 0.4)
+                                          : colors.border),
+                                ),
+                                child: PremiumRadioTile<int>(
+                                  value: optId,
+                                  groupValue: selectedSet.isNotEmpty
+                                      ? selectedSet.first
+                                      : -1,
+                                  title: opt['custom_label'] ??
+                                      opt['food_name'] ??
+                                      'Choice',
+                                  subtitle:
                                       '${opt['calories'] ?? 0} kcal  •  ${opt['protein_g'] ?? 0}g Protein',
-                                      style: const TextStyle(
-                                          fontSize: 12,
-                                          color: AppColors.textSecondary),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() {
+                                        _selectedOptions[gId] = {val};
+                                      });
+                                    }
+                                  },
+                                ),
+                              );
+                            }).toList(),
                           ),
                       ],
                     ),
@@ -398,40 +418,35 @@ class _MealLoggingScreenState extends State<MealLoggingScreen> {
             ],
 
             // User Notes Card
-            Card(
-              margin: const EdgeInsets.only(bottom: 16),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('NOTES (OPTIONAL)',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                            color: AppColors.cyan)),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _notesController,
-                      maxLines: 2,
-                      textInputAction: TextInputAction.done,
-                      decoration: const InputDecoration(
-                        hintText: 'e.g. Substituted with olive oil',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ],
-                ),
+            PremiumCard(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('NOTES (OPTIONAL)',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                          color: colors.textSecondary)),
+                  const SizedBox(height: 8),
+                  PremiumTextField(
+                    controller: _notesController,
+                    maxLines: 2,
+                    label: 'Add note (e.g. Substituted olive oil)',
+                    textInputAction: TextInputAction.done,
+                  ),
+                ],
               ),
             ),
 
-            const SizedBox(height: 8),
-            ElevatedButton(
+            const SizedBox(height: 20),
+            PremiumButton(
               onPressed: _isLoading ? null : _submitMealLog,
-              child: _isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Confirm & Save Meal Log'),
+              loading: _isLoading,
+              text: 'Confirm & Save Meal Log',
+              icon: const Icon(Icons.check, size: 18, color: Colors.white),
+              height: 48,
             ),
           ],
         ),

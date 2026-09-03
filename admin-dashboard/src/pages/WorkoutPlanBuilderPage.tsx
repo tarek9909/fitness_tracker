@@ -23,6 +23,19 @@ import {
   ChevronUp,
   FileText
 } from 'lucide-react';
+import {
+  Select,
+  Button,
+  IconButton,
+  Badge,
+  Card,
+  Dialog,
+  FormField,
+  TextInput,
+  NumberInput,
+  TextArea,
+  Checkbox,
+} from '../components/ui';
 
 interface WorkoutPlanBuilderProps {
   planId: number;
@@ -317,14 +330,13 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
       {/* Top Navigation Bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button onClick={onBack} className="btn btn-secondary btn-sm" id="btn-back-to-plans">
-            <ArrowLeft size={16} />
-            <span>Back to Plans</span>
-          </button>
+          <Button onClick={onBack} variant="secondary" size="sm" id="btn-back-to-plans" icon={<ArrowLeft size={16} />}>
+            Back to Plans
+          </Button>
           <div>
             <h2 style={{ fontSize: '1.35rem', fontWeight: 800 }}>{plan?.name || 'Workout Plan'}</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              <span className="badge badge-info">{plan?.goal_category || 'General Fitness'}</span>
+              <Badge variant="info">{plan?.goal_category || 'General Fitness'}</Badge>
               <span>{plan?.description || 'No description provided'}</span>
             </div>
           </div>
@@ -332,41 +344,38 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
 
         {/* Version Selector & Global Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--bg-tertiary)', padding: '0.35rem 0.75rem', borderRadius: 'var(--radius-md)' }}>
-            <Layers size={14} color="var(--accent-cyan, #06b6d4)" />
-            <select
-              id="select-workout-version"
-              style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.85rem', outline: 'none' }}
+          <div style={{ minWidth: '180px' }}>
+            <Select
+              options={
+                plan?.versions?.map((v: any) => ({
+                  value: v.id,
+                  label: `v${v.version_number} (${v.status ? v.status.toUpperCase() : 'DRAFT'})`,
+                })) || []
+              }
               value={selectedVersionId || ''}
-              onChange={(e) => setSelectedVersionId(Number(e.target.value))}
-            >
-              {plan?.versions?.map((v: any) => (
-                <option key={v.id} value={v.id} style={{ background: 'var(--bg-secondary)', color: '#fff' }}>
-                  v{v.version_number} ({v.status ? v.status.toUpperCase() : 'DRAFT'})
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedVersionId(Number(val))}
+              placeholder="Select Version..."
+            />
           </div>
 
-          <button 
-            onClick={() => setShowWeeklyPreview(!showWeeklyPreview)} 
-            className={`btn btn-sm ${showWeeklyPreview ? 'btn-primary' : 'btn-secondary'}`}
+          <Button
+            onClick={() => setShowWeeklyPreview(!showWeeklyPreview)}
+            variant={showWeeklyPreview ? 'primary' : 'secondary'}
+            size="sm"
             id="btn-toggle-weekly-preview"
+            icon={<Eye size={14} />}
           >
-            <Eye size={14} />
-            <span>{showWeeklyPreview ? 'Back to Editor' : 'Weekly Preview'}</span>
-          </button>
+            {showWeeklyPreview ? 'Back to Editor' : 'Weekly Preview'}
+          </Button>
 
-          <button onClick={handleCloneVersion} className="btn btn-secondary btn-sm" id="btn-clone-version" title="Clone into editable draft version">
-            <Copy size={14} />
-            <span>Clone to Draft</span>
-          </button>
+          <Button onClick={handleCloneVersion} variant="secondary" size="sm" id="btn-clone-version" title="Clone into editable draft version" icon={<Copy size={14} />}>
+            Clone to Draft
+          </Button>
 
           {!isPublished ? (
-            <button onClick={handlePublishVersion} className="btn btn-primary btn-sm" id="btn-publish-version">
-              <Check size={14} />
-              <span>Publish Version</span>
-            </button>
+            <Button onClick={handlePublishVersion} variant="primary" size="sm" id="btn-publish-version" icon={<Check size={14} />}>
+              Publish Version
+            </Button>
           ) : (
             <span className="badge badge-success" style={{ padding: '0.5rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
               <Lock size={12} />
@@ -386,29 +395,27 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
                 Audited schedule across all 7 days for {versionDetails?.version_number ? `Version ${versionDetails.version_number}` : 'Current Version'} ({versionDetails?.status ? versionDetails.status.toUpperCase() : 'DRAFT'}).
               </p>
             </div>
-            <button onClick={() => setShowWeeklyPreview(false)} className="btn btn-secondary btn-sm">
-              <ArrowLeft size={14} />
-              <span>Return to Daily Editor</span>
-            </button>
+            <Button onClick={() => setShowWeeklyPreview(false)} variant="secondary" size="sm" icon={<ArrowLeft size={14} />}>
+              Return to Daily Editor
+            </Button>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
             {versionDetails?.days?.map((day: any, dIdx: number) => (
-              <div 
-                key={day.id || dIdx} 
-                className="card"
-                style={{ 
+              <Card
+                key={day.id || dIdx}
+                style={{
                   backgroundColor: day.is_rest_day ? 'rgba(245, 158, 11, 0.03)' : 'var(--bg-card)',
-                  border: day.is_rest_day ? '1px dashed var(--accent-amber, #f59e0b)' : '1px solid var(--border-color)',
+                  border: day.is_rest_day ? '1px dashed var(--accent-amber)' : '1px solid var(--border-color)',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                   <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-primary)' }}>
                     Day {dIdx + 1}: {day.name}
                   </div>
-                  <span className={`badge ${day.is_rest_day ? 'badge-warning' : 'badge-info'}`}>
+                  <Badge variant={day.is_rest_day ? 'warning' : 'info'}>
                     {day.is_rest_day ? 'Rest Day' : `${day.exercises?.length || 0} Movements`}
-                  </span>
+                  </Badge>
                 </div>
 
                 {day.notes && (
@@ -418,7 +425,7 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
                 )}
 
                 {day.is_rest_day ? (
-                  <div style={{ padding: '1.5rem 1rem', textAlign: 'center', color: 'var(--accent-amber, #f59e0b)', fontSize: '0.85rem' }}>
+                  <div style={{ padding: '1.5rem 1rem', textAlign: 'center', color: 'var(--accent-amber)', fontSize: '0.85rem' }}>
                     Scheduled Rest & System Recovery
                   </div>
                 ) : day.exercises && day.exercises.length > 0 ? (
@@ -458,7 +465,7 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
                     No exercises programmed
                   </div>
                 )}
-              </div>
+              </Card>
             ))}
           </div>
         </div>
@@ -473,37 +480,36 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
               const isRest = dayData?.is_rest_day;
 
               return (
-                <button
+                <Button
                   key={idx}
                   id={`btn-day-tab-${idx}`}
+                  variant={isSelected ? 'primary' : 'secondary'}
                   onClick={() => setSelectedDayIndex(idx)}
                   style={{
                     padding: '0.85rem 0.5rem',
-                    borderRadius: 'var(--radius-md)',
+                    height: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
                     border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                    backgroundColor: isSelected ? 'rgba(16, 185, 129, 0.12)' : 'var(--bg-card)',
-                    color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
-                    cursor: 'pointer',
-                    textAlign: 'center',
-                    transition: 'all 0.15s ease',
                   }}
                 >
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: isSelected ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)', textTransform: 'uppercase' }}>
                     Day {idx + 1}
                   </div>
                   <div style={{ fontSize: '0.9rem', fontWeight: 700, marginTop: '0.2rem' }}>
                     {dayName}
                   </div>
-                  <div style={{ fontSize: '0.7rem', marginTop: '0.35rem', color: isRest ? 'var(--accent-amber)' : 'var(--text-secondary)' }}>
+                  <div style={{ fontSize: '0.7rem', marginTop: '0.35rem', color: isSelected ? '#ffffff' : (isRest ? 'var(--accent-amber)' : 'var(--text-secondary)') }}>
                     {isRest ? 'Rest Day' : `${dayData?.exercises?.length || 0} Exercises`}
                   </div>
-                </button>
+                </Button>
               );
             })}
           </div>
 
           {/* Selected Day Workout Content */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <Card style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -511,15 +517,16 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
                     {activeDay?.name || `Day ${selectedDayIndex + 1}`}
                   </h3>
                   {!isPublished && (
-                    <button 
-                      onClick={handleOpenEditDayModal} 
-                      className="btn btn-secondary btn-sm"
+                    <Button
+                      onClick={handleOpenEditDayModal}
+                      variant="secondary"
+                      size="sm"
                       title="Edit day title & notes"
+                      icon={<Edit2 size={12} />}
                       style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
                     >
-                      <Edit2 size={12} />
-                      <span>Edit Title</span>
-                    </button>
+                      Edit Title
+                    </Button>
                   )}
                 </div>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
@@ -529,14 +536,13 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
 
               {!isPublished && (
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  <button onClick={handleToggleRestDay} className="btn btn-secondary btn-sm" id="btn-toggle-rest-day">
+                  <Button onClick={handleToggleRestDay} variant="secondary" size="sm" id="btn-toggle-rest-day">
                     {activeDay?.is_rest_day ? 'Convert to Training Day' : 'Set as Rest Day'}
-                  </button>
+                  </Button>
                   {!activeDay?.is_rest_day && (
-                    <button onClick={handleOpenAddModal} className="btn btn-primary btn-sm" id="btn-add-exercise">
-                      <Plus size={14} />
-                      <span>Add Exercise</span>
-                    </button>
+                    <Button onClick={handleOpenAddModal} variant="primary" size="sm" id="btn-add-exercise" icon={<Plus size={14} />}>
+                      Add Exercise
+                    </Button>
                   )}
                 </div>
               )}
@@ -568,36 +574,22 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
                             {/* Reordering Controls */}
                             {!isPublished && (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                                <button
-                                  type="button"
+                                <IconButton
+                                  icon={<ArrowUp size={14} />}
+                                  label="Move Up"
+                                  size="sm"
                                   disabled={i === 0}
                                   onClick={() => handleMoveExercise(i, 'up')}
-                                  style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: i === 0 ? 'var(--text-muted)' : 'var(--text-primary)',
-                                    cursor: i === 0 ? 'not-allowed' : 'pointer',
-                                    padding: '0.1rem',
-                                  }}
-                                  title="Move Up"
-                                >
-                                  <ArrowUp size={14} />
-                                </button>
-                                <button
-                                  type="button"
+                                  style={{ width: '22px', height: '22px' }}
+                                />
+                                <IconButton
+                                  icon={<ArrowDown size={14} />}
+                                  label="Move Down"
+                                  size="sm"
                                   disabled={i === activeDay.exercises.length - 1}
                                   onClick={() => handleMoveExercise(i, 'down')}
-                                  style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: i === activeDay.exercises.length - 1 ? 'var(--text-muted)' : 'var(--text-primary)',
-                                    cursor: i === activeDay.exercises.length - 1 ? 'not-allowed' : 'pointer',
-                                    padding: '0.1rem',
-                                  }}
-                                  title="Move Down"
-                                >
-                                  <ArrowDown size={14} />
-                                </button>
+                                  style={{ width: '22px', height: '22px' }}
+                                />
                               </div>
                             )}
 
@@ -619,9 +611,9 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{ex.exercise_name}</span>
                                 {ex.is_optional ? (
-                                  <span className="badge badge-info" style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem' }}>
+                                  <Badge variant="info" style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem' }}>
                                     Optional
-                                  </span>
+                                  </Badge>
                                 ) : null}
                               </div>
                               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -646,34 +638,32 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
                             </div>
 
                             {setsCount > 0 && (
-                              <button
-                                type="button"
+                              <Button
+                                variant="secondary"
+                                size="sm"
                                 onClick={() => toggleSetBreakdown(ex.id)}
-                                className="btn btn-secondary btn-sm"
-                                title="Toggle per-set target breakdown"
+                                icon={isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                 style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }}
                               >
-                                {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                <span>{isExpanded ? 'Hide Sets' : 'Sets'}</span>
-                              </button>
+                                {isExpanded ? 'Hide Sets' : 'Sets'}
+                              </Button>
                             )}
 
                             {!isPublished && (
                               <div style={{ display: 'flex', gap: '0.4rem' }}>
-                                <button
+                                <IconButton
+                                  icon={<Edit2 size={14} />}
+                                  label="Edit Exercise Targets"
+                                  size="sm"
                                   onClick={() => handleOpenEditModal(ex)}
-                                  className="btn btn-sm btn-secondary"
-                                  title="Edit Exercise Targets"
-                                >
-                                  <Edit2 size={14} />
-                                </button>
-                                <button
+                                />
+                                <IconButton
+                                  icon={<Trash2 size={14} />}
+                                  label="Delete Exercise"
+                                  variant="danger"
+                                  size="sm"
                                   onClick={() => handleDeleteExercise(ex.id)}
-                                  className="btn btn-sm btn-danger"
-                                  title="Delete Exercise"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
+                                />
                               </div>
                             )}
                           </div>
@@ -730,205 +720,171 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
                 Rest Day — Focus on nutrition, sleep, hydration, and active recovery.
               </div>
             )}
-          </div>
+          </Card>
         </>
       )}
 
       {/* Add / Edit Exercise Modal */}
       {showAddExerciseModal && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '560px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>
-                {editingExercise ? `Edit ${editingExercise.exercise_name}` : `Add Exercise to ${activeDay?.name || 'Workout Day'}`}
-              </h3>
-              <button onClick={() => setShowAddExerciseModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
+        <Dialog
+          isOpen={showAddExerciseModal}
+          onClose={() => setShowAddExerciseModal(false)}
+          title={editingExercise ? `Edit ${editingExercise.exercise_name}` : `Add Exercise to ${activeDay?.name || 'Workout Day'}`}
+          maxWidth="560px"
+          footer={
+            <>
+              <Button type="button" variant="secondary" onClick={() => setShowAddExerciseModal(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" id="btn-save-exercise-modal" onClick={handleSaveExercise}>
+                {editingExercise ? 'Save Changes' : 'Add to Day'}
+              </Button>
+            </>
+          }
+        >
+          <form onSubmit={handleSaveExercise} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {!editingExercise && (
+              <FormField label="Select Exercise">
+                {libraryExercises.length === 0 ? (
+                  <p style={{ color: 'var(--accent-amber)', fontSize: '0.85rem' }}>No exercises found in library. Please create exercises in the Exercise Library first.</p>
+                ) : (
+                  <Select
+                    options={[
+                      { value: '', label: '-- Choose Exercise --' },
+                      ...libraryExercises.map((ex) => ({
+                        value: ex.id,
+                        label: `${ex.name} (${ex.primary_muscle_group_name || 'General'})`,
+                      })),
+                    ]}
+                    value={exForm.exerciseId}
+                    onChange={(val) => setExForm({ ...exForm, exerciseId: val === '' ? '' : Number(val) })}
+                    placeholder="Choose Exercise..."
+                    searchable
+                  />
+                )}
+              </FormField>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+              <FormField label="Working Sets" required>
+                <NumberInput
+                  id="input-target-sets"
+                  min={1}
+                  max={20}
+                  required
+                  placeholder="e.g. 3"
+                  value={exForm.targetSets}
+                  onChange={(val) => setExForm({ ...exForm, targetSets: val })}
+                />
+              </FormField>
+              <FormField label="Min Reps" required>
+                <NumberInput
+                  id="input-reps-min"
+                  min={1}
+                  max={500}
+                  required
+                  placeholder="e.g. 8"
+                  value={exForm.repsMin}
+                  onChange={(val) => setExForm({ ...exForm, repsMin: val })}
+                />
+              </FormField>
+              <FormField label="Max Reps">
+                <NumberInput
+                  id="input-reps-max"
+                  min={1}
+                  max={500}
+                  placeholder="e.g. 12"
+                  value={exForm.repsMax}
+                  onChange={(val) => setExForm({ ...exForm, repsMax: val })}
+                />
+              </FormField>
             </div>
 
-            <form onSubmit={handleSaveExercise} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {!editingExercise && (
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Select Exercise</label>
-                  {libraryExercises.length === 0 ? (
-                    <p style={{ color: 'var(--accent-amber, #f59e0b)', fontSize: '0.85rem' }}>No exercises found in library. Please create exercises in the Exercise Library first.</p>
-                  ) : (
-                    <select
-                      className="select"
-                      id="input-exercise-select"
-                      value={exForm.exerciseId}
-                      onChange={(e) => setExForm({ ...exForm, exerciseId: e.target.value === '' ? '' : Number(e.target.value) })}
-                    >
-                      <option value="">-- Choose Exercise --</option>
-                      {libraryExercises.map((ex) => (
-                        <option key={ex.id} value={ex.id}>
-                          {ex.name} ({ex.primary_muscle_group_name || 'General'})
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              )}
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Working Sets *</label>
-                  <input
-                    type="number"
-                    id="input-target-sets"
-                    className="input"
-                    min={1}
-                    max={20}
-                    required
-                    placeholder="e.g. 3"
-                    value={exForm.targetSets}
-                    onChange={(e) => setExForm({ ...exForm, targetSets: e.target.value === '' ? '' : Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Min Reps *</label>
-                  <input
-                    type="number"
-                    id="input-reps-min"
-                    className="input"
-                    min={1}
-                    max={500}
-                    required
-                    placeholder="e.g. 8"
-                    value={exForm.repsMin}
-                    onChange={(e) => setExForm({ ...exForm, repsMin: e.target.value === '' ? '' : Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Max Reps</label>
-                  <input
-                    type="number"
-                    id="input-reps-max"
-                    className="input"
-                    min={1}
-                    max={500}
-                    placeholder="e.g. 12"
-                    value={exForm.repsMax}
-                    onChange={(e) => setExForm({ ...exForm, repsMax: e.target.value === '' ? '' : Number(e.target.value) })}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Target RIR (0–10)</label>
-                  <input
-                    type="number"
-                    id="input-rir-target"
-                    className="input"
-                    min={0}
-                    max={10}
-                    step={0.5}
-                    placeholder="e.g. 2"
-                    value={exForm.rirTarget}
-                    onChange={(e) => setExForm({ ...exForm, rirTarget: e.target.value === '' ? '' : Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Rest (seconds)</label>
-                  <input
-                    type="number"
-                    id="input-rest-seconds"
-                    className="input"
-                    min={0}
-                    max={600}
-                    step={15}
-                    placeholder="e.g. 90"
-                    value={exForm.restSeconds}
-                    onChange={(e) => setExForm({ ...exForm, restSeconds: e.target.value === '' ? '' : Number(e.target.value) })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Technique & Cue Notes</label>
-                <textarea
-                  className="textarea"
-                  id="input-exercise-notes"
-                  rows={2}
-                  placeholder="e.g. Pause 1 second at the bottom, maintain neutral spine"
-                  value={exForm.notes}
-                  onChange={(e) => setExForm({ ...exForm, notes: e.target.value })}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <FormField label="Target RIR (0–10)">
+                <NumberInput
+                  id="input-rir-target"
+                  min={0}
+                  max={10}
+                  step={0.5}
+                  placeholder="e.g. 2"
+                  value={exForm.rirTarget}
+                  onChange={(val) => setExForm({ ...exForm, rirTarget: val })}
                 />
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
-                <input
-                  type="checkbox"
-                  id="checkbox-is-optional"
-                  checked={exForm.isOptional}
-                  onChange={(e) => setExForm({ ...exForm, isOptional: e.target.checked })}
+              </FormField>
+              <FormField label="Rest (seconds)">
+                <NumberInput
+                  id="input-rest-seconds"
+                  min={0}
+                  max={600}
+                  step={15}
+                  placeholder="e.g. 90"
+                  value={exForm.restSeconds}
+                  onChange={(val) => setExForm({ ...exForm, restSeconds: val })}
                 />
-                <label htmlFor="checkbox-is-optional" style={{ fontSize: '0.85rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
-                  Mark as Optional Movement (Accessory / Finisher)
-                </label>
-              </div>
+              </FormField>
+            </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setShowAddExerciseModal(false)} className="btn btn-secondary">
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" id="btn-save-exercise-modal">
-                  {editingExercise ? 'Save Changes' : 'Add to Day'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            <FormField label="Technique & Cue Notes">
+              <TextArea
+                id="input-exercise-notes"
+                rows={2}
+                placeholder="e.g. Pause 1 second at the bottom, maintain neutral spine"
+                value={exForm.notes}
+                onChange={(e) => setExForm({ ...exForm, notes: e.target.value })}
+              />
+            </FormField>
+
+            <div style={{ marginTop: '0.25rem' }}>
+              <Checkbox
+                id="checkbox-is-optional"
+                checked={exForm.isOptional}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setExForm({ ...exForm, isOptional: e.target.checked })}
+                label="Mark as Optional Movement (Accessory / Finisher)"
+              />
+            </div>
+          </form>
+        </Dialog>
       )}
 
       {/* Edit Day Details Modal */}
       {showEditDayModal && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '480px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Edit Day {selectedDayIndex + 1} Details</h3>
-              <button onClick={() => setShowEditDayModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
-            </div>
+        <Dialog
+          isOpen={showEditDayModal}
+          onClose={() => setShowEditDayModal(false)}
+          title={`Edit Day ${selectedDayIndex + 1} Details`}
+          maxWidth="480px"
+          footer={
+            <>
+              <Button type="button" variant="secondary" onClick={() => setShowEditDayModal(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" onClick={handleSaveDayDetails}>
+                Save Day
+              </Button>
+            </>
+          }
+        >
+          <form onSubmit={handleSaveDayDetails} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <FormField label="Day Title" required>
+              <TextInput
+                required
+                placeholder="e.g. Upper Body Hypertrophy"
+                value={dayNameInput}
+                onChange={(e) => setDayNameInput(e.target.value)}
+              />
+            </FormField>
 
-            <form onSubmit={handleSaveDayDetails} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Day Title</label>
-                <input
-                  type="text"
-                  className="input"
-                  required
-                  placeholder="e.g. Upper Body Hypertrophy"
-                  value={dayNameInput}
-                  onChange={(e) => setDayNameInput(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Day Focus / Warm-up Notes</label>
-                <textarea
-                  className="textarea"
-                  rows={3}
-                  placeholder="Warm-up protocols, focus muscle groups, recovery cues..."
-                  value={dayNotesInput}
-                  onChange={(e) => setDayNotesInput(e.target.value)}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setShowEditDayModal(false)} className="btn btn-secondary">
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Save Day
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            <FormField label="Day Focus / Warm-up Notes">
+              <TextArea
+                rows={3}
+                placeholder="Warm-up protocols, focus muscle groups, recovery cues..."
+                value={dayNotesInput}
+                onChange={(e) => setDayNotesInput(e.target.value)}
+              />
+            </FormField>
+          </form>
+        </Dialog>
       )}
     </div>
   );

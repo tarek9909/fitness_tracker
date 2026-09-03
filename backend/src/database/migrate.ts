@@ -15,10 +15,13 @@ async function migrationSql(): Promise<string> {
   if (env.dbClient === 'sqlite') return SCHEMA_SQL;
 
   const candidates = [
+    path.resolve(process.cwd(), 'src', 'database', 'fitness_tracker.sql'),
+    path.resolve(process.cwd(), 'src', 'database', 'fitness_tracker.db'),
+    path.resolve(process.cwd(), 'fitness_tracker.sql'),
     path.resolve(process.cwd(), 'fitness_tracker.db'),
     path.resolve(process.cwd(), '..', 'fitness_tracker.db'),
+    path.resolve(process.cwd(), 'dist', 'database', 'fitness_tracker.sql'),
     path.resolve(process.cwd(), 'dist', 'database', 'fitness_tracker.db'),
-    path.resolve(process.cwd(), 'src', 'database', 'fitness_tracker.db'),
   ];
   let sourcePath: string | undefined;
   for (const candidate of candidates) {

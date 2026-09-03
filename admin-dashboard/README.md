@@ -11,6 +11,7 @@ Modern, high-performance administrative web application built with React 18, Vit
   - Authentication state is maintained via backend HttpOnly, SameSite session cookies (`access_token`, `refresh_token`).
 - **Automated Double-Submit CSRF Protection**:
   - The API client (`src/api/client.ts`) extracts the `csrf_token` cookie and automatically attaches `X-CSRF-Token` headers to all state-mutating requests (`POST`, `PUT`, `PATCH`, `DELETE`).
+  - When the API is hosted on a separate origin, it bootstraps the token through `GET /api/v1/auth/csrf` and retains only that non-authenticating CSRF value in transient memory; access and refresh tokens remain HttpOnly.
 - **Single-Flight 401 Refresh Mutex**:
   - When an access token expires, a single refresh request (`POST /api/v1/auth/refresh`) is dispatched; concurrent API requests queue until the refresh resolves.
 - **Strict Role Enforcement**:
@@ -60,7 +61,7 @@ The admin dashboard will be available at `http://localhost:5173`.
 ## 4. Testing, Linting & Production Build
 
 ```powershell
-# Run Vitest automated unit test suite (87/87 tests passing across 12 suites)
+# Run Vitest automated unit test suite (88/88 tests passing across 12 suites)
 npm test
 
 # Typecheck and lint

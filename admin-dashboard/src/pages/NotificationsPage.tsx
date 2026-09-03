@@ -2,10 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { formatDateTime } from '../utils/date-utils';
 import { parsePositiveInteger } from '../utils/number-utils';
-import { 
-  Send, Plus, Eye, 
-  CheckCircle2, AlertCircle, RefreshCw, X 
+import {
+  Send, Plus, Eye,
+  CheckCircle2, AlertCircle, X
 } from 'lucide-react';
+import {
+  Card,
+  Button,
+  Badge,
+  Select,
+  Dialog,
+  FormField,
+  TextInput,
+  TextArea,
+  Pagination,
+  EmptyState,
+  Skeleton,
+  ErrorView,
+  AlertBanner,
+} from '../components/ui';
 
 interface NotificationItem {
   id: number;
@@ -42,6 +57,7 @@ export const NotificationsPage: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Modals
@@ -61,6 +77,7 @@ export const NotificationsPage: React.FC = () => {
   const fetchNotifications = async () => {
     try {
       setLoading(true);
+      setError(null);
       const params = new URLSearchParams();
       params.set('page', page.toString());
       params.set('limit', '20');
@@ -71,7 +88,7 @@ export const NotificationsPage: React.FC = () => {
       setNotifications(res.notifications || []);
       setTotal(res.total || 0);
     } catch (err: any) {
-      setFeedback({ type: 'error', message: err.message || 'Failed to load notifications' });
+      setError(err.message || 'Failed to load notifications');
     } finally {
       setLoading(false);
     }
@@ -133,492 +150,328 @@ export const NotificationsPage: React.FC = () => {
     }
   };
 
+  const totalPages = Math.ceil(total / 20) || 1;
+
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Send size={24} color="var(--accent-primary, #3b82f6)" />
-            Notifications & Dispatch Center
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+            <Send size={22} color="var(--accent-primary)" />
+            <span>Notifications & Dispatch Center</span>
           </h1>
-          <p style={{ color: 'var(--text-secondary, #94a3b8)', fontSize: '14px', marginTop: '4px' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.25rem' }}>
             Monitor in-app notifications, inspect delivery logs, and dispatch messages to users.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button
-            onClick={() => setComposeModalOpen(true)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 16px',
-              borderRadius: '8px',
-              background: 'var(--accent-primary, #3b82f6)',
-              color: '#fff',
-              border: 'none',
-              fontWeight: 600,
-              fontSize: '13px',
-              cursor: 'pointer',
-            }}
-          >
-            <Plus size={16} />
-            Dispatch Message
-          </button>
-        </div>
+        <Button
+          variant="primary"
+          onClick={() => setComposeModalOpen(true)}
+          icon={<Plus size={16} />}
+        >
+          Dispatch Message
+        </Button>
       </div>
 
       {/* Feedback Toast */}
       {feedback && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '12px 16px',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          background: feedback.type === 'success' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-          border: `1px solid ${feedback.type === 'success' ? '#22c55e' : '#ef4444'}`,
-          color: feedback.type === 'success' ? '#4ade80' : '#f87171',
-          fontSize: '14px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {feedback.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-            <span>{feedback.message}</span>
-          </div>
-          <button onClick={() => setFeedback(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>
-            <X size={16} />
-          </button>
-        </div>
+        <AlertBanner
+          type={feedback.type}
+          message={feedback.message}
+          onClose={() => setFeedback(null)}
+        />
       )}
 
       {/* Filter Row */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        <select
-          value={categoryFilter}
-          onChange={e => { setCategoryFilter(e.target.value); setPage(1); }}
-          style={{
-            padding: '8px 12px',
-            borderRadius: '8px',
-            background: 'var(--bg-secondary, #1e293b)',
-            border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
-            color: '#fff',
-            fontSize: '13px',
-          }}
-        >
-          <option value="">All Categories</option>
-          <option value="workout">Workout</option>
-          <option value="meal">Meal</option>
-          <option value="water">Water</option>
-          <option value="cardio">Cardio</option>
-          <option value="weight">Weight</option>
-          <option value="progress">Progress</option>
-          <option value="system">System</option>
-        </select>
+      <Card style={{ padding: '0.875rem 1rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ minWidth: '160px' }}>
+          <Select
+            options={[
+              { value: '', label: 'All Categories' },
+              { value: 'workout', label: 'Workout' },
+              { value: 'meal', label: 'Meal' },
+              { value: 'water', label: 'Water' },
+              { value: 'cardio', label: 'Cardio' },
+              { value: 'weight', label: 'Weight' },
+              { value: 'progress', label: 'Progress' },
+              { value: 'system', label: 'System' },
+            ]}
+            value={categoryFilter}
+            onChange={(val) => { setCategoryFilter(val); setPage(1); }}
+            placeholder="Category"
+          />
+        </div>
 
-        <select
-          value={statusFilter}
-          onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
-          style={{
-            padding: '8px 12px',
-            borderRadius: '8px',
-            background: 'var(--bg-secondary, #1e293b)',
-            border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
-            color: '#fff',
-            fontSize: '13px',
-          }}
-        >
-          <option value="">All Statuses</option>
-          <option value="unread">Unread</option>
-          <option value="read">Read</option>
-          <option value="dismissed">Dismissed</option>
-        </select>
-      </div>
+        <div style={{ minWidth: '160px' }}>
+          <Select
+            options={[
+              { value: '', label: 'All Statuses' },
+              { value: 'unread', label: 'Unread' },
+              { value: 'read', label: 'Read' },
+              { value: 'dismissed', label: 'Dismissed' },
+            ]}
+            value={statusFilter}
+            onChange={(val) => { setStatusFilter(val); setPage(1); }}
+            placeholder="Status"
+          />
+        </div>
+      </Card>
 
-      {/* Table */}
-      <div style={{
-        background: 'var(--bg-secondary, #1e293b)',
-        borderRadius: '12px',
-        border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
-        overflow: 'hidden',
-      }}>
+      {/* Notifications Table Card */}
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary, #94a3b8)' }}>
-            <RefreshCw size={24} className="spin" style={{ marginBottom: '12px' }} />
-            <p>Loading notification logs...</p>
+          <div style={{ padding: '1.5rem' }}>
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} style={{ padding: '1rem 0', borderBottom: '1px solid var(--border-subtle)', display: 'flex', gap: '1rem' }}>
+                <Skeleton width="25%" height="20px" />
+                <Skeleton width="30%" height="20px" />
+                <Skeleton width="15%" height="20px" />
+                <Skeleton width="15%" height="20px" />
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div style={{ padding: '2rem' }}>
+            <ErrorView message={error} onRetry={fetchNotifications} />
           </div>
         ) : notifications.length === 0 ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary, #94a3b8)' }}>
-            <p style={{ fontSize: '16px', fontWeight: 600 }}>No notifications found</p>
+          <div style={{ padding: '2rem' }}>
+            <EmptyState
+              icon={<Send size={36} color="var(--text-muted)" />}
+              title="No notifications found"
+              description="Adjust your filters or dispatch an announcement to athlete devices."
+            />
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ background: 'rgba(0, 0, 0, 0.2)', borderBottom: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))' }}>
-                <th style={{ padding: '12px 16px', color: 'var(--text-secondary, #94a3b8)' }}>Recipient</th>
-                <th style={{ padding: '12px 16px', color: 'var(--text-secondary, #94a3b8)' }}>Title</th>
-                <th style={{ padding: '12px 16px', color: 'var(--text-secondary, #94a3b8)' }}>Category</th>
-                <th style={{ padding: '12px 16px', color: 'var(--text-secondary, #94a3b8)' }}>Type</th>
-                <th style={{ padding: '12px 16px', color: 'var(--text-secondary, #94a3b8)' }}>Status</th>
-                <th style={{ padding: '12px 16px', color: 'var(--text-secondary, #94a3b8)' }}>Deliveries</th>
-                <th style={{ padding: '12px 16px', color: 'var(--text-secondary, #94a3b8)' }}>Sent At</th>
-                <th style={{ padding: '12px 16px', color: 'var(--text-secondary, #94a3b8)', textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {notifications.map(n => (
-                <tr key={n.id} style={{ borderBottom: '1px solid var(--border-color, rgba(255, 255, 255, 0.04))' }}>
-                  <td style={{ padding: '12px 16px', fontWeight: 600 }}>
-                    {n.first_name} {n.last_name || ''}
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)', fontWeight: 400 }}>{n.user_email}</div>
-                  </td>
-                  <td style={{ padding: '12px 16px', maxWidth: '240px' }}>
-                    <div style={{ fontWeight: 600, color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.title}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary, #94a3b8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.message}</div>
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <span style={{
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                      background: 'rgba(59, 130, 246, 0.15)',
-                      color: 'var(--accent-primary, #3b82f6)',
-                    }}>
-                      {n.category}
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px 16px', textTransform: 'capitalize' }}>{n.notification_type}</td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <span style={{
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      textTransform: 'capitalize',
-                      background: n.status === 'read' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                      color: n.status === 'read' ? '#4ade80' : '#f59e0b',
-                    }}>
-                      {n.status}
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <span style={{ padding: '2px 6px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px' }}>
-                      {n.delivery_count || 0} channels
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-secondary, #94a3b8)', fontSize: '12px' }}>
-                    {formatDateTime(n.created_at)}
-                  </td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                    <button
-                      onClick={() => handleInspect(n.id)}
-                      style={{
-                        padding: '6px 10px',
-                        borderRadius: '6px',
-                        background: 'rgba(59, 130, 246, 0.15)',
-                        border: 'none',
-                        color: 'var(--accent-primary, #3b82f6)',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                    >
-                      <Eye size={13} /> Inspect
-                    </button>
-                  </td>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
+                  <th style={{ padding: '0.875rem 1.25rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Recipient</th>
+                  <th style={{ padding: '0.875rem 1rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Title</th>
+                  <th style={{ padding: '0.875rem 1rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Category</th>
+                  <th style={{ padding: '0.875rem 1rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Type</th>
+                  <th style={{ padding: '0.875rem 1rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</th>
+                  <th style={{ padding: '0.875rem 1rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Deliveries</th>
+                  <th style={{ padding: '0.875rem 1rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sent At</th>
+                  <th style={{ padding: '0.875rem 1.25rem', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {notifications.map((n) => (
+                  <tr key={n.id} style={{ borderBottom: '1px solid var(--border-subtle)' }} className="table-row-hover">
+                    <td style={{ padding: '0.875rem 1.25rem', fontWeight: 600 }}>
+                      {n.first_name} {n.last_name || ''}
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>{n.user_email}</div>
+                    </td>
+                    <td style={{ padding: '0.875rem 1rem', maxWidth: '240px' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.title}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.message}</div>
+                    </td>
+                    <td style={{ padding: '0.875rem 1rem' }}>
+                      <Badge variant="info">
+                        {n.category.toUpperCase()}
+                      </Badge>
+                    </td>
+                    <td style={{ padding: '0.875rem 1rem', textTransform: 'capitalize', color: 'var(--text-secondary)' }}>{n.notification_type}</td>
+                    <td style={{ padding: '0.875rem 1rem' }}>
+                      <Badge variant={n.status === 'read' ? 'success' : 'warning'}>
+                        {n.status}
+                      </Badge>
+                    </td>
+                    <td style={{ padding: '0.875rem 1rem' }}>
+                      <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: 'var(--radius-sm)' }}>
+                        {n.delivery_count || 0} channels
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.875rem 1rem', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
+                      {formatDateTime(n.created_at)}
+                    </td>
+                    <td style={{ padding: '0.875rem 1.25rem', textAlign: 'right' }}>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleInspect(n.id)}
+                        icon={<Eye size={13} />}
+                      >
+                        Inspect
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </div>
 
-      {/* Inspect Modal */}
-      {inspectModalOpen && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0, 0, 0, 0.7)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 999,
-          padding: '16px',
-        }}>
-          <div style={{
-            background: 'var(--bg-secondary, #1e293b)',
-            borderRadius: '16px',
-            border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-            maxWidth: '600px',
-            width: '100%',
-            padding: '24px',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Notification & Delivery Details</h2>
-              <button onClick={() => setInspectModalOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary, #94a3b8)', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
+        {/* Pagination */}
+        <div style={{ padding: '0.5rem 1.25rem', borderTop: '1px solid var(--border-subtle)' }}>
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={total}
+            onPageChange={(p) => setPage(p)}
+          />
+        </div>
+      </Card>
+
+      {/* Inspect Modal Dialog */}
+      <Dialog
+        isOpen={inspectModalOpen}
+        onClose={() => setInspectModalOpen(false)}
+        title="Notification & Delivery Details"
+        description="Inspect broadcast payload, client recipient, and channel delivery receipts."
+        footer={
+          <Button variant="secondary" onClick={() => setInspectModalOpen(false)}>
+            Close
+          </Button>
+        }
+      >
+        {loadingDetail || !inspectDetail ? (
+          <div style={{ padding: '2rem', textAlign: 'center' }}>
+            <Skeleton width="60%" height="24px" style={{ margin: '0 auto 1rem' }} />
+            <Skeleton width="100%" height="60px" />
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>{inspectDetail.title}</h3>
+              <p style={{ color: 'var(--text-secondary)', marginTop: '0.35rem', whiteSpace: 'pre-wrap', fontSize: '0.875rem', lineHeight: 1.5 }}>
+                {inspectDetail.message}
+              </p>
             </div>
 
-            {loadingDetail || !inspectDetail ? (
-              <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary, #94a3b8)' }}>
-                <RefreshCw size={24} className="spin" />
-              </div>
+            <div style={{ padding: '0.875rem', background: 'rgba(0, 0, 0, 0.25)', borderRadius: 'var(--radius-md)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.625rem', fontSize: '0.8125rem' }}>
+              <div><strong style={{ color: 'var(--text-secondary)' }}>Recipient:</strong> {inspectDetail.first_name} {inspectDetail.last_name}</div>
+              <div><strong style={{ color: 'var(--text-secondary)' }}>Email:</strong> {inspectDetail.user_email}</div>
+              <div><strong style={{ color: 'var(--text-secondary)' }}>Category:</strong> {inspectDetail.category}</div>
+              <div><strong style={{ color: 'var(--text-secondary)' }}>Status:</strong> {inspectDetail.status}</div>
+              {inspectDetail.deep_link && <div style={{ gridColumn: 'span 2' }}><strong style={{ color: 'var(--text-secondary)' }}>Deep Link:</strong> {inspectDetail.deep_link}</div>}
+            </div>
+
+            <h4 style={{ fontSize: '0.875rem', fontWeight: 700, marginTop: '0.5rem' }}>Channel Delivery Receipts</h4>
+            {inspectDetail.deliveries.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>No external delivery records found.</p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '14px' }}>
-                <div>
-                  <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc' }}>{inspectDetail.title}</h3>
-                  <p style={{ color: 'var(--text-secondary, #94a3b8)', marginTop: '4px', whiteSpace: 'pre-wrap' }}>
-                    {inspectDetail.message}
-                  </p>
-                </div>
-
-                <div style={{ padding: '12px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '13px' }}>
-                  <div><strong>Recipient:</strong> {inspectDetail.first_name} {inspectDetail.last_name}</div>
-                  <div><strong>Email:</strong> {inspectDetail.user_email}</div>
-                  <div><strong>Category:</strong> {inspectDetail.category}</div>
-                  <div><strong>Status:</strong> {inspectDetail.status}</div>
-                  {inspectDetail.deep_link && <div style={{ gridColumn: 'span 2' }}><strong>Deep Link:</strong> {inspectDetail.deep_link}</div>}
-                </div>
-
-                <h4 style={{ fontSize: '14px', fontWeight: 700, marginTop: '8px' }}>Delivery Logs</h4>
-                {inspectDetail.deliveries.length === 0 ? (
-                  <p style={{ color: 'var(--text-secondary, #94a3b8)', fontSize: '13px' }}>No external delivery records found.</p>
-                ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))' }}>
-                        <th style={{ padding: '8px', color: 'var(--text-secondary, #94a3b8)' }}>Channel</th>
-                        <th style={{ padding: '8px', color: 'var(--text-secondary, #94a3b8)' }}>Status</th>
-                        <th style={{ padding: '8px', color: 'var(--text-secondary, #94a3b8)' }}>Attempts</th>
-                        <th style={{ padding: '8px', color: 'var(--text-secondary, #94a3b8)' }}>Timestamp</th>
+              <div style={{ overflowX: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-subtle)', background: 'rgba(255, 255, 255, 0.02)' }}>
+                      <th style={{ padding: '0.5rem 0.75rem', color: 'var(--text-muted)' }}>Channel</th>
+                      <th style={{ padding: '0.5rem 0.75rem', color: 'var(--text-muted)' }}>Status</th>
+                      <th style={{ padding: '0.5rem 0.75rem', color: 'var(--text-muted)' }}>Attempts</th>
+                      <th style={{ padding: '0.5rem 0.75rem', color: 'var(--text-muted)' }}>Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inspectDetail.deliveries.map((d) => (
+                      <tr key={d.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                        <td style={{ padding: '0.5rem 0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>{d.channel}</td>
+                        <td style={{ padding: '0.5rem 0.75rem' }}>
+                          <Badge variant={d.status === 'sent' || d.status === 'delivered' ? 'success' : 'danger'}>
+                            {d.status}
+                          </Badge>
+                        </td>
+                        <td style={{ padding: '0.5rem 0.75rem' }}>{d.attempt_count}</td>
+                        <td style={{ padding: '0.5rem 0.75rem', color: 'var(--text-muted)' }}>
+                          {d.delivered_at || d.sent_at || '—'}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {inspectDetail.deliveries.map(d => (
-                        <tr key={d.id} style={{ borderBottom: '1px solid var(--border-color, rgba(255, 255, 255, 0.04))' }}>
-                          <td style={{ padding: '8px', textTransform: 'uppercase', fontWeight: 600 }}>{d.channel}</td>
-                          <td style={{ padding: '8px', color: d.status === 'sent' || d.status === 'delivered' ? '#4ade80' : '#f87171' }}>{d.status}</td>
-                          <td style={{ padding: '8px' }}>{d.attempt_count}</td>
-                          <td style={{ padding: '8px', color: 'var(--text-secondary, #94a3b8)' }}>
-                            {d.delivered_at || d.sent_at || '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </Dialog>
 
-      {/* Compose Modal */}
-      {composeModalOpen && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0, 0, 0, 0.7)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 999,
-          padding: '16px',
-        }}>
-          <div style={{
-            background: 'var(--bg-secondary, #1e293b)',
-            borderRadius: '16px',
-            border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-            maxWidth: '520px',
-            width: '100%',
-            padding: '24px',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Dispatch Notification</h2>
-              <button onClick={() => setComposeModalOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary, #94a3b8)', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
-            </div>
+      {/* Compose Modal Dialog */}
+      <Dialog
+        isOpen={composeModalOpen}
+        onClose={() => setComposeModalOpen(false)}
+        title="Dispatch Notification"
+        description="Broadcast an announcement or target an individual athlete profile."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setComposeModalOpen(false)} disabled={sending}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleSendNotification} loading={sending}>
+              Send Notification
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleSendNotification} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <FormField label="Target User ID (Leave blank to Broadcast to All Active Users)">
+            <TextInput
+              type="number"
+              value={targetUserId}
+              onChange={(e) => setTargetUserId(e.target.value)}
+              placeholder="e.g. 2 (or leave empty for broadcast)"
+            />
+          </FormField>
 
-            <form onSubmit={handleSendNotification} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>
-                  Target User ID (Leave blank to Broadcast to All Active Users)
-                </label>
-                <input
-                  type="number"
-                  value={targetUserId}
-                  onChange={e => setTargetUserId(e.target.value)}
-                  placeholder="e.g. 2 (or leave empty for broadcast)"
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    background: 'rgba(0, 0, 0, 0.3)',
-                    border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                    color: '#fff',
-                    fontSize: '14px',
-                  }}
-                />
-              </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <FormField label="Category">
+              <Select
+                options={[
+                  { value: 'system', label: 'System' },
+                  { value: 'workout', label: 'Workout' },
+                  { value: 'meal', label: 'Meal' },
+                  { value: 'water', label: 'Water' },
+                  { value: 'cardio', label: 'Cardio' },
+                  { value: 'progress', label: 'Progress' },
+                ]}
+                value={composeCategory}
+                onChange={(val) => setComposeCategory(val)}
+              />
+            </FormField>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Category</label>
-                  <select
-                    value={composeCategory}
-                    onChange={e => setComposeCategory(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      background: 'rgba(0, 0, 0, 0.3)',
-                      border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                      color: '#fff',
-                      fontSize: '14px',
-                    }}
-                  >
-                    <option value="system">System</option>
-                    <option value="workout">Workout</option>
-                    <option value="meal">Meal</option>
-                    <option value="water">Water</option>
-                    <option value="cardio">Cardio</option>
-                    <option value="progress">Progress</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Type</label>
-                  <select
-                    value={composeType}
-                    onChange={e => setComposeType(e.target.value as any)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      background: 'rgba(0, 0, 0, 0.3)',
-                      border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                      color: '#fff',
-                      fontSize: '14px',
-                    }}
-                  >
-                    <option value="system">System Message</option>
-                    <option value="reminder">Reminder</option>
-                    <option value="adherence">Adherence Nudge</option>
-                    <option value="alert">Critical Alert</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Notification Title</label>
-                <input
-                  type="text"
-                  value={composeTitle}
-                  onChange={e => setComposeTitle(e.target.value)}
-                  placeholder="e.g. Schedule Update"
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    background: 'rgba(0, 0, 0, 0.3)',
-                    border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                    color: '#fff',
-                    fontSize: '14px',
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Message Body</label>
-                <textarea
-                  value={composeMessage}
-                  onChange={e => setComposeMessage(e.target.value)}
-                  placeholder="Enter message content for recipient(s)..."
-                  required
-                  rows={3}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    background: 'rgba(0, 0, 0, 0.3)',
-                    border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                    color: '#fff',
-                    fontSize: '14px',
-                    resize: 'vertical',
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Deep Link Route (Optional)</label>
-                <input
-                  type="text"
-                  value={composeDeepLink}
-                  onChange={e => setComposeDeepLink(e.target.value)}
-                  placeholder="e.g. /workout or /water"
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    background: 'rgba(0, 0, 0, 0.3)',
-                    border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                    color: '#fff',
-                    fontSize: '14px',
-                  }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
-                <button
-                  type="button"
-                  onClick={() => setComposeModalOpen(false)}
-                  style={{
-                    padding: '10px 16px',
-                    borderRadius: '8px',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    color: 'var(--text-secondary, #94a3b8)',
-                    border: 'none',
-                    fontWeight: 600,
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={sending}
-                  style={{
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    background: 'var(--accent-primary, #3b82f6)',
-                    color: '#fff',
-                    border: 'none',
-                    fontWeight: 600,
-                    fontSize: '13px',
-                    cursor: sending ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  {sending ? 'Dispatching...' : 'Send Notification'}
-                </button>
-              </div>
-            </form>
+            <FormField label="Type">
+              <Select
+                options={[
+                  { value: 'system', label: 'System Message' },
+                  { value: 'reminder', label: 'Reminder' },
+                  { value: 'adherence', label: 'Adherence Nudge' },
+                  { value: 'alert', label: 'Critical Alert' },
+                ]}
+                value={composeType}
+                onChange={(val) => setComposeType(val as any)}
+              />
+            </FormField>
           </div>
-        </div>
-      )}
+
+          <FormField label="Notification Title" required>
+            <TextInput
+              required
+              value={composeTitle}
+              onChange={(e) => setComposeTitle(e.target.value)}
+              placeholder="e.g. Protocol Schedule Update"
+            />
+          </FormField>
+
+          <FormField label="Message Body" required>
+            <TextArea
+              required
+              rows={3}
+              value={composeMessage}
+              onChange={(e) => setComposeMessage(e.target.value)}
+              placeholder="Enter message content for recipient(s)..."
+            />
+          </FormField>
+
+          <FormField label="Deep Link Route (Optional)">
+            <TextInput
+              value={composeDeepLink}
+              onChange={(e) => setComposeDeepLink(e.target.value)}
+              placeholder="e.g. /workout or /water"
+            />
+          </FormField>
+        </form>
+      </Dialog>
     </div>
   );
 };

@@ -1,7 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { formatDateOnly } from '../utils/date-utils';
-import { UserCheck, Plus, CheckCircle2, Dumbbell, Utensils, AlertCircle, RefreshCw, X, Calendar, Clock } from 'lucide-react';
+import { UserCheck, Plus, CheckCircle2, Dumbbell, Utensils, AlertCircle, X, Calendar } from 'lucide-react';
+import {
+  Card,
+  Button,
+  Badge,
+  Select,
+  Dialog,
+  FormField,
+  TextInput,
+  EmptyState,
+  Skeleton,
+  ErrorView,
+  AlertBanner,
+} from '../components/ui';
 
 export const AssignmentsPage: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
@@ -19,6 +32,8 @@ export const AssignmentsPage: React.FC = () => {
 
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
   const [showDietModal, setShowDietModal] = useState(false);
+  const [submittingWorkout, setSubmittingWorkout] = useState(false);
+  const [submittingDiet, setSubmittingDiet] = useState(false);
 
   const [selectedWorkoutVersionId, setSelectedWorkoutVersionId] = useState<number | ''>('');
   const [selectedDietVersionId, setSelectedDietVersionId] = useState<number | ''>('');
@@ -54,7 +69,6 @@ export const AssignmentsPage: React.FC = () => {
           }
         })
       );
-      // Filter out plans with no published versions
       setWorkoutPlansWithPublished(wPlansDetails.filter((p: any) => p.publishedVersions.length > 0));
 
       // Fetch details for diet plans to extract ONLY published versions
@@ -127,19 +141,12 @@ export const AssignmentsPage: React.FC = () => {
 
   const handleAssignWorkout = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedUserId) {
-      alert('Please select a client account first');
-      return;
-    }
-    if (!selectedWorkoutVersionId) {
-      alert('Please select a published workout plan version');
-      return;
-    }
-    if (!effectiveFrom) {
-      alert('Please enter an effective start date');
+    if (!selectedUserId || !selectedWorkoutVersionId || !effectiveFrom) {
+      alert('Please fill all required assignment fields');
       return;
     }
 
+    setSubmittingWorkout(true);
     try {
       await api.post(`/admin/users/${selectedUserId}/workout-assignments`, {
         workoutPlanVersionId: Number(selectedWorkoutVersionId),
@@ -152,24 +159,19 @@ export const AssignmentsPage: React.FC = () => {
       fetchUserAssignments(selectedUserId);
     } catch (err: any) {
       alert(err.message || 'Assignment failed');
+    } finally {
+      setSubmittingWorkout(false);
     }
   };
 
   const handleAssignDiet = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedUserId) {
-      alert('Please select a client account first');
-      return;
-    }
-    if (!selectedDietVersionId) {
-      alert('Please select a published diet protocol version');
-      return;
-    }
-    if (!effectiveFrom) {
-      alert('Please enter an effective start date');
+    if (!selectedUserId || !selectedDietVersionId || !effectiveFrom) {
+      alert('Please fill all required assignment fields');
       return;
     }
 
+    setSubmittingDiet(true);
     try {
       await api.post(`/admin/users/${selectedUserId}/diet-assignments`, {
         dietPlanVersionId: Number(selectedDietVersionId),
@@ -182,10 +184,11 @@ export const AssignmentsPage: React.FC = () => {
       fetchUserAssignments(selectedUserId);
     } catch (err: any) {
       alert(err.message || 'Assignment failed');
+    } finally {
+      setSubmittingDiet(false);
     }
   };
 
-  // Categorize assignments into current, upcoming, and history
   const categorizeAssignments = (assignments: any[]) => {
     const today = new Date().toISOString().split('T')[0];
     const current: any[] = [];
@@ -213,119 +216,102 @@ export const AssignmentsPage: React.FC = () => {
 
   if (loadingInitial) {
     return (
-      <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-        <RefreshCw size={24} className="spin" style={{ marginBottom: '12px' }} />
-        <p>Loading plan assignments center...</p>
+      <div style={{ padding: '3rem', textAlign: 'center' }}>
+        <Skeleton width="40%" height="28px" style={{ margin: '0 auto 1.5rem' }} />
+        <Skeleton width="100%" height="80px" />
       </div>
     );
   }
 
   if (error) {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <AlertCircle size={32} color="var(--accent-rose)" style={{ marginBottom: '1rem' }} />
-        <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Failed to Load Assignments</h3>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>{error}</p>
-        <button onClick={fetchInitialData} className="btn btn-primary">
-          <RefreshCw size={14} />
-          <span>Retry</span>
-        </button>
-      </div>
-    );
+    return <ErrorView message={error} onRetry={fetchInitialData} />;
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Plan Assignments</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Plan Assignments</h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.25rem' }}>
             Assign authoritative published workout and diet protocols to active client profiles.
           </p>
         </div>
       </div>
 
       {feedback && (
-        <div style={{
-          padding: '0.75rem 1rem',
-          borderRadius: 'var(--radius-md)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          background: feedback.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(244, 63, 94, 0.15)',
-          border: `1px solid ${feedback.type === 'success' ? '#10b981' : '#f43f5e'}`,
-          color: feedback.type === 'success' ? '#34d399' : '#fb7185',
-          fontSize: '0.875rem',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            {feedback.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-            <span>{feedback.message}</span>
-          </div>
-          <button onClick={() => setFeedback(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>
-            <X size={16} />
-          </button>
-        </div>
+        <AlertBanner
+          type={feedback.type}
+          message={feedback.message}
+          onClose={() => setFeedback(null)}
+        />
       )}
 
-      {/* Select Client Bar */}
-      <div className="card" style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+      {/* Select Client Bar Card */}
+      <Card style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1, minWidth: '280px' }}>
           <label style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
             Select Client:
           </label>
-          <select
-            className="select"
-            value={selectedUserId || ''}
-            onChange={(e) => setSelectedUserId(e.target.value ? Number(e.target.value) : null)}
-            aria-label="Select Client Account"
-          >
-            <option value="">-- Choose a Client Account --</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.firstName} {u.lastName} ({u.email})
-              </option>
-            ))}
-          </select>
+          <div style={{ flex: 1, maxWidth: '400px' }}>
+            <Select
+              options={[
+                { value: '', label: '-- Choose a Client Account --' },
+                ...users.map((u) => ({
+                  value: u.id,
+                  label: `${u.firstName || u.first_name} ${u.lastName || u.last_name}`,
+                  subLabel: u.email,
+                })),
+              ]}
+              value={selectedUserId || ''}
+              onChange={(val) => setSelectedUserId(val ? Number(val) : null)}
+              placeholder="Choose a Client Account"
+              searchable
+            />
+          </div>
         </div>
 
         {selectedUserId && (
           <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button onClick={handleOpenWorkoutModal} className="btn btn-primary btn-sm">
-              <Dumbbell size={14} />
-              <span>Assign Workout</span>
-            </button>
-            <button onClick={handleOpenDietModal} className="btn btn-secondary btn-sm">
-              <Utensils size={14} />
-              <span>Assign Diet</span>
-            </button>
+            <Button variant="primary" size="sm" onClick={handleOpenWorkoutModal} icon={<Dumbbell size={14} />}>
+              Assign Workout
+            </Button>
+            <Button variant="secondary" size="sm" onClick={handleOpenDietModal} icon={<Utensils size={14} />}>
+              Assign Diet
+            </Button>
           </div>
         )}
-      </div>
+      </Card>
 
       {!selectedUserId ? (
-        <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
-          <UserCheck size={36} style={{ marginBottom: '0.75rem', opacity: 0.5 }} />
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>No Client Selected</h3>
-          <p style={{ color: 'var(--text-secondary)' }}>Select a client account above to view active, upcoming, and past plan assignments.</p>
-        </div>
+        <EmptyState
+          icon={<UserCheck size={36} color="var(--text-muted)" />}
+          title="No Client Selected"
+          description="Select a client account above to view active, upcoming, and past plan assignments."
+        />
       ) : loadingAssignments ? (
-        <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-          <RefreshCw size={24} className="spin" style={{ marginBottom: '12px' }} />
-          <p>Loading client assignments...</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem' }}>
+          <Card style={{ height: '220px' }}>
+            <Skeleton width="40%" height="24px" style={{ marginBottom: '1rem' }} />
+            <Skeleton width="100%" height="60px" />
+          </Card>
+          <Card style={{ height: '220px' }}>
+            <Skeleton width="40%" height="24px" style={{ marginBottom: '1rem' }} />
+            <Skeleton width="100%" height="60px" />
+          </Card>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem' }}>
           {/* Workout Assignments Section */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+          <Card style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '1.1rem' }}>
                 <Dumbbell size={18} color="var(--accent-cyan)" />
                 <span>Workout Plan Assignments</span>
               </div>
-              <button onClick={handleOpenWorkoutModal} className="btn btn-primary btn-sm">
-                <Plus size={12} />
-                <span>Assign</span>
-              </button>
+              <Button variant="primary" size="sm" onClick={handleOpenWorkoutModal} icon={<Plus size={12} />}>
+                Assign
+              </Button>
             </div>
 
             {workoutAssignments.length === 0 ? (
@@ -340,7 +326,7 @@ export const AssignmentsPage: React.FC = () => {
                       Active / Current ({categorizedWorkouts.current.length})
                     </div>
                     {categorizedWorkouts.current.map((a) => (
-                      <div key={a.id} style={{ padding: '0.75rem 1rem', background: 'rgba(16, 185, 129, 0.06)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: 'var(--radius-md)', marginBottom: '0.5rem' }}>
+                      <div key={a.id} style={{ padding: '0.75rem 1rem', background: 'var(--accent-primary-muted)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: 'var(--radius-md)', marginBottom: '0.5rem' }}>
                         <div style={{ fontWeight: 700 }}>{a.plan_name || a.workout_name || 'Workout Plan'} (v{a.version_number || a.plan_version_number || '—'})</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                           From: {formatDateOnly(a.effective_from || a.effectiveFrom)} {a.effective_to ? `• To: ${formatDateOnly(a.effective_to)}` : '• Ongoing'}
@@ -356,7 +342,7 @@ export const AssignmentsPage: React.FC = () => {
                       Upcoming ({categorizedWorkouts.upcoming.length})
                     </div>
                     {categorizedWorkouts.upcoming.map((a) => (
-                      <div key={a.id} style={{ padding: '0.75rem 1rem', background: 'rgba(6, 182, 212, 0.06)', border: '1px solid rgba(6, 182, 212, 0.2)', borderRadius: 'var(--radius-md)', marginBottom: '0.5rem' }}>
+                      <div key={a.id} style={{ padding: '0.75rem 1rem', background: 'var(--accent-cyan-muted)', border: '1px solid rgba(56, 189, 248, 0.2)', borderRadius: 'var(--radius-md)', marginBottom: '0.5rem' }}>
                         <div style={{ fontWeight: 700 }}>{a.plan_name || a.workout_name || 'Workout Plan'} (v{a.version_number || a.plan_version_number || '—'})</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                           Starts: {formatDateOnly(a.effective_from || a.effectiveFrom)}
@@ -372,7 +358,7 @@ export const AssignmentsPage: React.FC = () => {
                       Past / History ({categorizedWorkouts.history.length})
                     </div>
                     {categorizedWorkouts.history.map((a) => (
-                      <div key={a.id} style={{ padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', marginBottom: '0.5rem', opacity: 0.75 }}>
+                      <div key={a.id} style={{ padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', marginBottom: '0.5rem', opacity: 0.75 }}>
                         <div style={{ fontWeight: 600 }}>{a.plan_name || a.workout_name || 'Workout Plan'} (v{a.version_number || a.plan_version_number || '—'})</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
                           {formatDateOnly(a.effective_from || a.effectiveFrom)} to {formatDateOnly(a.effective_to || a.effectiveTo)}
@@ -383,19 +369,18 @@ export const AssignmentsPage: React.FC = () => {
                 )}
               </div>
             )}
-          </div>
+          </Card>
 
           {/* Diet Assignments Section */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+          <Card style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '1.1rem' }}>
                 <Utensils size={18} color="var(--accent-amber)" />
                 <span>Diet Protocol Assignments</span>
               </div>
-              <button onClick={handleOpenDietModal} className="btn btn-secondary btn-sm">
-                <Plus size={12} />
-                <span>Assign</span>
-              </button>
+              <Button variant="secondary" size="sm" onClick={handleOpenDietModal} icon={<Plus size={12} />}>
+                Assign
+              </Button>
             </div>
 
             {dietAssignments.length === 0 ? (
@@ -410,7 +395,7 @@ export const AssignmentsPage: React.FC = () => {
                       Active / Current ({categorizedDiets.current.length})
                     </div>
                     {categorizedDiets.current.map((a) => (
-                      <div key={a.id} style={{ padding: '0.75rem 1rem', background: 'rgba(16, 185, 129, 0.06)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: 'var(--radius-md)', marginBottom: '0.5rem' }}>
+                      <div key={a.id} style={{ padding: '0.75rem 1rem', background: 'var(--accent-primary-muted)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: 'var(--radius-md)', marginBottom: '0.5rem' }}>
                         <div style={{ fontWeight: 700 }}>{a.plan_name || a.diet_name || 'Diet Protocol'} (v{a.version_number || a.plan_version_number || '—'})</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                           From: {formatDateOnly(a.effective_from || a.effectiveFrom)} {a.effective_to ? `• To: ${formatDateOnly(a.effective_to)}` : '• Ongoing'}
@@ -426,7 +411,7 @@ export const AssignmentsPage: React.FC = () => {
                       Upcoming ({categorizedDiets.upcoming.length})
                     </div>
                     {categorizedDiets.upcoming.map((a) => (
-                      <div key={a.id} style={{ padding: '0.75rem 1rem', background: 'rgba(6, 182, 212, 0.06)', border: '1px solid rgba(6, 182, 212, 0.2)', borderRadius: 'var(--radius-md)', marginBottom: '0.5rem' }}>
+                      <div key={a.id} style={{ padding: '0.75rem 1rem', background: 'var(--accent-cyan-muted)', border: '1px solid rgba(56, 189, 248, 0.2)', borderRadius: 'var(--radius-md)', marginBottom: '0.5rem' }}>
                         <div style={{ fontWeight: 700 }}>{a.plan_name || a.diet_name || 'Diet Protocol'} (v{a.version_number || a.plan_version_number || '—'})</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                           Starts: {formatDateOnly(a.effective_from || a.effectiveFrom)}
@@ -442,7 +427,7 @@ export const AssignmentsPage: React.FC = () => {
                       Past / History ({categorizedDiets.history.length})
                     </div>
                     {categorizedDiets.history.map((a) => (
-                      <div key={a.id} style={{ padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', marginBottom: '0.5rem', opacity: 0.75 }}>
+                      <div key={a.id} style={{ padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', marginBottom: '0.5rem', opacity: 0.75 }}>
                         <div style={{ fontWeight: 600 }}>{a.plan_name || a.diet_name || 'Diet Protocol'} (v{a.version_number || a.plan_version_number || '—'})</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
                           {formatDateOnly(a.effective_from || a.effectiveFrom)} to {formatDateOnly(a.effective_to || a.effectiveTo)}
@@ -453,187 +438,155 @@ export const AssignmentsPage: React.FC = () => {
                 )}
               </div>
             )}
-          </div>
+          </Card>
         </div>
       )}
 
-      {/* Assign Workout Modal */}
-      {showWorkoutModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Assign Workout Plan</h3>
-              <button onClick={() => setShowWorkoutModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleAssignWorkout} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
-                  Select Published Workout Version *
-                </label>
-                {workoutPlansWithPublished.length === 0 ? (
-                  <p style={{ color: 'var(--accent-rose)', fontSize: '0.85rem' }}>
-                    No published workout plans found. You must publish a workout plan version in Workout Plans before it can be assigned.
-                  </p>
-                ) : (
-                  <select
-                    className="select"
-                    required
-                    value={selectedWorkoutVersionId}
-                    onChange={(e) => setSelectedWorkoutVersionId(e.target.value === '' ? '' : Number(e.target.value))}
-                  >
-                    <option value="">-- Choose Published Plan Version --</option>
-                    {workoutPlansWithPublished.map((p) =>
-                      p.publishedVersions.map((v: any) => (
-                        <option key={v.id} value={v.id}>
-                          {p.name} — Version {v.version_number} (Published)
-                        </option>
-                      ))
-                    )}
-                  </select>
+      {/* Assign Workout Dialog */}
+      <Dialog
+        isOpen={showWorkoutModal}
+        onClose={() => setShowWorkoutModal(false)}
+        title="Assign Workout Plan"
+        description="Prescribe an immutable published workout version to this client."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowWorkoutModal(false)} disabled={submittingWorkout}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleAssignWorkout}
+              disabled={workoutPlansWithPublished.length === 0}
+              loading={submittingWorkout}
+            >
+              Confirm Assignment
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleAssignWorkout} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <FormField label="Select Published Workout Version" required>
+            {workoutPlansWithPublished.length === 0 ? (
+              <p style={{ color: 'var(--accent-rose)', fontSize: '0.85rem' }}>
+                No published workout plans found. You must publish a workout plan version in Workout Plans before it can be assigned.
+              </p>
+            ) : (
+              <Select
+                options={workoutPlansWithPublished.flatMap((p) =>
+                  p.publishedVersions.map((v: any) => ({
+                    value: v.id,
+                    label: `${p.name} — Version ${v.version_number}`,
+                    subLabel: 'Published Protocol',
+                  }))
                 )}
-              </div>
+                value={selectedWorkoutVersionId}
+                onChange={(val) => setSelectedWorkoutVersionId(val ? Number(val) : '')}
+                placeholder="Choose Published Plan Version"
+              />
+            )}
+          </FormField>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
-                    Effective Start Date *
-                  </label>
-                  <input
-                    type="date"
-                    className="input"
-                    required
-                    value={effectiveFrom}
-                    onChange={(e) => setEffectiveFrom(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
-                    Effective End Date (Optional)
-                  </label>
-                  <input
-                    type="date"
-                    className="input"
-                    value={effectiveTo}
-                    onChange={(e) => setEffectiveTo(e.target.value)}
-                  />
-                </div>
-              </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <FormField label="Effective Start Date" required>
+              <TextInput
+                type="date"
+                required
+                value={effectiveFrom}
+                onChange={(e) => setEffectiveFrom(e.target.value)}
+              />
+            </FormField>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
-                  Assignment Notes (Optional)
-                </label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="e.g. 8-week progressive overload mesocycle"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setShowWorkoutModal(false)} className="btn btn-secondary">Cancel</button>
-                <button type="submit" disabled={workoutPlansWithPublished.length === 0} className="btn btn-primary">
-                  Confirm Assignment
-                </button>
-              </div>
-            </form>
+            <FormField label="Effective End Date (Optional)">
+              <TextInput
+                type="date"
+                value={effectiveTo}
+                onChange={(e) => setEffectiveTo(e.target.value)}
+              />
+            </FormField>
           </div>
-        </div>
-      )}
 
-      {/* Assign Diet Modal */}
-      {showDietModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Assign Diet Protocol</h3>
-              <button onClick={() => setShowDietModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
-            </div>
+          <FormField label="Assignment Notes (Optional)">
+            <TextInput
+              placeholder="e.g. 8-week progressive overload mesocycle"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </FormField>
+        </form>
+      </Dialog>
 
-            <form onSubmit={handleAssignDiet} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
-                  Select Published Diet Version *
-                </label>
-                {dietPlansWithPublished.length === 0 ? (
-                  <p style={{ color: 'var(--accent-rose)', fontSize: '0.85rem' }}>
-                    No published diet protocols found. You must publish a diet protocol version in Diet Protocols before it can be assigned.
-                  </p>
-                ) : (
-                  <select
-                    className="select"
-                    required
-                    value={selectedDietVersionId}
-                    onChange={(e) => setSelectedDietVersionId(e.target.value === '' ? '' : Number(e.target.value))}
-                  >
-                    <option value="">-- Choose Published Diet Version --</option>
-                    {dietPlansWithPublished.map((p) =>
-                      p.publishedVersions.map((v: any) => (
-                        <option key={v.id} value={v.id}>
-                          {p.name} — Version {v.version_number} (Published)
-                        </option>
-                      ))
-                    )}
-                  </select>
+      {/* Assign Diet Dialog */}
+      <Dialog
+        isOpen={showDietModal}
+        onClose={() => setShowDietModal(false)}
+        title="Assign Diet Protocol"
+        description="Prescribe an immutable published diet protocol version to this client."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowDietModal(false)} disabled={submittingDiet}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleAssignDiet}
+              disabled={dietPlansWithPublished.length === 0}
+              loading={submittingDiet}
+            >
+              Confirm Assignment
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleAssignDiet} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <FormField label="Select Published Diet Version" required>
+            {dietPlansWithPublished.length === 0 ? (
+              <p style={{ color: 'var(--accent-rose)', fontSize: '0.85rem' }}>
+                No published diet protocols found. You must publish a diet protocol version in Diet Protocols before it can be assigned.
+              </p>
+            ) : (
+              <Select
+                options={dietPlansWithPublished.flatMap((p) =>
+                  p.publishedVersions.map((v: any) => ({
+                    value: v.id,
+                    label: `${p.name} — Version ${v.version_number}`,
+                    subLabel: 'Published Protocol',
+                  }))
                 )}
-              </div>
+                value={selectedDietVersionId}
+                onChange={(val) => setSelectedDietVersionId(val ? Number(val) : '')}
+                placeholder="Choose Published Diet Version"
+              />
+            )}
+          </FormField>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
-                    Effective Start Date *
-                  </label>
-                  <input
-                    type="date"
-                    className="input"
-                    required
-                    value={effectiveFrom}
-                    onChange={(e) => setEffectiveFrom(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
-                    Effective End Date (Optional)
-                  </label>
-                  <input
-                    type="date"
-                    className="input"
-                    value={effectiveTo}
-                    onChange={(e) => setEffectiveTo(e.target.value)}
-                  />
-                </div>
-              </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <FormField label="Effective Start Date" required>
+              <TextInput
+                type="date"
+                required
+                value={effectiveFrom}
+                onChange={(e) => setEffectiveFrom(e.target.value)}
+              />
+            </FormField>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
-                  Assignment Notes (Optional)
-                </label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="e.g. Hypertrophy cut with flexible meal options"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setShowDietModal(false)} className="btn btn-secondary">Cancel</button>
-                <button type="submit" disabled={dietPlansWithPublished.length === 0} className="btn btn-primary">
-                  Confirm Assignment
-                </button>
-              </div>
-            </form>
+            <FormField label="Effective End Date (Optional)">
+              <TextInput
+                type="date"
+                value={effectiveTo}
+                onChange={(e) => setEffectiveTo(e.target.value)}
+              />
+            </FormField>
           </div>
-        </div>
-      )}
+
+          <FormField label="Assignment Notes (Optional)">
+            <TextInput
+              placeholder="e.g. Hypertrophy cut with flexible meal options"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </FormField>
+        </form>
+      </Dialog>
     </div>
   );
 };

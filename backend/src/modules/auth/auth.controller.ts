@@ -32,6 +32,22 @@ const resetPasswordSchema = z.object({
 export class AuthController {
   private service = new AuthService();
 
+  async csrf(request: FastifyRequest, reply: FastifyReply) {
+    const existingToken = (request as any).cookies?.csrf_token;
+    const csrfToken = existingToken || generateCsrfToken();
+
+    // The endpoint is also used when the dashboard is hosted on a different
+    // origin from the API, where JavaScript cannot read the API's cookie.
+    if (!existingToken) {
+      setCsrfCookie(reply, csrfToken);
+    }
+
+    return reply.status(200).send({
+      success: true,
+      data: { csrfToken },
+    });
+  }
+
   async login(request: FastifyRequest, reply: FastifyReply) {
     const body = loginSchema.parse(request.body);
     const ip = request.ip;

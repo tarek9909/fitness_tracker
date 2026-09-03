@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/storage/local_cache.dart';
+import '../../core/widgets/premium_widgets.dart';
 
 class HistoryScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -103,15 +104,11 @@ class _HistoryScreenState extends State<HistoryScreen>
       if (response['data'] is List<dynamic>) {
         return response['data'] as List<dynamic>;
       }
-      if (response['data'] is Map<String, dynamic> &&
-          response['data']['history'] is List<dynamic>) {
-        return response['data']['history'] as List<dynamic>;
+      if (response['sessions'] is List<dynamic>) {
+        return response['sessions'] as List<dynamic>;
       }
-      if (response['entries'] is List<dynamic>) {
-        return response['entries'] as List<dynamic>;
-      }
-      if (response['items'] is List<dynamic>) {
-        return response['items'] as List<dynamic>;
+      if (response['logs'] is List<dynamic>) {
+        return response['logs'] as List<dynamic>;
       }
     }
     return const [];
@@ -119,56 +116,30 @@ class _HistoryScreenState extends State<HistoryScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Activity History',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: AppColors.surface,
-        elevation: 0,
-        bottom: TabBar(
+    final colors = AppThemeColors.of(context);
+
+    return PremiumScaffold(
+      appBar: PremiumAppBar(
+        titleText: 'Activity History',
+        bottom: PremiumTabBar(
           controller: _tabController,
           isScrollable: true,
-          indicatorColor: AppColors.cyan,
-          labelColor: AppColors.cyan,
-          unselectedLabelColor: AppColors.textSecondary,
           tabs: const [
             Tab(text: 'Workouts'),
-            Tab(text: 'Meals'),
-            Tab(text: 'Water'),
+            Tab(text: 'Nutrition'),
+            Tab(text: 'Hydration'),
             Tab(text: 'Cardio'),
-            Tab(text: 'Weight'),
+            Tab(text: 'Body Weight'),
           ],
         ),
       ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.cyan))
-          : _errorMessage != null && !_showingCachedData
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.cloud_off,
-                            size: 48, color: AppColors.rose),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Failed to load history: $_errorMessage',
-                          textAlign: TextAlign.center,
-                          style:
-                              const TextStyle(color: AppColors.textSecondary),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: _fetchAllHistory,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
+          ? Center(
+              child: CircularProgressIndicator(color: colors.primary))
+          : _errorMessage != null
+              ? ErrorStateWidget(
+                  message: _errorMessage!,
+                  onRetry: _fetchAllHistory,
                 )
               : Column(
                   children: [
@@ -177,22 +148,24 @@ class _HistoryScreenState extends State<HistoryScreen>
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 10),
-                        color: AppColors.amber.withValues(alpha: 0.14),
-                        child: const Text(
+                        color: colors.amberMuted,
+                        child: Text(
                           'Offline mode: showing the last synchronized history.',
-                          style:
-                              TextStyle(color: AppColors.amber, fontSize: 12),
+                          style: TextStyle(
+                              color: colors.amber,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600),
                         ),
                       ),
                     Expanded(
-                      child: TabBarView(
+                      child: PremiumTabView(
                         controller: _tabController,
                         children: [
-                          _buildWorkoutList(),
-                          _buildMealList(),
-                          _buildWaterList(),
-                          _buildCardioList(),
-                          _buildWeightList(),
+                          _buildWorkoutList(colors),
+                          _buildMealList(colors),
+                          _buildWaterList(colors),
+                          _buildCardioList(colors),
+                          _buildWeightList(colors),
                         ],
                       ),
                     ),
@@ -201,15 +174,19 @@ class _HistoryScreenState extends State<HistoryScreen>
     );
   }
 
-  Widget _buildWorkoutList() {
+  Widget _buildWorkoutList(AppThemeColors colors) {
     if (_workouts.isEmpty) {
-      return _buildEmpty('No workout history recorded yet');
+      return const EmptyStateWidget(
+        icon: Icons.fitness_center,
+        title: 'No Workouts Logged',
+        description: 'You have not recorded any workouts yet.',
+      );
     }
     return RefreshIndicator(
       onRefresh: _fetchAllHistory,
-      color: AppColors.cyan,
+      color: colors.primary,
       child: ListView.separated(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         itemCount: _workouts.length,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (context, idx) {
@@ -220,13 +197,8 @@ class _HistoryScreenState extends State<HistoryScreen>
           final exerciseCount = w['exercise_count'] ?? 0;
           final setsCount = w['completed_sets_count'] ?? 0;
 
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
-            ),
+          return PremiumCard(
+            padding: const EdgeInsets.all(AppSpacing.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -234,23 +206,31 @@ class _HistoryScreenState extends State<HistoryScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(name,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800,
                             fontSize: 16,
-                            color: Colors.white)),
+                            color: colors.textPrimary)),
                     Text(date,
-                        style: const TextStyle(
-                            fontSize: 12, color: AppColors.textSecondary)),
+                        style: TextStyle(
+                            fontSize: 12, color: colors.textSecondary)),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Row(
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
                   children: [
-                    _buildBadge(Icons.fitness_center,
-                        '$exerciseCount exercises', AppColors.cyan),
-                    const SizedBox(width: 8),
-                    _buildBadge(Icons.check_circle_outline,
-                        '$setsCount completed sets', AppColors.primary),
+                    StatusBadge(
+                      icon: Icon(Icons.fitness_center,
+                          size: 12, color: colors.cyan),
+                      label: '$exerciseCount exercises',
+                      color: colors.cyan,
+                    ),
+                    StatusBadge(
+                      icon: Icon(Icons.check,
+                          size: 12, color: colors.primary),
+                      label: '$setsCount sets logged',
+                      color: colors.primary,
+                    ),
                   ],
                 ),
               ],
@@ -261,28 +241,30 @@ class _HistoryScreenState extends State<HistoryScreen>
     );
   }
 
-  Widget _buildMealList() {
-    if (_meals.isEmpty) return _buildEmpty('No meal history recorded yet');
+  Widget _buildMealList(AppThemeColors colors) {
+    if (_meals.isEmpty) {
+      return const EmptyStateWidget(
+        icon: Icons.restaurant,
+        title: 'No Meals Logged',
+        description: 'No nutrition logs found in your activity history.',
+      );
+    }
     return RefreshIndicator(
       onRefresh: _fetchAllHistory,
-      color: AppColors.cyan,
+      color: colors.primary,
       child: ListView.separated(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         itemCount: _meals.length,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (context, idx) {
           final m = _meals[idx];
           final name = m['meal_name'] as String? ?? 'Meal';
-          final date = (m['log_date'] ?? m['meal_date']) as String? ?? '';
           final status = m['status'] as String? ?? 'completed';
+          final date = (m['meal_date'] ?? m['entry_date'] ?? '') as String;
+          final calories = m['total_calories'];
 
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
-            ),
+          return PremiumCard(
+            padding: const EdgeInsets.all(AppSpacing.md),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -290,20 +272,34 @@ class _HistoryScreenState extends State<HistoryScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(name,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800,
                             fontSize: 15,
-                            color: Colors.white)),
+                            color: colors.textPrimary)),
                     const SizedBox(height: 4),
                     Text(date,
-                        style: const TextStyle(
-                            fontSize: 12, color: AppColors.textSecondary)),
+                        style: TextStyle(
+                            fontSize: 12, color: colors.textSecondary)),
                   ],
                 ),
-                _buildBadge(
-                  Icons.restaurant,
-                  status.toUpperCase(),
-                  status == 'completed' ? AppColors.primary : AppColors.amber,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    StatusBadge(
+                      label: status.toUpperCase(),
+                      color: status == 'completed'
+                          ? colors.primary
+                          : (status == 'skipped'
+                              ? colors.rose
+                              : colors.amber),
+                    ),
+                    if (calories != null) ...[
+                      const SizedBox(height: 4),
+                      Text('$calories kcal',
+                          style: TextStyle(
+                              fontSize: 12, color: colors.textSecondary)),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -313,35 +309,43 @@ class _HistoryScreenState extends State<HistoryScreen>
     );
   }
 
-  Widget _buildWaterList() {
+  Widget _buildWaterList(AppThemeColors colors) {
     if (_water.isEmpty) {
-      return _buildEmpty('No water intake history recorded yet');
+      return const EmptyStateWidget(
+        icon: Icons.water_drop,
+        title: 'No Water Logged',
+        description: 'You have not tracked your daily hydration yet.',
+      );
     }
     return RefreshIndicator(
       onRefresh: _fetchAllHistory,
-      color: AppColors.cyan,
+      color: colors.primary,
       child: ListView.separated(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         itemCount: _water.length,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (context, idx) {
-          final w = _water[idx];
-          final amount = (w['amount_ml'] ?? w['total_ml'] ?? 0);
-          final date = (w['intake_date'] ?? w['logged_at'] ?? '') as String;
+          final entry = _water[idx];
+          final totalMl = entry['total_ml'] ?? entry['amount_ml'] ?? 0;
+          final date =
+              (entry['intake_date'] ?? entry['entry_date'] ?? '') as String;
 
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
-            ),
+          return PremiumCard(
+            padding: const EdgeInsets.all(AppSpacing.md),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(date,
-                    style: const TextStyle(fontSize: 14, color: Colors.white)),
-                _buildBadge(Icons.water_drop, '$amount ml', AppColors.cyan),
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: colors.textPrimary,
+                        fontWeight: FontWeight.w600)),
+                StatusBadge(
+                  icon: Icon(Icons.water_drop,
+                      size: 12, color: colors.cyan),
+                  label: '$totalMl ml',
+                  color: colors.cyan,
+                ),
               ],
             ),
           );
@@ -350,49 +354,75 @@ class _HistoryScreenState extends State<HistoryScreen>
     );
   }
 
-  Widget _buildCardioList() {
+  Widget _buildCardioList(AppThemeColors colors) {
     if (_cardio.isEmpty) {
-      return _buildEmpty('No cardio activity history recorded yet');
+      return const EmptyStateWidget(
+        icon: Icons.directions_run,
+        title: 'No Cardio History',
+        description: 'You have not recorded any cardio sessions yet.',
+      );
     }
     return RefreshIndicator(
       onRefresh: _fetchAllHistory,
-      color: AppColors.cyan,
+      color: colors.primary,
       child: ListView.separated(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         itemCount: _cardio.length,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (context, idx) {
           final c = _cardio[idx];
-          final activityName = c['activity_name'] as String? ?? 'Cardio';
+          final activity = c['activity_name'] as String? ?? 'Cardio';
           final duration = c['duration_minutes'] ?? 0;
-          final date = c['cardio_date'] as String? ?? '';
+          final date =
+              (c['cardio_date'] ?? c['session_date'] ?? '') as String;
+          final distance = c['distance_km'];
+          final calories = c['calories_burned'];
 
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          return PremiumCard(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(activityName,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            color: Colors.white)),
-                    const SizedBox(height: 4),
+                    Text(activity,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            color: colors.textPrimary)),
                     Text(date,
-                        style: const TextStyle(
-                            fontSize: 12, color: AppColors.textSecondary)),
+                        style: TextStyle(
+                            fontSize: 12, color: colors.textSecondary)),
                   ],
                 ),
-                _buildBadge(
-                    Icons.timer_outlined, '$duration min', AppColors.rose),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    StatusBadge(
+                      icon: Icon(Icons.timer_outlined,
+                          size: 12, color: colors.cyan),
+                      label: '$duration min',
+                      color: colors.cyan,
+                    ),
+                    if (distance != null)
+                      StatusBadge(
+                        icon: Icon(Icons.straighten,
+                            size: 12, color: colors.primary),
+                        label: '$distance km',
+                        color: colors.primary,
+                      ),
+                    if (calories != null)
+                      StatusBadge(
+                        icon: Icon(Icons.local_fire_department,
+                            size: 12, color: colors.amber),
+                        label: '$calories kcal',
+                        color: colors.amber,
+                      ),
+                  ],
+                ),
               ],
             ),
           );
@@ -401,68 +431,49 @@ class _HistoryScreenState extends State<HistoryScreen>
     );
   }
 
-  Widget _buildWeightList() {
+  Widget _buildWeightList(AppThemeColors colors) {
     if (_weight.isEmpty) {
-      return _buildEmpty('No weight log history recorded yet');
+      return const EmptyStateWidget(
+        icon: Icons.monitor_weight_outlined,
+        title: 'No Weight Logged',
+        description: 'You have not recorded your morning weigh-in history.',
+      );
     }
     return RefreshIndicator(
       onRefresh: _fetchAllHistory,
-      color: AppColors.cyan,
+      color: colors.primary,
       child: ListView.separated(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         itemCount: _weight.length,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (context, idx) {
           final w = _weight[idx];
-          final weightKg = w['weight_kg'];
+          final kg = w['weight_kg'] ?? w['weightKg'] ?? 0;
           final date =
-              (w['measurement_date'] ?? w['entry_date'] ?? '') as String;
+              (w['date'] ?? w['weigh_in_date'] ?? w['created_at'] ?? '')
+                  as String;
 
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
-            ),
+          return PremiumCard(
+            padding: const EdgeInsets.all(AppSpacing.md),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(date,
-                    style: const TextStyle(fontSize: 14, color: Colors.white)),
-                _buildBadge(Icons.scale, '$weightKg kg', AppColors.cyan),
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: colors.textPrimary,
+                        fontWeight: FontWeight.w600)),
+                StatusBadge(
+                  icon: Icon(Icons.monitor_weight,
+                      size: 12, color: colors.violet),
+                  label: '$kg kg',
+                  color: colors.violet,
+                ),
               ],
             ),
           );
         },
       ),
-    );
-  }
-
-  Widget _buildBadge(IconData icon, String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(
-                  color: color, fontSize: 12, fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmpty(String message) {
-    return Center(
-      child: Text(message,
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 15)),
     );
   }
 }

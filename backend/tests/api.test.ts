@@ -111,6 +111,16 @@ describe('Fitness Platform REST API Suite', () => {
       expect(json.data.database).toBe('connected');
     });
 
+    it('GET /api/v1/auth/csrf should issue a token for cross-origin web clients', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/v1/auth/csrf',
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data.csrfToken).toMatch(/^[a-f0-9]{64}$/);
+      expect(res.headers['set-cookie']).toBeDefined();
+    });
+
     it('should reject request payloads exceeding bodyLimit with 413 Payload Too Large', async () => {
       const oversizedPayload = JSON.stringify({ data: 'x'.repeat(1048576 + 512) });
       const res = await app.inject({

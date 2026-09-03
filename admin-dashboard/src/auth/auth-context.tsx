@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { api } from '../api/client';
+import { api, clearCsrfToken } from '../api/client';
 
 export interface AdminUser {
   id: number;
@@ -100,6 +100,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // Ignore logout transport errors
     } finally {
+      clearCsrfToken();
       setUser(null);
     }
   };

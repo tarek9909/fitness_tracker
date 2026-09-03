@@ -18,7 +18,8 @@ import { AnalyticsPage } from './pages/AnalyticsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { NotFoundPage } from './pages/NotFound';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { Menu, Sparkles } from 'lucide-react';
+import { Menu, Activity } from 'lucide-react';
+import { IconButton } from './components/ui';
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
@@ -36,8 +37,25 @@ const AppContent: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-primary, #0f172a)' }}>
-        <div style={{ color: 'var(--accent-primary, #3b82f6)', fontWeight: 600 }}>Loading Fitness Platform...</div>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-canvas)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: 'var(--radius-md)',
+              background: 'linear-gradient(135deg, var(--accent-primary), #059669)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Activity size={22} color="#ffffff" />
+          </div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', fontWeight: 600 }}>
+            Initializing Fitness OS Console...
+          </div>
+        </div>
       </div>
     );
   }
@@ -138,7 +156,7 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="app-container" style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-primary, #0f172a)' }}>
+    <div className="app-container" style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-canvas)' }}>
       <Sidebar
         activeTab={activeTab}
         mobileOpen={mobileNavOpen}
@@ -158,19 +176,19 @@ const AppContent: React.FC = () => {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0.75rem 1rem',
-          backgroundColor: 'var(--bg-secondary)',
-          borderBottom: '1px solid var(--border-color)',
+          backgroundColor: 'var(--bg-primary)',
+          borderBottom: '1px solid var(--border-subtle)',
         }}>
-          <button
+          <IconButton
+            icon={<Menu size={18} />}
+            label="Open Navigation Menu"
+            size="sm"
+            variant="secondary"
             onClick={() => setMobileNavOpen(true)}
-            className="btn btn-secondary btn-sm"
-            aria-label="Open Navigation Menu"
-          >
-            <Menu size={18} />
-          </button>
+          />
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Sparkles size={16} color="var(--accent-primary)" />
-            <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>FITNESS OS</span>
+            <Activity size={16} color="var(--accent-primary)" />
+            <span style={{ fontWeight: 800, fontSize: '0.9rem', letterSpacing: '-0.01em' }}>FITNESS OS</span>
           </div>
           <div style={{ width: '32px' }} />
         </header>

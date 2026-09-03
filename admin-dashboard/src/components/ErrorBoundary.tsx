@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { Button } from './ui';
 
 interface Props {
   children: ReactNode;
@@ -77,28 +78,16 @@ export class ErrorBoundary extends Component<Props, State> {
                 {this.state.error.message}
               </pre>
             )}
-            <button
+            <Button
+              variant="primary"
+              icon={<RefreshCw size={16} />}
               onClick={() => {
                 this.setState({ hasError: false, error: null });
                 window.location.reload();
               }}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 20px',
-                borderRadius: '8px',
-                background: 'var(--accent-primary, #3b82f6)',
-                color: '#fff',
-                fontWeight: 600,
-                fontSize: '14px',
-                border: 'none',
-                cursor: 'pointer',
-              }}
             >
-              <RefreshCw size={16} />
               Reload Page
-            </button>
+            </Button>
           </div>
         </div>
       );

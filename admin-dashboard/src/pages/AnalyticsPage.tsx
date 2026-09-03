@@ -7,6 +7,18 @@ import {
   CheckCircle2, XCircle, ChevronLeft, ChevronRight, Activity, Filter, Award,
   Flame, Zap, BarChart3, Clock, AlertCircle
 } from 'lucide-react';
+import {
+  Select,
+  Button,
+  IconButton,
+  Card,
+  Badge,
+  Dialog,
+  Table,
+  Pagination,
+  EmptyState,
+  Skeleton,
+} from '../components/ui';
 
 export const AnalyticsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'athlete' | 'audit'>('overview');
@@ -155,105 +167,71 @@ export const AnalyticsPage: React.FC = () => {
 
         {/* Global Controls: Timeframe Selector & Refresh */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ display: 'inline-flex', background: 'rgba(0, 0, 0, 0.3)', borderRadius: '8px', padding: '3px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+          <div style={{ display: 'inline-flex', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', padding: '3px', border: '1px solid var(--border-color)' }}>
             {[
               { label: '7D', value: 7 },
               { label: '30D', value: 30 },
               { label: '90D', value: 90 },
               { label: '1Y', value: 365 },
             ].map(tf => (
-              <button
+              <Button
                 key={tf.value}
+                variant={timeframeDays === tf.value ? 'primary' : 'ghost'}
+                size="sm"
                 onClick={() => setTimeframeDays(tf.value)}
                 style={{
-                  padding: '5px 12px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  background: timeframeDays === tf.value ? 'var(--accent-primary, #3b82f6)' : 'transparent',
-                  color: timeframeDays === tf.value ? '#fff' : 'var(--text-secondary, #94a3b8)',
-                  fontWeight: 600,
+                  padding: '4px 10px',
+                  borderRadius: 'var(--radius-sm)',
                   fontSize: '12px',
-                  cursor: 'pointer',
+                  fontWeight: 600,
                 }}
               >
                 {tf.label}
-              </button>
+              </Button>
             ))}
           </div>
 
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => {
               if (activeTab === 'overview') fetchOverview();
               else if (activeTab === 'athlete' && selectedUserId) fetchUserAnalytics(selectedUserId);
               else fetchLogs();
             }}
-            className="btn btn-secondary btn-sm"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+            loading={loadingOverview || loadingUserAnalytics || loadingLogs}
+            icon={<RefreshCw size={14} />}
           >
-            <RefreshCw size={14} className={loadingOverview || loadingUserAnalytics || loadingLogs ? 'spin' : ''} />
-            <span>Refresh</span>
-          </button>
+            Refresh
+          </Button>
         </div>
       </div>
 
       {/* Navigation Tabs */}
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '12px' }}>
-        <button
+      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+        <Button
+          variant={activeTab === 'overview' ? 'primary' : 'ghost'}
           onClick={() => setActiveTab('overview')}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 18px',
-            borderRadius: '8px',
-            border: 'none',
-            background: activeTab === 'overview' ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
-            color: activeTab === 'overview' ? 'var(--accent-primary, #3b82f6)' : 'var(--text-secondary, #94a3b8)',
-            fontWeight: 700,
-            fontSize: '14px',
-            cursor: 'pointer',
-          }}
+          icon={<Activity size={16} />}
         >
-          <Activity size={16} /> Platform Overview & Trends
-        </button>
+          Platform Overview & Trends
+        </Button>
 
-        <button
+        <Button
+          variant={activeTab === 'athlete' ? 'primary' : 'ghost'}
           onClick={() => setActiveTab('athlete')}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 18px',
-            borderRadius: '8px',
-            border: 'none',
-            background: activeTab === 'athlete' ? 'rgba(168, 85, 247, 0.15)' : 'transparent',
-            color: activeTab === 'athlete' ? '#c084fc' : 'var(--text-secondary, #94a3b8)',
-            fontWeight: 700,
-            fontSize: '14px',
-            cursor: 'pointer',
-          }}
+          icon={<Users size={16} />}
         >
-          <Users size={16} /> Athlete Deep-Dive ({athleteTotal || athletes.length})
-        </button>
+          Athlete Deep-Dive ({athleteTotal || athletes.length})
+        </Button>
 
-        <button
+        <Button
+          variant={activeTab === 'audit' ? 'primary' : 'ghost'}
           onClick={() => setActiveTab('audit')}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 18px',
-            borderRadius: '8px',
-            border: 'none',
-            background: activeTab === 'audit' ? 'rgba(34, 197, 94, 0.15)' : 'transparent',
-            color: activeTab === 'audit' ? '#4ade80' : 'var(--text-secondary, #94a3b8)',
-            fontWeight: 700,
-            fontSize: '14px',
-            cursor: 'pointer',
-          }}
+          icon={<ShieldCheck size={16} />}
         >
-          <ShieldCheck size={16} /> Audit Trail ({logs.length})
-        </button>
+          Audit Logs
+        </Button>
       </div>
 
       {/* ========================================================================= */}
@@ -526,28 +504,22 @@ export const AnalyticsPage: React.FC = () => {
             gap: '12px',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary, #94a3b8)' }}>Select Athlete:</label>
-              <select
-                value={selectedUserId || ''}
-                onChange={e => setSelectedUserId(e.target.value ? Number(e.target.value) : null)}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: '8px',
-                  background: 'rgba(0, 0, 0, 0.3)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  color: '#fff',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                <option value="">-- Choose Athlete --</option>
-                {athletes.map(a => (
-                  <option key={a.id} value={a.id}>
-                    {a.first_name} {a.last_name || ''} ({a.email}) — {a.adherencePct}% Adherence
-                  </option>
-                ))}
-              </select>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>Select Athlete:</label>
+              <div style={{ minWidth: '280px' }}>
+                <Select
+                  options={[
+                    { value: '', label: '-- Choose Athlete --' },
+                    ...athletes.map(a => ({
+                      value: a.id,
+                      label: `${a.first_name} ${a.last_name || ''} (${a.email}) — ${a.adherencePct}% Adherence`,
+                    })),
+                  ]}
+                  value={selectedUserId || ''}
+                  onChange={val => setSelectedUserId(val ? Number(val) : null)}
+                  placeholder="Choose Athlete..."
+                  searchable
+                />
+              </div>
             </div>
 
             {userAnalytics?.user && (
@@ -558,65 +530,16 @@ export const AnalyticsPage: React.FC = () => {
           </div>
 
           {athleteTotalPages > 1 && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '10px 14px',
-              borderRadius: '8px',
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
-              color: 'var(--text-secondary, #94a3b8)',
-              fontSize: '12px',
-            }}>
-              <span>{loadingAthletes ? 'Loading athletes...' : `Page ${athletePage} of ${athleteTotalPages} (${athleteTotal} total athletes)`}</span>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  disabled={loadingAthletes || athletePage <= 1}
-                  onClick={() => {
-                    setSelectedUserId(null);
-                    setUserAnalytics(null);
-                    setAthletePage(athletePage - 1);
-                  }}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    color: loadingAthletes || athletePage <= 1 ? 'rgba(255, 255, 255, 0.2)' : '#fff',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    cursor: loadingAthletes || athletePage <= 1 ? 'not-allowed' : 'pointer',
-                    fontSize: '12px',
-                  }}
-                >
-                  <ChevronLeft size={13} /> Prev
-                </button>
-                <button
-                  disabled={loadingAthletes || athletePage >= athleteTotalPages}
-                  onClick={() => {
-                    setSelectedUserId(null);
-                    setUserAnalytics(null);
-                    setAthletePage(athletePage + 1);
-                  }}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    color: loadingAthletes || athletePage >= athleteTotalPages ? 'rgba(255, 255, 255, 0.2)' : '#fff',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    cursor: loadingAthletes || athletePage >= athleteTotalPages ? 'not-allowed' : 'pointer',
-                    fontSize: '12px',
-                  }}
-                >
-                  Next <ChevronRight size={13} />
-                </button>
-              </div>
-            </div>
+            <Pagination
+              currentPage={athletePage}
+              totalPages={athleteTotalPages}
+              totalItems={athleteTotal}
+              onPageChange={(p) => {
+                setSelectedUserId(null);
+                setUserAnalytics(null);
+                setAthletePage(p);
+              }}
+            />
           )}
 
           {!selectedUserId ? (
@@ -878,30 +801,20 @@ export const AnalyticsPage: React.FC = () => {
                       {log.entity_id || '—'}
                     </td>
                     <td style={{ padding: '1rem 1.25rem', textAlign: 'right' }}>
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => handleInspectLog(log.id)}
-                        style={{
-                          padding: '6px 10px',
-                          borderRadius: '6px',
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          border: 'none',
-                          color: 'var(--text-secondary, #94a3b8)',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
+                        icon={<Eye size={13} />}
                       >
-                        <Eye size={13} /> Inspect
-                      </button>
+                        Inspect
+                      </Button>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary, #94a3b8)' }}>
+                  <td colSpan={6} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
                     No audit log entries recorded yet.
                   </td>
                 </tr>
@@ -910,40 +823,13 @@ export const AnalyticsPage: React.FC = () => {
           </table>
 
           {auditTotalPages > 1 && (
-            <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary, #94a3b8)' }}>
-              <span>Page {auditPage} of {auditTotalPages} ({auditTotal} total events)</span>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  disabled={auditPage <= 1}
-                  onClick={() => setAuditPage(auditPage - 1)}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    color: auditPage <= 1 ? 'rgba(255, 255, 255, 0.2)' : '#fff',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    cursor: auditPage <= 1 ? 'not-allowed' : 'pointer',
-                    fontSize: '12px',
-                  }}
-                >
-                  Prev
-                </button>
-                <button
-                  disabled={auditPage >= auditTotalPages}
-                  onClick={() => setAuditPage(auditPage + 1)}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    color: auditPage >= auditTotalPages ? 'rgba(255, 255, 255, 0.2)' : '#fff',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    cursor: auditPage >= auditTotalPages ? 'not-allowed' : 'pointer',
-                    fontSize: '12px',
-                  }}
-                >
-                  Next
-                </button>
-              </div>
+            <div style={{ padding: '0.5rem 1rem', borderTop: '1px solid var(--border-color)' }}>
+              <Pagination
+                currentPage={auditPage}
+                totalPages={auditTotalPages}
+                totalItems={auditTotal}
+                onPageChange={(p) => setAuditPage(p)}
+              />
             </div>
           )}
         </div>
@@ -951,96 +837,76 @@ export const AnalyticsPage: React.FC = () => {
 
       {/* Audit Detail Modal */}
       {selectedLog && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0, 0, 0, 0.7)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 999,
-          padding: '16px',
-        }}>
-          <div style={{
-            background: 'var(--bg-secondary, #1e293b)',
-            borderRadius: '16px',
-            border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-            maxWidth: '650px',
-            width: '100%',
-            padding: '24px',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Terminal size={18} color="var(--accent-primary, #3b82f6)" />
-                <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Audit Event #{selectedLog.id}</h2>
-              </div>
-              <button onClick={() => setSelectedLog(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary, #94a3b8)', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
+        <Dialog
+          isOpen={!!selectedLog}
+          onClose={() => setSelectedLog(null)}
+          title={`Audit Event #${selectedLog.id}`}
+          maxWidth="650px"
+          footer={
+            <Button variant="secondary" onClick={() => setSelectedLog(null)}>
+              Close
+            </Button>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '13px' }}>
+            <div style={{ padding: '12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div><strong>Action:</strong> {selectedLog.action}</div>
+              <div><strong>Entity Type:</strong> {selectedLog.entity_type}</div>
+              <div><strong>Entity ID:</strong> {selectedLog.entity_id || '—'}</div>
+              <div><strong>Actor:</strong> {selectedLog.actor_email || 'System'}</div>
+              <div><strong>Timestamp:</strong> {formatDateTime(selectedLog.created_at)}</div>
+              <div><strong>IP Address:</strong> {selectedLog.ip_address || '—'}</div>
+              {selectedLog.request_id && <div style={{ gridColumn: 'span 2' }}><strong>Request ID:</strong> {selectedLog.request_id}</div>}
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '13px' }}>
-              <div style={{ padding: '12px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <div><strong>Action:</strong> {selectedLog.action}</div>
-                <div><strong>Entity Type:</strong> {selectedLog.entity_type}</div>
-                <div><strong>Entity ID:</strong> {selectedLog.entity_id || '—'}</div>
-                <div><strong>Actor:</strong> {selectedLog.actor_email || 'System'}</div>
-                <div><strong>Timestamp:</strong> {formatDateTime(selectedLog.created_at)}</div>
-                <div><strong>IP Address:</strong> {selectedLog.ip_address || '—'}</div>
-                {selectedLog.request_id && <div style={{ gridColumn: 'span 2' }}><strong>Request ID:</strong> {selectedLog.request_id}</div>}
-              </div>
+            <div>
+              <h4 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>Metadata / Payload</h4>
+              <pre style={{
+                background: 'rgba(0, 0, 0, 0.4)',
+                padding: '12px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                color: 'var(--accent-cyan)',
+                overflowX: 'auto',
+                maxHeight: '200px',
+              }}>
+                {JSON.stringify(selectedLog.parsedMetadata || selectedLog.metadata || {}, null, 2)}
+              </pre>
+            </div>
 
+            {selectedLog.before_data && (
               <div>
-                <h4 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>Metadata / Payload</h4>
+                <h4 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>Before State</h4>
                 <pre style={{
                   background: 'rgba(0, 0, 0, 0.4)',
                   padding: '12px',
                   borderRadius: '8px',
                   fontSize: '12px',
-                  color: '#38bdf8',
+                  color: 'var(--accent-rose)',
                   overflowX: 'auto',
-                  maxHeight: '200px',
                 }}>
-                  {JSON.stringify(selectedLog.parsedMetadata || selectedLog.metadata || {}, null, 2)}
+                  {selectedLog.before_data}
                 </pre>
               </div>
+            )}
 
-              {selectedLog.before_data && (
-                <div>
-                  <h4 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>Before State</h4>
-                  <pre style={{
-                    background: 'rgba(0, 0, 0, 0.4)',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    color: '#f87171',
-                    overflowX: 'auto',
-                  }}>
-                    {selectedLog.before_data}
-                  </pre>
-                </div>
-              )}
-
-              {selectedLog.after_data && (
-                <div>
-                  <h4 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>After State</h4>
-                  <pre style={{
-                    background: 'rgba(0, 0, 0, 0.4)',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    color: '#4ade80',
-                    overflowX: 'auto',
-                  }}>
-                    {selectedLog.after_data}
-                  </pre>
-                </div>
-              )}
-            </div>
+            {selectedLog.after_data && (
+              <div>
+                <h4 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>After State</h4>
+                <pre style={{
+                  background: 'rgba(0, 0, 0, 0.4)',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  color: '#4ade80',
+                  overflowX: 'auto',
+                }}>
+                  {selectedLog.after_data}
+                </pre>
+              </div>
+            )}
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

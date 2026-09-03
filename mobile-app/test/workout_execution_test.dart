@@ -9,6 +9,7 @@ import 'package:fitness_mobile_app/core/api/api_client.dart';
 import 'package:fitness_mobile_app/core/auth/auth_session.dart';
 import 'package:fitness_mobile_app/core/storage/secure_storage_service.dart';
 import 'package:fitness_mobile_app/core/sync/sync_coordinator.dart';
+import 'package:fitness_mobile_app/core/widgets/premium_widgets.dart';
 import 'package:fitness_mobile_app/features/workout/workout_execution_screen.dart';
 
 void main() {
@@ -138,16 +139,16 @@ void main() {
       expect(find.text('Log Set 1'), findsOneWidget);
 
       // Verify inputs pre-filled with planned target (65kg, 8 reps, 2 rir) instead of fake 80kg/10reps
-      final weightField = tester
-          .widget<TextField>(find.byKey(const Key('set_dialog_weight_input')));
-      final repsField = tester
-          .widget<TextField>(find.byKey(const Key('set_dialog_reps_input')));
-      final rirField = tester
-          .widget<TextField>(find.byKey(const Key('set_dialog_rir_input')));
+      final weightField = tester.widget<PremiumTextField>(
+          find.byKey(const Key('set_dialog_weight_input')));
+      final repsField = tester.widget<PremiumTextField>(
+          find.byKey(const Key('set_dialog_reps_input')));
+      final rirField = tester.widget<PremiumTextField>(
+          find.byKey(const Key('set_dialog_rir_input')));
 
-      expect(weightField.controller?.text, equals('65'));
-      expect(repsField.controller?.text, equals('8'));
-      expect(rirField.controller?.text, equals('2'));
+      expect(weightField.controller.text, equals('65'));
+      expect(repsField.controller.text, equals('8'));
+      expect(rirField.controller.text, equals('2'));
 
       // Tap Save Set
       await tester.tap(find.byKey(const Key('set_dialog_save_button')));
@@ -223,17 +224,17 @@ void main() {
       await tester.tap(find.byKey(const Key('log_set_button_202_1')));
       await tester.pumpAndSettle();
 
-      final weightField = tester
-          .widget<TextField>(find.byKey(const Key('set_dialog_weight_input')));
-      final repsField = tester
-          .widget<TextField>(find.byKey(const Key('set_dialog_reps_input')));
-      final rirField = tester
-          .widget<TextField>(find.byKey(const Key('set_dialog_rir_input')));
+      final weightField = tester.widget<PremiumTextField>(
+          find.byKey(const Key('set_dialog_weight_input')));
+      final repsField = tester.widget<PremiumTextField>(
+          find.byKey(const Key('set_dialog_reps_input')));
+      final rirField = tester.widget<PremiumTextField>(
+          find.byKey(const Key('set_dialog_rir_input')));
 
       // Must NOT invent fake defaults like 80kg or 10 reps
-      expect(weightField.controller?.text, isEmpty);
-      expect(repsField.controller?.text, isEmpty);
-      expect(rirField.controller?.text, isEmpty);
+      expect(weightField.controller.text, isEmpty);
+      expect(repsField.controller.text, isEmpty);
+      expect(rirField.controller.text, isEmpty);
 
       // Attempt to save without reps -> triggers validation error
       await tester.tap(find.byKey(const Key('set_dialog_save_button')));
@@ -341,16 +342,16 @@ void main() {
       expect(find.text('Edit Set 1'), findsOneWidget);
 
       // Verify previous logged values are populated
-      final weightField = tester
-          .widget<TextField>(find.byKey(const Key('set_dialog_weight_input')));
-      final repsField = tester
-          .widget<TextField>(find.byKey(const Key('set_dialog_reps_input')));
-      final rirField = tester
-          .widget<TextField>(find.byKey(const Key('set_dialog_rir_input')));
+      final weightField = tester.widget<PremiumTextField>(
+          find.byKey(const Key('set_dialog_weight_input')));
+      final repsField = tester.widget<PremiumTextField>(
+          find.byKey(const Key('set_dialog_reps_input')));
+      final rirField = tester.widget<PremiumTextField>(
+          find.byKey(const Key('set_dialog_rir_input')));
 
-      expect(weightField.controller?.text, equals('32.5'));
-      expect(repsField.controller?.text, equals('10'));
-      expect(rirField.controller?.text, equals('1'));
+      expect(weightField.controller.text, equals('32.5'));
+      expect(repsField.controller.text, equals('10'));
+      expect(rirField.controller.text, equals('1'));
 
       // Update reps to 11
       await tester.enterText(
@@ -427,7 +428,7 @@ void main() {
       expect(find.text('Session Notes (optional)'), findsOneWidget);
 
       // Tap Finish Workout inside dialog without entering notes or rating
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Finish Workout'));
+      await tester.tap(find.widgetWithText(PremiumButton, 'Finish Workout'));
       await tester.pumpAndSettle();
 
       // Verify no synthetic note "Completed on mobile app" or rating 5 was injected
@@ -490,17 +491,17 @@ void main() {
 
       // Enter notes
       await tester.enterText(
-        find.widgetWithText(TextField, 'Session Notes (optional)'),
+        find.widgetWithText(PremiumTextField, 'Session Notes (optional)'),
         'Felt strong on bench press today',
       );
 
       // Select 4-star rating (the 4th star button)
-      final starButtons = find.byType(IconButton);
+      final starButtons = find.byType(PremiumIconButton);
       await tester.tap(starButtons.at(3));
       await tester.pumpAndSettle();
 
       // Tap Finish Workout
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Finish Workout'));
+      await tester.tap(find.widgetWithText(PremiumButton, 'Finish Workout'));
       await tester.pumpAndSettle();
 
       // Verify payload contains explicit user values

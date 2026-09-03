@@ -1,5 +1,6 @@
 import React from 'react';
 import { Compass, ArrowLeft } from 'lucide-react';
+import { Button, Card } from '../components/ui';
 
 interface NotFoundProps {
   onNavigate?: (page: string) => void;
@@ -12,47 +13,50 @@ export const NotFoundPage: React.FC<NotFoundProps> = ({ onNavigate }) => {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      minHeight: '60vh',
+      minHeight: '65vh',
       textAlign: 'center',
-      padding: '32px',
+      padding: '2rem',
     }}>
-      <div style={{
-        display: 'inline-flex',
-        padding: '20px',
-        borderRadius: '50%',
-        background: 'rgba(59, 130, 246, 0.1)',
-        color: 'var(--accent-primary, #3b82f6)',
-        marginBottom: '20px',
+      <Card style={{
+        maxWidth: '480px',
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '3rem 2rem',
+        gap: '1.25rem',
       }}>
-        <Compass size={48} />
-      </div>
-      <h1 style={{ fontSize: '32px', fontWeight: 800, marginBottom: '8px' }}>
-        404 - Page Not Found
-      </h1>
-      <p style={{ fontSize: '15px', color: 'var(--text-secondary, #94a3b8)', maxWidth: '440px', marginBottom: '24px', lineHeight: 1.6 }}>
-        The requested administrative surface does not exist or has been relocated.
-      </p>
-      {onNavigate && (
-        <button
-          onClick={() => onNavigate('dashboard')}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 20px',
-            borderRadius: '8px',
-            background: 'var(--accent-primary, #3b82f6)',
-            color: '#fff',
-            fontWeight: 600,
-            fontSize: '14px',
-            border: 'none',
-            cursor: 'pointer',
-          }}
-        >
-          <ArrowLeft size={16} />
-          Return to Dashboard
-        </button>
-      )}
+        <div style={{
+          width: '64px',
+          height: '64px',
+          borderRadius: 'var(--radius-full)',
+          background: 'var(--accent-primary-muted)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'var(--accent-primary)',
+        }}>
+          <Compass size={32} />
+        </div>
+        <div>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+            404 — Page Not Found
+          </h1>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.5rem', lineHeight: 1.5 }}>
+            The requested administrative surface or navigation route does not exist or has been relocated.
+          </p>
+        </div>
+        {onNavigate && (
+          <Button
+            variant="primary"
+            onClick={() => onNavigate('dashboard')}
+            icon={<ArrowLeft size={16} />}
+            style={{ marginTop: '0.5rem' }}
+          >
+            Return to Dashboard
+          </Button>
+        )}
+      </Card>
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/premium_widgets.dart';
 
 class WeightScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -63,9 +64,10 @@ class _WeightScreenState extends State<WeightScreen> {
   Future<void> _saveWeight() async {
     final val = double.tryParse(_weightController.text.trim());
     if (val == null || val < 20 || val > 500) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Please enter a valid weight in kg (20–500)')),
+      showPremiumSnackBar(
+        context,
+        'Please enter a valid weight in kg (20–500)',
+        isError: true,
       );
       return;
     }
@@ -79,21 +81,25 @@ class _WeightScreenState extends State<WeightScreen> {
       });
       if (mounted) {
         _fetchWeightHistory();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Body weight logged successfully!')),
+        showPremiumSnackBar(
+          context,
+          'Body weight logged successfully!',
+          isSuccess: true,
         );
       }
     } on OfflineOperationQueued catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Weight logged offline. Will sync when online.')),
+        showPremiumSnackBar(
+          context,
+          'Weight logged offline. Will sync when online.',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to log weight: $e')),
+        showPremiumSnackBar(
+          context,
+          'Failed to log weight: $e',
+          isError: true,
         );
       }
     } finally {
@@ -103,38 +109,23 @@ class _WeightScreenState extends State<WeightScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppThemeColors.of(context);
+
     if (_isLoading) {
-      return const Scaffold(
+      return PremiumScaffold(
         body:
-            Center(child: CircularProgressIndicator(color: AppColors.primary)),
+            Center(child: CircularProgressIndicator(color: colors.primary)),
       );
     }
 
     if (_errorMessage != null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Body Weight Tracker')),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.cloud_off, size: 48, color: AppColors.rose),
-                const SizedBox(height: 16),
-                Text(
-                  'Failed to load weight records: $_errorMessage',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: _fetchWeightHistory,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
+      return PremiumScaffold(
+        appBar: const PremiumAppBar(
+          titleText: 'Body Weight Tracker',
+        ),
+        body: ErrorStateWidget(
+          message: _errorMessage!,
+          onRetry: _fetchWeightHistory,
         ),
       );
     }
@@ -142,151 +133,151 @@ class _WeightScreenState extends State<WeightScreen> {
     final goal = _weightData?['goal'];
     final entries = (_weightData?['entries'] as List<dynamic>? ?? []);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Body Weight Tracker')),
+    return PremiumScaffold(
+      appBar: const PremiumAppBar(
+        titleText: 'Body Weight Tracker',
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Log Input Card
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Log Today\'s Weight',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _weightController,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      textInputAction: TextInputAction.next,
-                      onSubmitted: (_) {
-                        FocusScope.of(context).requestFocus(_notesFocusNode);
-                      },
-                      decoration: const InputDecoration(
-                        labelText: 'Weight',
-                        suffixText: 'kg',
-                        prefixIcon: Icon(Icons.monitor_weight_outlined),
+            PremiumCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Log Today\'s Weight',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: colors.textPrimary)),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: PremiumTextField(
+                          controller: _weightController,
+                          label: 'Weight (kg)',
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _notesController,
-                      focusNode: _notesFocusNode,
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) {
-                        if (!_isSaving) _saveWeight();
-                      },
-                      decoration: const InputDecoration(
-                        labelText: 'Notes (optional)',
-                        prefixIcon: Icon(Icons.note_alt_outlined),
+                      const SizedBox(width: 12),
+                      PremiumButton(
+                        text: 'Save',
+                        onPressed: _isSaving ? null : _saveWeight,
+                        loading: _isSaving,
+                        height: 48,
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: _isSaving ? null : _saveWeight,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: _isSaving
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text('Log Weight'),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
 
-            // Goal Progress Summary
-            if (goal != null)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
-                ),
+            // Goal Card
+            if (goal != null) ...[
+              PremiumCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('WEIGHT GOAL PROGRESS',
-                            style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.5,
-                                color: AppColors.violet)),
-                        Text('${goal['progressPct'] ?? 0}% Complete',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary)),
+                        Text(
+                          'Weight Goal',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: colors.textPrimary,
+                          ),
+                        ),
+                        StatusBadge(
+                          label: '${goal['progressPct'] ?? 0}% Complete',
+                          color: colors.primary,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: LinearProgressIndicator(
-                        value: ((goal['progressPct'] ?? 0) / 100.0)
-                            .clamp(0.0, 1.0),
-                        minHeight: 8,
-                        backgroundColor: AppColors.card,
-                        valueColor:
-                            const AlwaysStoppedAnimation(AppColors.primary),
-                      ),
+                    PremiumProgressBar(
+                      value:
+                          ((goal['progressPct'] ?? 0) / 100.0).clamp(0.0, 1.0),
+                      height: 8,
+                      color: colors.primary,
+                      backgroundColor: colors.surfaceElevated,
                     ),
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text('Start: ${goal['startWeightKg']} kg',
-                            style: const TextStyle(
-                                fontSize: 12, color: AppColors.textMuted)),
-                        Text('Lost: ${goal['weightLostKg']} kg',
-                            style: const TextStyle(
+                            style: TextStyle(
+                                fontSize: 12, color: colors.textMuted)),
+                        Text('Delta: ${goal['weightLostKg']} kg',
+                            style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary)),
+                                color: colors.textPrimary)),
                         Text('Target: ${goal['targetWeightKg']} kg',
-                            style: const TextStyle(
-                                fontSize: 12, color: AppColors.cyan)),
+                            style: TextStyle(
+                                fontSize: 12, color: colors.cyan)),
                       ],
                     ),
                   ],
                 ),
               ),
+            ],
 
             const SizedBox(height: 20),
-            const Text('Recent Entries',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
+            const SectionHeader(
+              title: 'Recent Entries',
+              subtitle: 'Previous recorded morning weigh-ins',
+            ),
+            const SizedBox(height: 8),
 
-            ...entries.map((e) {
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  title: Text('${e['weight_kg']} kg',
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text(e['measurement_date'] ?? '',
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textMuted)),
-                  trailing: const Icon(Icons.check_circle,
-                      size: 18, color: AppColors.primary),
-                ),
-              );
-            }),
+            if (entries.isEmpty)
+              const EmptyStateWidget(
+                icon: Icons.monitor_weight_outlined,
+                title: 'No Recorded Entries',
+                description:
+                    'Start tracking your morning body weight regularly.',
+              )
+            else
+              ...entries.map((e) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: PremiumCard(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${e['weight_kg']} kg',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16,
+                                    color: colors.textPrimary)),
+                            const SizedBox(height: 2),
+                            Text(e['measurement_date'] ?? '',
+                                style: TextStyle(
+                                    fontSize: 12, color: colors.textMuted)),
+                          ],
+                        ),
+                        StatusBadge(
+                          label: 'Recorded',
+                          color: colors.primary,
+                          icon: Icon(Icons.check,
+                              size: 12, color: colors.primary),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
           ],
         ),
       ),

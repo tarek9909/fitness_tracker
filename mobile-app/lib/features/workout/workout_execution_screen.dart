@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/storage/local_cache.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/premium_widgets.dart';
 
 class WorkoutExecutionScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -123,9 +124,8 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         if (_session == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to load session: $e')),
-          );
+          showPremiumSnackBar(context, 'Failed to load session: $e',
+              isError: true);
         }
       }
     }
@@ -239,16 +239,14 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
         setState(() {
           _session = updatedSession;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Set saved offline. Will sync when online.')),
+        showPremiumSnackBar(
+          context,
+          'Set saved offline. Will sync when online.',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to log set: $e')),
-        );
+        showPremiumSnackBar(context, 'Failed to log set: $e', isError: true);
       }
     }
   }
@@ -267,119 +265,108 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
     final canFinish = exercises.isEmpty || totalCompletedSets > 0;
 
     final notesController = TextEditingController();
+    final colors = AppThemeColors.of(context);
     int? selectedRating;
 
-    await showDialog(
+    await showPremiumDialog(
       context: context,
-      builder: (dialogCtx) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Finish Workout'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (totalCompletedSets == 0) ...[
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: AppColors.amber.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                              color: AppColors.amber.withValues(alpha: 0.5)),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.info_outline,
-                                color: AppColors.amber, size: 20),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'No completed sets recorded in this session.',
-                                style: TextStyle(
-                                    fontSize: 12, color: AppColors.amber),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Text(
-                        'Log at least one completed set before finishing.',
-                        style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-                      ),
-                    ],
-                    const Text(
-                      'Great work! Rate this session or leave any workout notes before finishing.',
+      title: 'Finish Workout',
+      content: StatefulBuilder(
+        builder: (context, setDialogState) {
+          return SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (totalCompletedSets == 0) ...[
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: colors.amberMuted,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                          color: colors.amber.withValues(alpha: 0.4)),
                     ),
-                    const SizedBox(height: 16),
-                    const Text('Rating (optional):',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 13)),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(5, (index) {
-                        final starValue = index + 1;
-                        final isSelected = selectedRating != null &&
-                            starValue <= selectedRating!;
-                        return IconButton(
-                          icon: Icon(
-                            isSelected ? Icons.star : Icons.star_border,
-                            color: isSelected ? Colors.amber : Colors.grey,
-                            size: 28,
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline,
+                            color: colors.amber, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'No completed sets recorded in this session.',
+                            style:
+                                TextStyle(fontSize: 12, color: colors.amber),
                           ),
-                          onPressed: () {
-                            setDialogState(() {
-                              selectedRating = (selectedRating == starValue)
-                                  ? null
-                                  : starValue;
-                            });
-                          },
-                        );
-                      }),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: notesController,
-                      maxLines: 3,
-                      textInputAction: TextInputAction.done,
-                      decoration: const InputDecoration(
-                        labelText: 'Session Notes (optional)',
-                        hintText: 'e.g. Felt strong on bench press today',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogCtx),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: canFinish ? () {
-                    final trimmed = notesController.text.trim();
-                    Navigator.pop(dialogCtx);
-                    _completeWorkout(
-                      notes: trimmed.isNotEmpty ? trimmed : null,
-                      rating: selectedRating,
-                    );
-                  } : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
                   ),
-                  child: const Text('Finish Workout'),
+                  Text(
+                    'Log at least one completed set before finishing.',
+                    style: TextStyle(fontSize: 12, color: colors.textMuted),
+                  ),
+                ],
+                const Text(
+                  'Great work! Rate this session or leave any workout notes before finishing.',
+                ),
+                const SizedBox(height: 16),
+                const Text('Rating (optional):',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    final starValue = index + 1;
+                    final isSelected =
+                        selectedRating != null && starValue <= selectedRating!;
+                    return PremiumIconButton(
+                      icon: isSelected ? Icons.star : Icons.star_border,
+                      color: isSelected ? colors.amber : colors.textMuted,
+                      size: 28,
+                      onPressed: () {
+                        setDialogState(() {
+                          selectedRating =
+                              (selectedRating == starValue) ? null : starValue;
+                        });
+                      },
+                    );
+                  }),
+                ),
+                const SizedBox(height: 12),
+                PremiumTextField(
+                  label: 'Session Notes (optional)',
+                  controller: notesController,
+                  maxLines: 3,
+                  textInputAction: TextInputAction.done,
                 ),
               ],
-            );
-          },
-        );
-      },
+            ),
+          );
+        },
+      ),
+      actions: [
+        PremiumButton(
+          text: 'Cancel',
+          isSecondary: true,
+          onPressed: () => Navigator.pop(context),
+        ),
+        PremiumButton(
+          text: 'Finish Workout',
+          onPressed: canFinish
+              ? () {
+                  final trimmed = notesController.text.trim();
+                  Navigator.pop(context);
+                  _completeWorkout(
+                    notes: trimmed.isNotEmpty ? trimmed : null,
+                    rating: selectedRating,
+                  );
+                }
+              : null,
+        ),
+      ],
     );
   }
 
@@ -402,25 +389,28 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
       await _clearLocalSession();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Workout session completed! Great job! 🎉')),
+        showPremiumSnackBar(
+          context,
+          'Workout session completed! Great job! 🎉',
+          isSuccess: true,
         );
         Navigator.pop(context);
       }
     } on OfflineOperationQueued catch (_) {
       await _clearLocalSession();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Workout completion queued for sync! 🎉')),
+        showPremiumSnackBar(
+          context,
+          'Workout completion queued for sync! 🎉',
         );
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to complete workout: $e')),
+        showPremiumSnackBar(
+          context,
+          'Failed to complete workout: $e',
+          isError: true,
         );
       }
     }
@@ -428,25 +418,29 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppThemeColors.of(context);
     if (_isLoading) {
-      return const Scaffold(
+      return PremiumScaffold(
         body:
-            Center(child: CircularProgressIndicator(color: AppColors.primary)),
+            Center(child: CircularProgressIndicator(color: colors.primary)),
       );
     }
 
     final exercises = (_session?['exercises'] as List<dynamic>? ?? []);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Live Workout Tracker'),
+    return PremiumScaffold(
+      appBar: PremiumAppBar(
+        titleText: 'Live Workout Tracker',
         actions: [
-          TextButton.icon(
-            onPressed: _showFinishWorkoutDialog,
-            icon: const Icon(Icons.check_circle, color: AppColors.primary),
-            label: const Text('Finish',
-                style: TextStyle(
-                    color: AppColors.primary, fontWeight: FontWeight.bold)),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: PremiumButton(
+              text: 'Finish',
+              onPressed: _showFinishWorkoutDialog,
+              icon:
+                  const Icon(Icons.check_circle, size: 16, color: Colors.white),
+              height: 36,
+            ),
           ),
         ],
       ),
@@ -535,10 +529,10 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
             prevPerfDesc = 'Last session: $prevPerf';
           }
 
-          return Card(
+          return Container(
             margin: const EdgeInsets.only(bottom: 16),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+            child: PremiumCard(
+              padding: const EdgeInsets.all(AppSpacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -557,9 +551,9 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                       if (targetHeader.isNotEmpty)
                         Text(
                           targetHeader,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.cyan,
+                              color: colors.cyan,
                               fontWeight: FontWeight.w600),
                         ),
                     ],
@@ -568,9 +562,9 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                     const SizedBox(height: 4),
                     Text(
                       prevPerfDesc,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.amber,
+                          color: colors.amber,
                           fontWeight: FontWeight.w500),
                     ),
                   ],
@@ -579,20 +573,21 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: colors.surfaceElevated,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.border),
+                        border: Border.all(color: colors.border),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             'No planned sets configured.',
                             style: TextStyle(
-                                color: AppColors.textMuted, fontSize: 13),
+                                color: colors.textMuted, fontSize: 13),
                           ),
-                          ElevatedButton.icon(
+                          PremiumButton(
                             key: Key('add_set_button_${ex['id']}'),
+                            text: 'Add Set',
                             onPressed: () {
                               _showLogSetDialog(
                                 exercise: ex,
@@ -603,14 +598,7 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                               );
                             },
                             icon: const Icon(Icons.add, size: 16),
-                            label: const Text('Add Set',
-                                style: TextStyle(fontSize: 12)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 4),
-                              minimumSize: const Size(80, 32),
-                            ),
+                            height: 32,
                           ),
                         ],
                       ),
@@ -671,13 +659,13 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                             horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
                           color: isDone
-                              ? AppColors.primary.withValues(alpha: 0.1)
-                              : AppColors.surface,
+                              ? colors.primaryMuted
+                              : colors.surfaceElevated,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                               color: isDone
-                                  ? AppColors.primary.withValues(alpha: 0.4)
-                                  : AppColors.border),
+                                  ? colors.primary.withValues(alpha: 0.35)
+                                  : colors.border),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -688,15 +676,17 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                             if (isDone)
                               Text(
                                 completedSummary,
-                                style: const TextStyle(
+                                style: TextStyle(
                                     fontWeight: FontWeight.w600,
-                                    color: AppColors.textPrimary),
+                                    color: colors.textPrimary),
                               )
                             else
-                              const Text('—',
-                                  style: TextStyle(color: AppColors.textMuted)),
-                            ElevatedButton(
+                              Text('—',
+                                  style: TextStyle(color: colors.textMuted)),
+                            PremiumButton(
                               key: Key('log_set_button_${ex['id']}_$setNum'),
+                              text: isDone ? 'Edit' : 'Log Set',
+                              isSecondary: isDone,
                               onPressed: () {
                                 _showLogSetDialog(
                                   exercise: ex,
@@ -707,16 +697,7 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                                       prevPerf is Map ? prevPerf : null,
                                 );
                               },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: isDone
-                                    ? AppColors.surface
-                                    : AppColors.primary,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 4),
-                                minimumSize: const Size(60, 30),
-                              ),
-                              child: Text(isDone ? 'Edit' : 'Log Set',
-                                  style: const TextStyle(fontSize: 11)),
+                              height: 30,
                             ),
                           ],
                         ),
@@ -725,8 +706,11 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                     if (sets.length >= totalSets && totalSets > 0) ...[
                       Align(
                         alignment: Alignment.centerRight,
-                        child: TextButton.icon(
+                        child: PremiumButton(
                           key: Key('add_extra_set_button_${ex['id']}'),
+                          text: 'Add Extra Set',
+                          isSecondary: true,
+                          icon: const Icon(Icons.add, size: 14),
                           onPressed: () {
                             _showLogSetDialog(
                               exercise: ex,
@@ -736,9 +720,7 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                                   prevPerf is Map ? prevPerf : null,
                             );
                           },
-                          icon: const Icon(Icons.add, size: 14),
-                          label: const Text('Add Extra Set',
-                              style: TextStyle(fontSize: 11)),
+                          height: 30,
                         ),
                       ),
                     ],
@@ -854,22 +836,37 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
         trackingType == 'bodyweight_reps' ||
         trackingType == 'custom';
 
-    showDialog(
+    showPremiumDialog(
       context: context,
       builder: (ctx) {
+        final dialogColors = AppThemeColors.of(ctx);
         return StatefulBuilder(
           builder: (dialogCtx, setDialogState) {
             return AlertDialog(
-              title: Text(loggedSet != null
-                  ? 'Edit Set $setNumber'
-                  : 'Log Set $setNumber'),
+              backgroundColor: dialogColors.card,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadii.xl),
+                side: BorderSide(color: dialogColors.border),
+              ),
+              title: Text(
+                loggedSet != null
+                    ? 'Edit Set $setNumber'
+                    : 'Log Set $setNumber',
+                style: TextStyle(
+                  color: dialogColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (isWeightTracking) ...[
-                      TextField(
+                      PremiumTextField(
                         key: const Key('set_dialog_weight_input'),
+                        label: 'Weight (kg)',
+                        hint: targetWeight != null ? '$targetWeight kg' : '0.0',
                         controller: weightCtrl,
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
@@ -877,12 +874,7 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                         onSubmitted: (_) {
                           FocusScope.of(context).requestFocus(repsFocus);
                         },
-                        decoration: InputDecoration(
-                          labelText: 'Weight (kg)',
-                          hintText:
-                              targetWeight != null ? '$targetWeight kg' : '0.0',
-                          errorText: weightError,
-                        ),
+                        errorText: weightError,
                         onChanged: (_) {
                           if (weightError != null) {
                             setDialogState(() => weightError = null);
@@ -892,8 +884,10 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                       const SizedBox(height: 12),
                     ],
                     if (isRepTracking) ...[
-                      TextField(
+                      PremiumTextField(
                         key: const Key('set_dialog_reps_input'),
+                        label: 'Reps Completed',
+                        hint: targetReps != null ? '$targetReps' : 'e.g. 10',
                         controller: repsCtrl,
                         focusNode: repsFocus,
                         keyboardType: TextInputType.number,
@@ -901,12 +895,7 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                         onSubmitted: (_) {
                           FocusScope.of(context).requestFocus(rirFocus);
                         },
-                        decoration: InputDecoration(
-                          labelText: 'Reps Completed',
-                          hintText:
-                              targetReps != null ? '$targetReps' : 'e.g. 10',
-                          errorText: repsError,
-                        ),
+                        errorText: repsError,
                         onChanged: (_) {
                           if (repsError != null) {
                             setDialogState(() => repsError = null);
@@ -914,17 +903,15 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                         },
                       ),
                       const SizedBox(height: 12),
-                      TextField(
+                      PremiumTextField(
                         key: const Key('set_dialog_rir_input'),
+                        label: 'RIR (Reps in Reserve)',
+                        hint: targetRir != null ? '$targetRir' : '0 - 10',
                         controller: rirCtrl,
                         focusNode: rirFocus,
                         keyboardType: TextInputType.number,
                         textInputAction: TextInputAction.done,
-                        decoration: InputDecoration(
-                          labelText: 'RIR (Reps in Reserve)',
-                          hintText: targetRir != null ? '$targetRir' : '0 - 10',
-                          errorText: rirError,
-                        ),
+                        errorText: rirError,
                         onChanged: (_) {
                           if (rirError != null) {
                             setDialogState(() => rirError = null);
@@ -933,17 +920,15 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                       ),
                     ],
                     if (isDistanceTracking) ...[
-                      TextField(
+                      PremiumTextField(
                         key: const Key('set_dialog_distance_input'),
+                        label: 'Distance (meters)',
+                        hint: 'e.g. 1000',
                         controller: distanceCtrl,
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
                         textInputAction: TextInputAction.next,
-                        decoration: InputDecoration(
-                          labelText: 'Distance (meters)',
-                          hintText: 'e.g. 1000',
-                          errorText: distanceError,
-                        ),
+                        errorText: distanceError,
                         onChanged: (_) {
                           if (distanceError != null) {
                             setDialogState(() => distanceError = null);
@@ -953,16 +938,14 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                       const SizedBox(height: 12),
                     ],
                     if (isDurationTracking) ...[
-                      TextField(
+                      PremiumTextField(
                         key: const Key('set_dialog_duration_input'),
+                        label: 'Duration (seconds)',
+                        hint: 'e.g. 60',
                         controller: durationCtrl,
                         keyboardType: TextInputType.number,
                         textInputAction: TextInputAction.done,
-                        decoration: InputDecoration(
-                          labelText: 'Duration (seconds)',
-                          hintText: 'e.g. 60',
-                          errorText: durationError,
-                        ),
+                        errorText: durationError,
                         onChanged: (_) {
                           if (durationError != null) {
                             setDialogState(() => durationError = null);
@@ -974,13 +957,15 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                 ),
               ),
               actions: [
-                TextButton(
+                PremiumButton(
                   key: const Key('set_dialog_cancel_button'),
+                  text: 'Cancel',
+                  isSecondary: true,
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Cancel'),
                 ),
-                ElevatedButton(
+                PremiumButton(
                   key: const Key('set_dialog_save_button'),
+                  text: 'Save Set',
                   onPressed: () {
                     int? parsedReps;
                     int? parsedRir;
@@ -1059,7 +1044,6 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                       distanceMeters: parsedDistance,
                     );
                   },
-                  child: const Text('Save Set'),
                 ),
               ],
             );

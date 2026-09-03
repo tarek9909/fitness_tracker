@@ -12,7 +12,7 @@ class ReleaseConfigurationError implements Exception {
 /// Release-safe API Configuration with strict compile-time validation in release mode.
 ///
 /// Environment Setup Guidelines:
-/// - Android Emulator (Host Loopback): `flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000/api/v1`
+/// - Android Emulator (Host Loopback): `flutter run --dart-define=API_BASE_URL=http://192.168.10.210:3000/api/v1`
 /// - iOS Simulator: `flutter run --dart-define=API_BASE_URL=http://localhost:3000/api/v1`
 /// - Physical Devices (Local LAN / Reverse Proxy): `flutter run --dart-define=API_BASE_URL=https://192.168.1.100:3000/api/v1`
 /// - Production Release Build: `flutter build apk --release --dart-define=API_BASE_URL=https://api.fitnessplatform.com/api/v1`

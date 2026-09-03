@@ -27,6 +27,10 @@ function resolveApiBaseUrl(): string {
 
 export const API_BASE_URL = resolveApiBaseUrl();
 
+// This is only the non-authenticating CSRF value. Access and refresh tokens
+// remain HttpOnly and are never exposed to JavaScript or browser storage.
+let csrfTokenInMemory: string | null = null;
+
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
@@ -49,10 +53,23 @@ export function getCsrfTokenFromCookie(): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+export function clearCsrfToken(): void {
+  csrfTokenInMemory = null;
+}
+
+function captureCsrfToken(data: unknown): void {
+  if (!data || typeof data !== 'object' || !('csrfToken' in data)) return;
+  const token = (data as { csrfToken?: unknown }).csrfToken;
+  if (typeof token === 'string' && token.length > 0 && token.length <= 256) {
+    csrfTokenInMemory = token;
+  }
+}
+
 type SessionExpiredHandler = () => void;
 
 class ApiClient {
   private refreshPromise: Promise<boolean> | null = null;
+  private csrfBootstrapPromise: Promise<string | null> | null = null;
   private sessionExpiredHandlers: SessionExpiredHandler[] = [];
 
   onSessionExpired(handler: SessionExpiredHandler): () => void {
@@ -63,7 +80,39 @@ class ApiClient {
   }
 
   private triggerSessionExpired(): void {
+    clearCsrfToken();
     this.sessionExpiredHandlers.forEach(handler => handler());
+  }
+
+  private async getCsrfTokenForRequest(): Promise<string | null> {
+    // Prefer the cookie when it is readable so another tab's token rotation
+    // is observed; use transient memory for cross-origin API deployments.
+    const availableToken = getCsrfTokenFromCookie() || csrfTokenInMemory;
+    if (availableToken) return availableToken;
+
+    if (!this.csrfBootstrapPromise) {
+      this.csrfBootstrapPromise = this.bootstrapCsrfToken().finally(() => {
+        this.csrfBootstrapPromise = null;
+      });
+    }
+
+    return this.csrfBootstrapPromise;
+  }
+
+  private async bootstrapCsrfToken(): Promise<string | null> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/csrf`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { Accept: 'application/json' },
+      });
+      const json: ApiResponse<{ csrfToken?: string }> = await response.json().catch(() => ({ success: false }));
+      if (!response.ok || !json.success) return null;
+      captureCsrfToken(json.data);
+      return getCsrfTokenFromCookie() || csrfTokenInMemory;
+    } catch {
+      return null;
+    }
   }
 
   async request<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -80,9 +129,11 @@ class ApiClient {
 
     const method = (options.method || 'GET').toUpperCase();
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
-      const csrfToken = getCsrfTokenFromCookie();
-      if (csrfToken && !headers.has('X-CSRF-Token')) {
-        headers.set('X-CSRF-Token', csrfToken);
+      if (!headers.has('X-CSRF-Token')) {
+        const csrfToken = await this.getCsrfTokenForRequest();
+        if (csrfToken) {
+          headers.set('X-CSRF-Token', csrfToken);
+        }
       }
     }
 
@@ -102,6 +153,7 @@ class ApiClient {
     }
 
     const json: ApiResponse<T> = await response.json().catch(() => ({ success: false }));
+    captureCsrfToken(json.data);
 
     if (!response.ok || !json.success) {
       const errorMsg = json.error?.message || `Request failed with status ${response.status}`;
@@ -110,6 +162,10 @@ class ApiClient {
       error.status = response.status;
       error.details = json.error?.details;
       throw error;
+    }
+
+    if (endpoint.endsWith('/auth/logout')) {
+      clearCsrfToken();
     }
 
     // Keep the historical convenience of returning `data` directly while
@@ -141,7 +197,7 @@ class ApiClient {
       const headers = new Headers({
         'Content-Type': 'application/json',
       });
-      const csrfToken = getCsrfTokenFromCookie();
+      const csrfToken = await this.getCsrfTokenForRequest();
       if (csrfToken) {
         headers.set('X-CSRF-Token', csrfToken);
       }
@@ -154,6 +210,7 @@ class ApiClient {
       });
 
       const json: ApiResponse = await response.json().catch(() => ({ success: false }));
+      captureCsrfToken(json.data);
       return response.ok && json.success === true;
     } catch {
       return false;

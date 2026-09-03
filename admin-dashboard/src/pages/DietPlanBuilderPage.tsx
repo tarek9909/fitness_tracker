@@ -5,6 +5,19 @@ import {
   Utensils, Clock, Flame, X, Edit2, Copy, AlertCircle, RefreshCw,
   ChevronUp, ChevronDown
 } from 'lucide-react';
+import {
+  Select,
+  Button,
+  IconButton,
+  Card,
+  Badge,
+  Dialog,
+  FormField,
+  TextInput,
+  NumberInput,
+  TextArea,
+  Checkbox,
+} from '../components/ui';
 
 interface DietPlanBuilderProps {
   planId: number;
@@ -462,10 +475,9 @@ export const DietPlanBuilderPage: React.FC<DietPlanBuilderProps> = ({ planId, in
         <AlertCircle size={32} color="var(--accent-rose)" style={{ marginBottom: '1rem' }} />
         <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Failed to Load Diet Protocol</h3>
         <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>{error}</p>
-        <button onClick={fetchPlan} className="btn btn-primary">
-          <RefreshCw size={14} />
-          <span>Retry</span>
-        </button>
+        <Button onClick={fetchPlan} variant="primary" icon={<RefreshCw size={14} />}>
+          Retry
+        </Button>
       </div>
     );
   }
@@ -475,16 +487,15 @@ export const DietPlanBuilderPage: React.FC<DietPlanBuilderProps> = ({ planId, in
       {/* Top Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button onClick={onBack} className="btn btn-secondary btn-sm" aria-label="Back to Diets">
-            <ArrowLeft size={16} />
-            <span>Back to Diets</span>
-          </button>
+          <Button onClick={onBack} variant="secondary" size="sm" aria-label="Back to Diets" icon={<ArrowLeft size={16} />}>
+            Back to Diets
+          </Button>
           <div>
             <h2 style={{ fontSize: '1.35rem', fontWeight: 800 }}>{plan?.name}</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
-              <span className="badge badge-warning">
+              <Badge variant="warning">
                 {versionDetails?.daily_calories_target ? `${versionDetails.daily_calories_target} kcal` : (plan?.daily_calories_target ? `${plan.daily_calories_target} kcal` : 'Calorie target unconfigured')}
-              </span>
+              </Badge>
               <span>{plan?.description || 'No description provided'}</span>
             </div>
           </div>
@@ -493,73 +504,68 @@ export const DietPlanBuilderPage: React.FC<DietPlanBuilderProps> = ({ planId, in
         {/* Actions & Version Switcher */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           {/* Version Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--bg-tertiary)', padding: '0.35rem 0.75rem', borderRadius: 'var(--radius-md)' }}>
-            <Layers size={14} color="var(--accent-amber)" />
-            <select
+          <div style={{ minWidth: '180px' }}>
+            <Select
+              options={
+                plan?.versions?.map((v: any) => ({
+                  value: v.id,
+                  label: `v${v.version_number} (${v.status.toUpperCase()})`,
+                })) || []
+              }
               value={selectedVersionId || ''}
-              onChange={(e) => setSelectedVersionId(Number(e.target.value))}
-              style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '0.85rem', fontWeight: 600, outline: 'none', cursor: 'pointer' }}
-              aria-label="Select Diet Plan Version"
-            >
-              {plan?.versions?.map((v: any) => (
-                <option key={v.id} value={v.id} style={{ background: 'var(--bg-secondary)', color: '#fff' }}>
-                  v{v.version_number} ({v.status.toUpperCase()})
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedVersionId(Number(val))}
+              placeholder="Select Version..."
+            />
           </div>
 
-          <button onClick={handleCloneVersion} className="btn btn-secondary btn-sm" title="Draft New Version">
-            <Copy size={14} />
-            <span>New Version</span>
-          </button>
+          <Button onClick={handleCloneVersion} variant="secondary" size="sm" title="Draft New Version" icon={<Copy size={14} />}>
+            New Version
+          </Button>
 
           {!isPublished ? (
             <>
-              <button onClick={() => setShowEditVersionModal(true)} className="btn btn-secondary btn-sm">
-                <Edit2 size={14} />
-                <span>Edit Targets</span>
-              </button>
-              <button onClick={handlePublish} className="btn btn-primary btn-sm">
-                <Check size={14} />
-                <span>Publish Version</span>
-              </button>
+              <Button onClick={() => setShowEditVersionModal(true)} variant="secondary" size="sm" icon={<Edit2 size={14} />}>
+                Edit Targets
+              </Button>
+              <Button onClick={handlePublish} variant="primary" size="sm" icon={<Check size={14} />}>
+                Publish Version
+              </Button>
             </>
           ) : (
-            <span className="badge badge-success" style={{ padding: '0.5rem 0.8rem' }}>
+            <Badge variant="success" style={{ padding: '0.5rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
               <Lock size={12} />
               <span>Immutable (Published)</span>
-            </span>
+            </Badge>
           )}
         </div>
       </div>
 
       {/* Target Macros Snapshot */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
-        <div className="card" style={{ padding: '0.75rem 1rem' }}>
+        <Card style={{ padding: '0.75rem 1rem' }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Daily Calories</div>
           <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-amber)' }}>
             {versionDetails?.daily_calories_target ? `${versionDetails.daily_calories_target} kcal` : 'Unconfigured'}
           </div>
-        </div>
-        <div className="card" style={{ padding: '0.75rem 1rem' }}>
+        </Card>
+        <Card style={{ padding: '0.75rem 1rem' }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Protein Target</div>
           <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
             {versionDetails?.daily_protein_target_g ? `${versionDetails.daily_protein_target_g}g` : 'Unconfigured'}
           </div>
-        </div>
-        <div className="card" style={{ padding: '0.75rem 1rem' }}>
+        </Card>
+        <Card style={{ padding: '0.75rem 1rem' }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Carbs Target</div>
           <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-cyan)' }}>
             {versionDetails?.daily_carbs_target_g ? `${versionDetails.daily_carbs_target_g}g` : 'Unconfigured'}
           </div>
-        </div>
-        <div className="card" style={{ padding: '0.75rem 1rem' }}>
+        </Card>
+        <Card style={{ padding: '0.75rem 1rem' }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Fat Target</div>
           <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-rose)' }}>
             {versionDetails?.daily_fat_target_g ? `${versionDetails.daily_fat_target_g}g` : 'Unconfigured'}
           </div>
-        </div>
+        </Card>
       </div>
 
       {/* Meals & Option Groups Builder */}
@@ -567,16 +573,15 @@ export const DietPlanBuilderPage: React.FC<DietPlanBuilderProps> = ({ planId, in
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Configured Meals</h3>
           {!isPublished && (
-            <button onClick={handleOpenAddMeal} className="btn btn-primary btn-sm">
-              <Plus size={14} />
-              <span>Add Meal</span>
-            </button>
+            <Button onClick={handleOpenAddMeal} variant="primary" size="sm" icon={<Plus size={14} />}>
+              Add Meal
+            </Button>
           )}
         </div>
 
         {versionDetails?.meals && versionDetails.meals.length > 0 ? (
           versionDetails.meals.map((meal: any, mIdx: number) => (
-            <div key={meal.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <Card key={meal.id} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <div style={{
@@ -607,37 +612,37 @@ export const DietPlanBuilderPage: React.FC<DietPlanBuilderProps> = ({ planId, in
                 {!isPublished && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                      <button
-                        onClick={() => handleMoveMeal(mIdx, 'up')}
+                      <IconButton
+                        icon={<ChevronUp size={14} />}
+                        label="Move Meal Up"
+                        size="sm"
                         disabled={mIdx === 0}
-                        className="btn btn-secondary btn-sm"
-                        style={{ padding: '0.35rem 0.5rem' }}
-                        aria-label="Move Meal Up"
-                        title="Move Meal Up"
-                      >
-                        <ChevronUp size={14} />
-                      </button>
-                      <button
-                        onClick={() => handleMoveMeal(mIdx, 'down')}
+                        onClick={() => handleMoveMeal(mIdx, 'up')}
+                      />
+                      <IconButton
+                        icon={<ChevronDown size={14} />}
+                        label="Move Meal Down"
+                        size="sm"
                         disabled={mIdx === versionDetails.meals.length - 1}
-                        className="btn btn-secondary btn-sm"
-                        style={{ padding: '0.35rem 0.5rem' }}
-                        aria-label="Move Meal Down"
-                        title="Move Meal Down"
-                      >
-                        <ChevronDown size={14} />
-                      </button>
+                        onClick={() => handleMoveMeal(mIdx, 'down')}
+                      />
                     </div>
-                    <button onClick={() => handleOpenAddGroup(meal.id)} className="btn btn-secondary btn-sm">
-                      <Plus size={12} />
-                      <span>Add Option Group</span>
-                    </button>
-                    <button onClick={() => handleOpenEditMeal(meal)} className="btn btn-secondary btn-sm" aria-label="Edit Meal">
-                      <Edit2 size={12} />
-                    </button>
-                    <button onClick={() => handleDeleteMeal(meal.id)} className="btn btn-danger btn-sm" aria-label="Delete Meal">
-                      <Trash2 size={12} />
-                    </button>
+                    <Button onClick={() => handleOpenAddGroup(meal.id)} variant="secondary" size="sm" icon={<Plus size={12} />}>
+                      Add Option Group
+                    </Button>
+                    <IconButton
+                      icon={<Edit2 size={12} />}
+                      label="Edit Meal"
+                      size="sm"
+                      onClick={() => handleOpenEditMeal(meal)}
+                    />
+                    <IconButton
+                      icon={<Trash2 size={12} />}
+                      label="Delete Meal"
+                      variant="danger"
+                      size="sm"
+                      onClick={() => handleDeleteMeal(meal.id)}
+                    />
                   </div>
                 )}
               </div>
@@ -672,36 +677,36 @@ export const DietPlanBuilderPage: React.FC<DietPlanBuilderProps> = ({ planId, in
 
                         {!isPublished && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                            <button
-                              onClick={() => handleMoveGroup(meal, gIdx, 'up')}
+                            <IconButton
+                              icon={<ChevronUp size={12} />}
+                              label="Move Group Up"
+                              size="sm"
                               disabled={gIdx === 0}
-                              className="btn btn-secondary btn-sm"
-                              style={{ padding: '0.2rem 0.35rem' }}
-                              aria-label="Move Group Up"
-                              title="Move Group Up"
-                            >
-                              <ChevronUp size={12} />
-                            </button>
-                            <button
-                              onClick={() => handleMoveGroup(meal, gIdx, 'down')}
+                              onClick={() => handleMoveGroup(meal, gIdx, 'up')}
+                            />
+                            <IconButton
+                              icon={<ChevronDown size={12} />}
+                              label="Move Group Down"
+                              size="sm"
                               disabled={gIdx === meal.optionGroups.length - 1}
-                              className="btn btn-secondary btn-sm"
-                              style={{ padding: '0.2rem 0.35rem' }}
-                              aria-label="Move Group Down"
-                              title="Move Group Down"
-                            >
-                              <ChevronDown size={12} />
-                            </button>
-                            <button onClick={() => handleOpenAddOption(group.id)} className="btn btn-secondary btn-sm" style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}>
-                              <Plus size={10} />
-                              <span>Add Choice</span>
-                            </button>
-                            <button onClick={() => handleOpenEditGroup(group)} className="btn btn-secondary btn-sm" style={{ padding: '0.2rem 0.4rem' }} aria-label="Edit Group">
-                              <Edit2 size={10} />
-                            </button>
-                            <button onClick={() => handleDeleteGroup(group.id)} className="btn btn-danger btn-sm" style={{ padding: '0.2rem 0.4rem' }} aria-label="Delete Group">
-                              <Trash2 size={10} />
-                            </button>
+                              onClick={() => handleMoveGroup(meal, gIdx, 'down')}
+                            />
+                            <Button onClick={() => handleOpenAddOption(group.id)} variant="secondary" size="sm" icon={<Plus size={10} />} style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}>
+                              Add Choice
+                            </Button>
+                            <IconButton
+                              icon={<Edit2 size={10} />}
+                              label="Edit Group"
+                              size="sm"
+                              onClick={() => handleOpenEditGroup(group)}
+                            />
+                            <IconButton
+                              icon={<Trash2 size={10} />}
+                              label="Delete Group"
+                              variant="danger"
+                              size="sm"
+                              onClick={() => handleDeleteGroup(group.id)}
+                            />
                           </div>
                         )}
                       </div>
@@ -736,30 +741,33 @@ export const DietPlanBuilderPage: React.FC<DietPlanBuilderProps> = ({ planId, in
                                 </span>
                                 {!isPublished && (
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                    <button
-                                      onClick={() => handleMoveOption(group, oIdx, 'up')}
+                                    <IconButton
+                                      icon={<ChevronUp size={14} />}
+                                      label="Move Option Up"
+                                      size="sm"
                                       disabled={oIdx === 0}
-                                      style={{ background: 'none', border: 'none', color: oIdx === 0 ? 'var(--text-muted)' : 'var(--text-secondary)', cursor: oIdx === 0 ? 'not-allowed' : 'pointer', opacity: oIdx === 0 ? 0.3 : 1 }}
-                                      aria-label="Move Option Up"
-                                      title="Move Option Up"
-                                    >
-                                      <ChevronUp size={14} />
-                                    </button>
-                                    <button
-                                      onClick={() => handleMoveOption(group, oIdx, 'down')}
+                                      onClick={() => handleMoveOption(group, oIdx, 'up')}
+                                    />
+                                    <IconButton
+                                      icon={<ChevronDown size={14} />}
+                                      label="Move Option Down"
+                                      size="sm"
                                       disabled={oIdx === group.options.length - 1}
-                                      style={{ background: 'none', border: 'none', color: oIdx === group.options.length - 1 ? 'var(--text-muted)' : 'var(--text-secondary)', cursor: oIdx === group.options.length - 1 ? 'not-allowed' : 'pointer', opacity: oIdx === group.options.length - 1 ? 0.3 : 1 }}
-                                      aria-label="Move Option Down"
-                                      title="Move Option Down"
-                                    >
-                                      <ChevronDown size={14} />
-                                    </button>
-                                    <button onClick={() => handleOpenEditOption(opt)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} aria-label="Edit Option">
-                                      <Edit2 size={12} />
-                                    </button>
-                                    <button onClick={() => handleDeleteOption(opt.id)} style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer' }} aria-label="Delete Option">
-                                      <Trash2 size={12} />
-                                    </button>
+                                      onClick={() => handleMoveOption(group, oIdx, 'down')}
+                                    />
+                                    <IconButton
+                                      icon={<Edit2 size={12} />}
+                                      label="Edit Option"
+                                      size="sm"
+                                      onClick={() => handleOpenEditOption(opt)}
+                                    />
+                                    <IconButton
+                                      icon={<Trash2 size={12} />}
+                                      label="Delete Option"
+                                      variant="danger"
+                                      size="sm"
+                                      onClick={() => handleDeleteOption(opt.id)}
+                                    />
                                   </div>
                                 )}
                               </div>
@@ -779,7 +787,7 @@ export const DietPlanBuilderPage: React.FC<DietPlanBuilderProps> = ({ planId, in
                   No option groups yet. Add a category (e.g. "Protein Source", "Carb Source").
                 </div>
               )}
-            </div>
+            </Card>
           ))
         ) : (
           <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)' }}>
@@ -790,344 +798,286 @@ export const DietPlanBuilderPage: React.FC<DietPlanBuilderProps> = ({ planId, in
 
       {/* Edit Version Metadata Modal */}
       {showEditVersionModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Version Nutrition Targets</h3>
-              <button onClick={() => setShowEditVersionModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
+        <Dialog
+          isOpen={showEditVersionModal}
+          onClose={() => setShowEditVersionModal(false)}
+          title="Version Nutrition Targets"
+          maxWidth="520px"
+          footer={
+            <>
+              <Button type="button" variant="secondary" onClick={() => setShowEditVersionModal(false)}>Cancel</Button>
+              <Button type="submit" variant="primary" onClick={handleSaveVersionMeta}>Save Targets</Button>
+            </>
+          }
+        >
+          <form onSubmit={handleSaveVersionMeta} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <FormField label="Version Title">
+              <TextInput
+                value={versionForm.title}
+                onChange={(e) => setVersionForm({ ...versionForm, title: e.target.value })}
+              />
+            </FormField>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <FormField label="Daily Calories Target (kcal)">
+                <NumberInput
+                  placeholder="e.g. 2400"
+                  value={versionForm.dailyCaloriesTarget}
+                  onChange={(val) => setVersionForm({ ...versionForm, dailyCaloriesTarget: val })}
+                />
+              </FormField>
+              <FormField label="Daily Protein Target (g)">
+                <NumberInput
+                  placeholder="e.g. 180"
+                  value={versionForm.dailyProteinTargetG}
+                  onChange={(val) => setVersionForm({ ...versionForm, dailyProteinTargetG: val })}
+                />
+              </FormField>
+              <FormField label="Daily Carbs Target (g)">
+                <NumberInput
+                  placeholder="e.g. 250"
+                  value={versionForm.dailyCarbsTargetG}
+                  onChange={(val) => setVersionForm({ ...versionForm, dailyCarbsTargetG: val })}
+                />
+              </FormField>
+              <FormField label="Daily Fat Target (g)">
+                <NumberInput
+                  placeholder="e.g. 70"
+                  value={versionForm.dailyFatTargetG}
+                  onChange={(val) => setVersionForm({ ...versionForm, dailyFatTargetG: val })}
+                />
+              </FormField>
             </div>
-            <form onSubmit={handleSaveVersionMeta} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Version Title</label>
-                <input
-                  type="text"
-                  className="input"
-                  value={versionForm.title}
-                  onChange={(e) => setVersionForm({ ...versionForm, title: e.target.value })}
-                />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Daily Calories Target (kcal)</label>
-                  <input
-                    type="number"
-                    className="input"
-                    placeholder="e.g. 2400"
-                    value={versionForm.dailyCaloriesTarget}
-                    onChange={(e) => setVersionForm({ ...versionForm, dailyCaloriesTarget: e.target.value === '' ? '' : Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Daily Protein Target (g)</label>
-                  <input
-                    type="number"
-                    className="input"
-                    placeholder="e.g. 180"
-                    value={versionForm.dailyProteinTargetG}
-                    onChange={(e) => setVersionForm({ ...versionForm, dailyProteinTargetG: e.target.value === '' ? '' : Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Daily Carbs Target (g)</label>
-                  <input
-                    type="number"
-                    className="input"
-                    placeholder="e.g. 250"
-                    value={versionForm.dailyCarbsTargetG}
-                    onChange={(e) => setVersionForm({ ...versionForm, dailyCarbsTargetG: e.target.value === '' ? '' : Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Daily Fat Target (g)</label>
-                  <input
-                    type="number"
-                    className="input"
-                    placeholder="e.g. 70"
-                    value={versionForm.dailyFatTargetG}
-                    onChange={(e) => setVersionForm({ ...versionForm, dailyFatTargetG: e.target.value === '' ? '' : Number(e.target.value) })}
-                  />
-                </div>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Change Notes</label>
-                <textarea
-                  className="input"
-                  rows={2}
-                  value={versionForm.changeSummary}
-                  onChange={(e) => setVersionForm({ ...versionForm, changeSummary: e.target.value })}
-                />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setShowEditVersionModal(false)} className="btn btn-secondary">Cancel</button>
-                <button type="submit" className="btn btn-primary">Save Targets</button>
-              </div>
-            </form>
-          </div>
-        </div>
+            <FormField label="Change Notes">
+              <TextArea
+                rows={2}
+                value={versionForm.changeSummary}
+                onChange={(e) => setVersionForm({ ...versionForm, changeSummary: e.target.value })}
+              />
+            </FormField>
+          </form>
+        </Dialog>
       )}
 
       {/* Add / Edit Meal Modal */}
       {showAddMealModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>{editingMeal ? 'Edit Meal' : 'Add Meal'}</h3>
-              <button onClick={() => setShowAddMealModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
-            </div>
-            <form onSubmit={handleSaveMeal} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Meal Name</label>
-                <input
-                  type="text"
-                  className="input"
-                  required
-                  placeholder="e.g. Breakfast, Lunch, Snack"
-                  value={mealName}
-                  onChange={(e) => setMealName(e.target.value)}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Scheduled Time</label>
-                <input
-                  type="time"
-                  className="input"
-                  value={mealTime}
-                  onChange={(e) => setMealTime(e.target.value)}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Instructions / Notes (Optional)</label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="e.g. Consume within 60 mins of workout"
-                  value={mealNotes}
-                  onChange={(e) => setMealNotes(e.target.value)}
-                />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setShowAddMealModal(false)} className="btn btn-secondary">Cancel</button>
-                <button type="submit" className="btn btn-primary">{editingMeal ? 'Update Meal' : 'Add Meal'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <Dialog
+          isOpen={showAddMealModal}
+          onClose={() => setShowAddMealModal(false)}
+          title={editingMeal ? 'Edit Meal' : 'Add Meal'}
+          maxWidth="480px"
+          footer={
+            <>
+              <Button type="button" variant="secondary" onClick={() => setShowAddMealModal(false)}>Cancel</Button>
+              <Button type="submit" variant="primary" onClick={handleSaveMeal}>{editingMeal ? 'Update Meal' : 'Add Meal'}</Button>
+            </>
+          }
+        >
+          <form onSubmit={handleSaveMeal} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <FormField label="Meal Name" required>
+              <TextInput
+                required
+                placeholder="e.g. Breakfast, Lunch, Snack"
+                value={mealName}
+                onChange={(e) => setMealName(e.target.value)}
+              />
+            </FormField>
+            <FormField label="Scheduled Time">
+              <TextInput
+                type="time"
+                value={mealTime}
+                onChange={(e) => setMealTime(e.target.value)}
+              />
+            </FormField>
+            <FormField label="Instructions / Notes (Optional)">
+              <TextInput
+                placeholder="e.g. Consume within 60 mins of workout"
+                value={mealNotes}
+                onChange={(e) => setMealNotes(e.target.value)}
+              />
+            </FormField>
+          </form>
+        </Dialog>
       )}
 
       {/* Add / Edit Group Modal */}
       {showAddGroupModal !== null && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>{editingGroup ? 'Edit Option Group' : 'Add Option Group'}</h3>
-              <button onClick={() => { setShowAddGroupModal(null); setEditingGroup(null); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
+        <Dialog
+          isOpen={showAddGroupModal !== null}
+          onClose={() => { setShowAddGroupModal(null); setEditingGroup(null); }}
+          title={editingGroup ? 'Edit Option Group' : 'Add Option Group'}
+          maxWidth="480px"
+          footer={
+            <>
+              <Button type="button" variant="secondary" onClick={() => { setShowAddGroupModal(null); setEditingGroup(null); }}>Cancel</Button>
+              <Button type="submit" variant="primary" onClick={handleSaveGroup}>{editingGroup ? 'Update Group' : 'Save Group'}</Button>
+            </>
+          }
+        >
+          <form onSubmit={handleSaveGroup} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <FormField label="Group Category Name" required>
+              <TextInput
+                required
+                placeholder="e.g. Lean Protein Source, Carbohydrate Base"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+              />
+            </FormField>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <FormField label="Min Selections">
+                <NumberInput
+                  min={0}
+                  max={20}
+                  placeholder="e.g. 1"
+                  value={minSelections}
+                  onChange={(val) => setMinSelections(val)}
+                />
+              </FormField>
+              <FormField label="Max Selections">
+                <NumberInput
+                  min={1}
+                  max={20}
+                  placeholder="e.g. 1"
+                  value={maxSelections}
+                  onChange={(val) => setMaxSelections(val)}
+                />
+              </FormField>
             </div>
-            <form onSubmit={handleSaveGroup} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Group Category Name</label>
-                <input
-                  type="text"
-                  className="input"
-                  required
-                  placeholder="e.g. Lean Protein Source, Carbohydrate Base"
-                  value={groupName}
-                  onChange={(e) => setGroupName(e.target.value)}
-                />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Min Selections</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="20"
-                    placeholder="e.g. 1"
-                    className="input"
-                    value={minSelections}
-                    onChange={(e) => setMinSelections(e.target.value === '' ? '' : Number(e.target.value))}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Max Selections</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="20"
-                    placeholder="e.g. 1"
-                    className="input"
-                    value={maxSelections}
-                    onChange={(e) => setMaxSelections(e.target.value === '' ? '' : Number(e.target.value))}
-                  />
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <input
-                  type="checkbox"
-                  id="groupReq"
-                  checked={groupRequired}
-                  onChange={(e) => setGroupRequired(e.target.checked)}
-                />
-                <label htmlFor="groupReq" style={{ fontSize: '0.85rem' }}>Required Selection</label>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
-                <button type="button" onClick={() => { setShowAddGroupModal(null); setEditingGroup(null); }} className="btn btn-secondary">Cancel</button>
-                <button type="submit" className="btn btn-primary">{editingGroup ? 'Update Group' : 'Save Group'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
+            <div style={{ marginTop: '0.25rem' }}>
+              <Checkbox
+                id="groupReq"
+                checked={groupRequired}
+                onChange={(e) => setGroupRequired(e.target.checked)}
+                label="Required Selection"
+              />
+            </div>
+          </form>
+        </Dialog>
       )}
 
       {/* Add / Edit Option Modal */}
       {showAddOptionModal !== null && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>{editingOption ? 'Edit Food Choice' : 'Add Food Choice'}</h3>
-              <button onClick={() => { setShowAddOptionModal(null); setEditingOption(null); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
-            </div>
-            <form onSubmit={handleSaveOption} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Select Food Reference</label>
-                {foods.length === 0 ? (
-                  <p style={{ color: 'var(--accent-amber)', fontSize: '0.85rem' }}>No foods found. Please add foods in the Food Database first.</p>
-                ) : (
-                  <select
-                    className="select"
-                    value={optionForm.foodId}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (!val) {
-                        setOptionForm({
-                          ...optionForm,
-                          foodId: '',
-                          servingQuantity: '',
-                          calories: '',
-                          proteinG: '',
-                          carbsG: '',
-                          fatG: '',
-                        });
-                        return;
-                      }
-                      const fId = Number(val);
-                      const selected = foods.find(f => f.id === fId);
-                      if (selected) {
-                        setOptionForm({
-                          ...optionForm,
-                          foodId: fId,
-                          servingQuantity: selected.reference_quantity ?? selected.default_serving_amount ?? '',
-                          calories: selected.calories ?? '',
-                          proteinG: selected.protein_g ?? '',
-                          carbsG: selected.carbs_g ?? '',
-                          fatG: selected.fat_g ?? '',
-                        });
-                      }
-                    }}
-                  >
-                    <option value="">-- Choose Food (or Enter Custom Nutrition) --</option>
-                    {foods.map((f) => {
+        <Dialog
+          isOpen={showAddOptionModal !== null}
+          onClose={() => { setShowAddOptionModal(null); setEditingOption(null); }}
+          title={editingOption ? 'Edit Food Choice' : 'Add Food Choice'}
+          maxWidth="560px"
+          footer={
+            <>
+              <Button type="button" variant="secondary" onClick={() => { setShowAddOptionModal(null); setEditingOption(null); }}>Cancel</Button>
+              <Button type="submit" variant="primary" onClick={handleSaveOption}>{editingOption ? 'Update Food Choice' : 'Save Food Choice'}</Button>
+            </>
+          }
+        >
+          <form onSubmit={handleSaveOption} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <FormField label="Select Food Reference">
+              {foods.length === 0 ? (
+                <p style={{ color: 'var(--accent-amber)', fontSize: '0.85rem' }}>No foods found. Please add foods in the Food Database first.</p>
+              ) : (
+                <Select
+                  options={[
+                    { value: '', label: '-- Choose Food (or Enter Custom Nutrition) --' },
+                    ...foods.map((f) => {
                       const calStr = f.calories != null ? `${f.calories} kcal` : 'Calories unconfigured';
                       const servingStr = (f.reference_quantity || f.default_serving_amount) 
                         ? `${f.reference_quantity || f.default_serving_amount}${f.unit_code ? ` ${f.unit_code}` : ''}`
                         : 'Serving unconfigured';
-                      return (
-                        <option key={f.id} value={f.id}>{f.name} ({calStr} / {servingStr})</option>
-                      );
-                    })}
-                  </select>
-                )}
-              </div>
+                      return {
+                        value: f.id,
+                        label: `${f.name} (${calStr} / ${servingStr})`,
+                      };
+                    }),
+                  ]}
+                  value={optionForm.foodId}
+                  onChange={(val) => {
+                    if (!val) {
+                      setOptionForm({
+                        ...optionForm,
+                        foodId: '',
+                        servingQuantity: '',
+                        calories: '',
+                        proteinG: '',
+                        carbsG: '',
+                        fatG: '',
+                      });
+                      return;
+                    }
+                    const fId = Number(val);
+                    const selected = foods.find(f => f.id === fId);
+                    if (selected) {
+                      setOptionForm({
+                        ...optionForm,
+                        foodId: fId,
+                        servingQuantity: selected.reference_quantity ?? selected.default_serving_amount ?? '',
+                        calories: selected.calories ?? '',
+                        proteinG: selected.protein_g ?? '',
+                        carbsG: selected.carbs_g ?? '',
+                        fatG: selected.fat_g ?? '',
+                      });
+                    }
+                  }}
+                  placeholder="Choose Food..."
+                  searchable
+                />
+              )}
+            </FormField>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Custom Label (Optional)</label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="e.g. 200g Grilled Chicken Breast"
-                  value={optionForm.customLabel}
-                  onChange={(e) => setOptionForm({ ...optionForm, customLabel: e.target.value })}
+            <FormField label="Custom Label (Optional)">
+              <TextInput
+                placeholder="e.g. 200g Grilled Chicken Breast"
+                value={optionForm.customLabel}
+                onChange={(e) => setOptionForm({ ...optionForm, customLabel: e.target.value })}
+              />
+            </FormField>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <FormField label="Serving Quantity" required>
+                <NumberInput
+                  required
+                  min={0.1}
+                  value={optionForm.servingQuantity}
+                  onChange={(val) => setOptionForm({ ...optionForm, servingQuantity: val })}
+                />
+              </FormField>
+              <FormField label="Total Calories (kcal)" required>
+                <NumberInput
+                  required
+                  min={0}
+                  value={optionForm.calories}
+                  onChange={(val) => setOptionForm({ ...optionForm, calories: val })}
+                />
+              </FormField>
+              <FormField label="Protein (g)">
+                <NumberInput
+                  min={0}
+                  value={optionForm.proteinG}
+                  onChange={(val) => setOptionForm({ ...optionForm, proteinG: val })}
+                />
+              </FormField>
+              <FormField label="Carbs (g)">
+                <NumberInput
+                  min={0}
+                  value={optionForm.carbsG}
+                  onChange={(val) => setOptionForm({ ...optionForm, carbsG: val })}
+                />
+              </FormField>
+              <FormField label="Fat (g)">
+                <NumberInput
+                  min={0}
+                  value={optionForm.fatG}
+                  onChange={(val) => setOptionForm({ ...optionForm, fatG: val })}
+                />
+              </FormField>
+              <div style={{ marginTop: '1.25rem' }}>
+                <Checkbox
+                  id="isDefaultOpt"
+                  checked={optionForm.isDefault}
+                  onChange={(e) => setOptionForm({ ...optionForm, isDefault: e.target.checked })}
+                  label="Default Selection"
                 />
               </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Serving Quantity</label>
-                  <input
-                    type="number"
-                    className="input"
-                    required
-                    min="0.1"
-                    value={optionForm.servingQuantity}
-                    onChange={(e) => setOptionForm({ ...optionForm, servingQuantity: e.target.value === '' ? '' : Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Total Calories (kcal)</label>
-                  <input
-                    type="number"
-                    className="input"
-                    required
-                    min="0"
-                    value={optionForm.calories}
-                    onChange={(e) => setOptionForm({ ...optionForm, calories: e.target.value === '' ? '' : Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Protein (g)</label>
-                  <input
-                    type="number"
-                    className="input"
-                    min="0"
-                    value={optionForm.proteinG}
-                    onChange={(e) => setOptionForm({ ...optionForm, proteinG: e.target.value === '' ? '' : Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Carbs (g)</label>
-                  <input
-                    type="number"
-                    className="input"
-                    min="0"
-                    value={optionForm.carbsG}
-                    onChange={(e) => setOptionForm({ ...optionForm, carbsG: e.target.value === '' ? '' : Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Fat (g)</label>
-                  <input
-                    type="number"
-                    className="input"
-                    min="0"
-                    value={optionForm.fatG}
-                    onChange={(e) => setOptionForm({ ...optionForm, fatG: e.target.value === '' ? '' : Number(e.target.value) })}
-                  />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1.25rem' }}>
-                  <input
-                    type="checkbox"
-                    id="isDefaultOpt"
-                    checked={optionForm.isDefault}
-                    onChange={(e) => setOptionForm({ ...optionForm, isDefault: e.target.checked })}
-                  />
-                  <label htmlFor="isDefaultOpt" style={{ fontSize: '0.85rem' }}>Default Selection</label>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
-                <button type="button" onClick={() => { setShowAddOptionModal(null); setEditingOption(null); }} className="btn btn-secondary">Cancel</button>
-                <button type="submit" className="btn btn-primary">{editingOption ? 'Update Food Choice' : 'Save Food Choice'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
+            </div>
+          </form>
+        </Dialog>
       )}
     </div>
   );

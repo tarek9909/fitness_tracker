@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
-import { Settings as SettingsIcon, Save, RefreshCw, CheckCircle2, AlertCircle, X } from 'lucide-react';
+import { Settings as SettingsIcon, Save, RefreshCw, CheckCircle2, AlertCircle, X, ShieldAlert } from 'lucide-react';
+import {
+  Card,
+  Button,
+  Select,
+  FormField,
+  TextInput,
+  NumberInput,
+  Skeleton,
+  AlertBanner,
+} from '../components/ui';
 
 interface SystemSetting {
   id: number;
@@ -26,7 +36,7 @@ export const SettingsPage: React.FC = () => {
       setSettings(list);
 
       const initialForm: Record<string, string> = {};
-      list.forEach(s => {
+      list.forEach((s) => {
         initialForm[s.setting_key] = s.setting_value;
       });
 
@@ -39,7 +49,7 @@ export const SettingsPage: React.FC = () => {
         'session_timeout_minutes': '60',
         'app_name': 'Fitness Platform',
       };
-      Object.keys(defaults).forEach(k => {
+      Object.keys(defaults).forEach((k) => {
         if (initialForm[k] === undefined) initialForm[k] = defaults[k];
       });
 
@@ -56,7 +66,7 @@ export const SettingsPage: React.FC = () => {
   }, []);
 
   const handleChange = (key: string, value: string) => {
-    setFormData(prev => ({ ...prev, [key]: value }));
+    setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -81,15 +91,15 @@ export const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: '24px', maxWidth: '900px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '900px' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <SettingsIcon size={24} color="var(--accent-primary, #3b82f6)" />
-            Platform & System Settings
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+            <SettingsIcon size={22} color="var(--accent-primary)" />
+            <span>Platform & System Settings</span>
           </h1>
-          <p style={{ color: 'var(--text-secondary, #94a3b8)', fontSize: '14px', marginTop: '4px' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.25rem' }}>
             Configure global platform parameters, compliance rules, and mobile application constraints.
           </p>
         </div>
@@ -97,171 +107,104 @@ export const SettingsPage: React.FC = () => {
 
       {/* Feedback Toast */}
       {feedback && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '12px 16px',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          background: feedback.type === 'success' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-          border: `1px solid ${feedback.type === 'success' ? '#22c55e' : '#ef4444'}`,
-          color: feedback.type === 'success' ? '#4ade80' : '#f87171',
-          fontSize: '14px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {feedback.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-            <span>{feedback.message}</span>
-          </div>
-          <button onClick={() => setFeedback(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>
-            <X size={16} />
-          </button>
-        </div>
+        <AlertBanner
+          type={feedback.type}
+          message={feedback.message}
+          onClose={() => setFeedback(null)}
+        />
       )}
 
       {loading ? (
-        <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary, #94a3b8)' }}>
-          <RefreshCw size={24} className="spin" style={{ marginBottom: '12px' }} />
-          <p>Loading configuration parameters...</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <Card style={{ height: '180px' }}>
+            <Skeleton width="40%" height="24px" style={{ marginBottom: '1rem' }} />
+            <Skeleton width="100%" height="40px" />
+          </Card>
+          <Card style={{ height: '180px' }}>
+            <Skeleton width="40%" height="24px" style={{ marginBottom: '1rem' }} />
+            <Skeleton width="100%" height="40px" />
+          </Card>
         </div>
       ) : (
-        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {/* Section: Platform Control */}
-          <div style={{
-            background: 'var(--bg-secondary, #1e293b)',
-            borderRadius: '16px',
-            padding: '24px',
-            border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
-          }}>
-            <h2 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px', color: '#f8fafc' }}>
-              Platform Maintenance & Mobile Release Gates
-            </h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>
-                  Platform Maintenance Mode
-                </label>
-                <select
-                  value={formData['platform_maintenance_mode'] || '0'}
-                  onChange={e => handleChange('platform_maintenance_mode', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    background: 'rgba(0, 0, 0, 0.3)',
-                    border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                    color: '#fff',
-                    fontSize: '14px',
-                  }}
-                >
-                  <option value="0">Disabled (Normal Operations)</option>
-                  <option value="1">Enabled (Block Non-Admin Traffic)</option>
-                </select>
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary, #94a3b8)', marginTop: '4px' }}>
-                  When enabled, mobile client APIs return 503 Maintenance Mode status.
-                </p>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>
-                  Minimum Supported Mobile App Version
-                </label>
-                <input
-                  type="text"
-                  value={formData['min_app_version'] || '1.0.0'}
-                  onChange={e => handleChange('min_app_version', e.target.value)}
-                  placeholder="1.0.0"
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    background: 'rgba(0, 0, 0, 0.3)',
-                    border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                    color: '#fff',
-                    fontSize: '14px',
-                  }}
-                />
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary, #94a3b8)', marginTop: '4px' }}>
-                  Outdated app versions below this semver threshold are prompted to upgrade.
-                </p>
-              </div>
+          <Card style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem' }}>
+              <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                Platform Maintenance & Mobile Release Gates
+              </h2>
+              <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                Control mobile client traffic access and enforce minimum mobile build requirements.
+              </p>
             </div>
-          </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <FormField
+                label="Platform Maintenance Mode"
+                helperText="When enabled, mobile client APIs return 503 Maintenance Mode status."
+              >
+                <Select
+                  options={[
+                    { value: '0', label: 'Disabled (Normal Operations)' },
+                    { value: '1', label: 'Enabled (Block Non-Admin Traffic)' },
+                  ]}
+                  value={formData['platform_maintenance_mode'] || '0'}
+                  onChange={(val) => handleChange('platform_maintenance_mode', val)}
+                />
+              </FormField>
+
+              <FormField
+                label="Minimum Supported Mobile App Version"
+                helperText="Outdated app versions below this semver threshold are prompted to upgrade."
+              >
+                <TextInput
+                  value={formData['min_app_version'] || '1.0.0'}
+                  onChange={(e) => handleChange('min_app_version', e.target.value)}
+                  placeholder="1.0.0"
+                />
+              </FormField>
+            </div>
+          </Card>
 
           {/* Section: Defaults & Policies */}
-          <div style={{
-            background: 'var(--bg-secondary, #1e293b)',
-            borderRadius: '16px',
-            padding: '24px',
-            border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
-          }}>
-            <h2 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px', color: '#f8fafc' }}>
-              Default Client Targets & Policies
-            </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>
-                  Default Daily Water Target (ml)
-                </label>
-                <input
+          <Card style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem' }}>
+              <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                Default Client Targets & Policies
+              </h2>
+              <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                Baseline thresholds automatically assigned to newly onboarded athlete profiles.
+              </p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <FormField label="Default Daily Water Target (ml)">
+                <TextInput
                   type="number"
                   value={formData['default_water_target_ml'] || '3000'}
-                  onChange={e => handleChange('default_water_target_ml', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    background: 'rgba(0, 0, 0, 0.3)',
-                    border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                    color: '#fff',
-                    fontSize: '14px',
-                  }}
+                  onChange={(e) => handleChange('default_water_target_ml', e.target.value)}
                 />
-              </div>
+              </FormField>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>
-                  Session Inactivity Timeout (Minutes)
-                </label>
-                <input
+              <FormField label="Session Inactivity Timeout (Minutes)">
+                <TextInput
                   type="number"
                   value={formData['session_timeout_minutes'] || '60'}
-                  onChange={e => handleChange('session_timeout_minutes', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    background: 'rgba(0, 0, 0, 0.3)',
-                    border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                    color: '#fff',
-                    fontSize: '14px',
-                  }}
+                  onChange={(e) => handleChange('session_timeout_minutes', e.target.value)}
                 />
-              </div>
+              </FormField>
             </div>
-          </div>
+          </Card>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-            <button
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+            <Button
               type="submit"
-              disabled={saving}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '12px 24px',
-                borderRadius: '8px',
-                background: 'var(--accent-primary, #3b82f6)',
-                color: '#fff',
-                border: 'none',
-                fontWeight: 600,
-                fontSize: '14px',
-                cursor: saving ? 'not-allowed' : 'pointer',
-              }}
+              variant="primary"
+              loading={saving}
+              icon={<Save size={16} />}
             >
-              {saving ? <RefreshCw size={16} className="spin" /> : <Save size={16} />}
               {saving ? 'Saving Changes...' : 'Save Platform Settings'}
-            </button>
+            </Button>
           </div>
         </form>
       )}

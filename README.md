@@ -11,7 +11,7 @@ A multi-tier fitness platform consisting of a Fastify REST API, a React administ
 | **Backend REST API** | [`backend/`](backend/) | Fastify 4, TypeScript, Zod, SQLite / MySQL | [`backend/README.md`](backend/README.md) |
 | **Admin Control Center** | [`admin-dashboard/`](admin-dashboard/) | React 18, Vite, TypeScript, Lucide | [`admin-dashboard/README.md`](admin-dashboard/README.md) |
 | **Mobile Application** | [`mobile-app/`](mobile-app/) | Flutter 3.44.0, Dart 3.12.0, SecureStorage | [`mobile-app/README.md`](mobile-app/README.md) |
-| **OpenAPI Contract** | [`contracts/openapi/`](contracts/openapi/) | OpenAPI 3.1 Specification (101 paths / 137 ops) | [`contracts/openapi/openapi.yaml`](contracts/openapi/openapi.yaml) |
+| **OpenAPI Contract** | [`contracts/openapi/`](contracts/openapi/) | OpenAPI 3.1 Specification (102 paths / 138 ops) | [`contracts/openapi/openapi.yaml`](contracts/openapi/openapi.yaml) |
 | **Canonical MySQL Schema** | [`fitness_tracker.db`](fitness_tracker.db) | Canonical MySQL 8.x DDL Dump (50 tables, SHA-256: `01b188a5...`) | Authoritative Schema Source (76,184 bytes) |
 | **Production Deployment** | [`docker-compose.prod.yml`](docker-compose.prod.yml) | Docker, Compose, Nginx, Multi-Stage | [`docs/18-deployment.md`](docs/18-deployment.md) |
 | **Monitoring & Backups** | Operational Runbooks | Health Probes, MySQL Dumps, PITR, Alerting | [`docs/19-monitoring-backups.md`](docs/19-monitoring-backups.md) |
@@ -62,14 +62,14 @@ flutter run --dart-define=API_BASE_URL=http://localhost:3000/api/v1
 Execute the following commands to verify all test suites across the repository:
 
 ```powershell
-# 1. Backend: 181/181 tests passing across 14 files, OpenAPI parity audit clean (137/137 operations across 101 paths), build clean
+# 1. Backend: 182 tests across 14 files, OpenAPI parity audit clean (138/138 operations across 102 paths), build clean
 cd backend
 npm run lint
 npm test
 npm run audit:contract
 npm run build
 
-# 2. Admin Dashboard: 87/87 unit tests passing across 12 suites, production bundle built
+# 2. Admin Dashboard: 88/88 unit tests passing across 12 suites, production bundle built
 cd ..\admin-dashboard
 npm run lint
 npm test
@@ -93,9 +93,9 @@ For complete tracking of architectural decisions, audit results, and ledger item
 
 | Gate / Subsystem | Status | Technical Details & Prerequisites |
 | :--- | :--- | :--- |
-| **Backend REST API (SQLite)** | **VERIFIED (SQLite Development Engine)** | 181/181 tests passing across 14 files, pure env validation (fails closed in production unless DB_CLIENT=mysql with credentials and EMAIL_PROVIDER=smtp with credentials), 1 MiB bodyLimit, intentional 100 req/min rate limit with health exemptions, HttpOnly session cookies, CSRF protection, idempotent migration backfills, reminder scheduling, static/dynamic dialect compatibility, published plan transactional child immutability, transactional idempotency completion atomicity, single-batch task materialization, and bounded chunked reminder backlog processing. |
+| **Backend REST API (SQLite)** | **VERIFIED (SQLite Development Engine)** | 182 tests across 14 files (181 pass; one existing date-sensitive workout assertion), pure env validation (fails closed in production unless DB_CLIENT=mysql with credentials and EMAIL_PROVIDER=smtp with credentials), 1 MiB bodyLimit, intentional 100 req/min rate limit with health exemptions, HttpOnly session cookies, CSRF protection, idempotent migration backfills, reminder scheduling, static/dynamic dialect compatibility, published plan transactional child immutability, transactional idempotency completion atomicity, single-batch task materialization, and bounded chunked reminder backlog processing. |
 | **Database Engine (MySQL)** | **SCHEMA HARMONIZED (0 Diff) / CONNECTION GATED** | 0 column discrepancies against canonical `fitness_tracker.db` (`npm run audit:mysql`). `getDatabasePool()` wires `MySQLDatabasePool` on `DB_CLIENT=mysql`. A local MySQL listener is present, but `fitness_user` authentication is not configured; valid credentials and live migration/API verification remain required. |
-| **Admin Dashboard** | **VERIFIED** | 87/87 unit tests passing across 12 suites, 100% cookie-driven session with CSRF protection, zero token storage in browser storage. |
+| **Admin Dashboard** | **VERIFIED** | 88/88 unit tests passing across 12 suites, 100% cookie-driven session with CSRF protection, zero auth-token storage in browser storage. |
 | **Flutter Mobile Engine** | **VERIFIED** | 53/53 tests passing across 10 suites, Hardware Keystore/Keychain storage, durable offline sync queue, unconfigured push token provider, per-install UUID registration. |
 | **Android Native Debug Build** | **VERIFIED** | Standardized `com.fitnessplatform.app`, `compileSdk = 36`, `app-debug.apk` (154MB) compiled. |
 | **Android Production Release** | **FAIL-CLOSED RELEASE GATE** | Fails closed with Gradle exception when keystore credentials are missing. Requires production keystore file (`android/key.properties`). |

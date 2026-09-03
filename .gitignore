@@ -24,6 +24,7 @@ build/
 *.log
 
 # Explicitly preserve authoritative MySQL canonical dump
-!/fitness_tracker.db
+!**/fitness_tracker.db
+!**/fitness_tracker.sql
 
 

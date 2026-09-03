@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/premium_widgets.dart';
 
 class CardioScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -12,7 +13,7 @@ class CardioScreen extends StatefulWidget {
 }
 
 class _CardioScreenState extends State<CardioScreen>
-    with SingleTickerProviderStateMixin {
+  with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<dynamic> _activities = [];
   List<dynamic> _history = [];
@@ -83,9 +84,8 @@ class _CardioScreenState extends State<CardioScreen>
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load cardio data: $e')),
-        );
+        showPremiumSnackBar(context, 'Failed to load cardio data: $e',
+            isError: true);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -104,10 +104,8 @@ class _CardioScreenState extends State<CardioScreen>
     if (_selectedActivityId == null) return;
     final duration = int.tryParse(_durationController.text.trim());
     if (duration == null || duration <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Please enter a valid duration in minutes')),
-      );
+      showPremiumSnackBar(context, 'Please enter a valid duration in minutes',
+          isError: true);
       return;
     }
 
@@ -133,12 +131,8 @@ class _CardioScreenState extends State<CardioScreen>
       await widget.apiClient.post('/me/cardio', body: payload);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cardio session recorded successfully!'),
-            backgroundColor: AppColors.primary,
-          ),
-        );
+        showPremiumSnackBar(context, 'Cardio session recorded successfully!',
+            isSuccess: true);
         _durationController.clear();
         _distanceController.clear();
         _caloriesController.clear();
@@ -151,13 +145,8 @@ class _CardioScreenState extends State<CardioScreen>
       }
     } on OfflineOperationQueued catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content:
-                Text('Cardio session saved offline. Will sync when online.'),
-            backgroundColor: AppColors.primary,
-          ),
-        );
+        showPremiumSnackBar(
+            context, 'Cardio session saved offline. Will sync when online.');
         _durationController.clear();
         _distanceController.clear();
         _caloriesController.clear();
@@ -168,9 +157,7 @@ class _CardioScreenState extends State<CardioScreen>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error logging cardio: $e')),
-        );
+        showPremiumSnackBar(context, 'Error logging cardio: $e', isError: true);
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -179,76 +166,70 @@ class _CardioScreenState extends State<CardioScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Cardio Tracking',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: AppColors.surface,
-        elevation: 0,
-        bottom: TabBar(
+    final colors = AppThemeColors.of(context);
+
+    return PremiumScaffold(
+      appBar: PremiumAppBar(
+        titleText: 'Cardio Tracking',
+        bottom: PremiumTabBar(
           controller: _tabController,
-          indicatorColor: AppColors.cyan,
-          labelColor: AppColors.cyan,
-          unselectedLabelColor: AppColors.textSecondary,
           tabs: const [
-            Tab(icon: Icon(Icons.add_circle_outline), text: 'Log Activity'),
-            Tab(icon: Icon(Icons.history), text: 'Session History'),
+            Tab(
+                icon: Icon(Icons.add_circle_outline, size: 18),
+                text: 'Log Activity'),
+            Tab(icon: Icon(Icons.history, size: 18), text: 'Session History'),
           ],
         ),
       ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.cyan))
-          : TabBarView(
+          ? Center(
+              child: CircularProgressIndicator(color: colors.primary))
+          : PremiumTabView(
               controller: _tabController,
               children: [
-                _buildLogForm(),
-                _buildHistoryList(),
+                _buildLogForm(colors),
+                _buildHistoryList(colors),
               ],
             ),
     );
   }
 
-  Widget _buildLogForm() {
+  Widget _buildLogForm(AppThemeColors colors) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Activity Selector
-          const Text('Select Activity',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<int>(
-                value: _selectedActivityId,
-                isExpanded: true,
-                dropdownColor: AppColors.surface,
-                items: _activities.map((a) {
-                  return DropdownMenuItem<int>(
-                    value: a['id'] as int,
-                    child: Text(a['name'] as String? ?? 'Cardio'),
-                  );
-                }).toList(),
-                onChanged: (val) => setState(() => _selectedActivityId = val),
-              ),
-            ),
+          const SectionHeader(
+            title: 'Activity & Prescriptions',
+            subtitle: 'Choose target conditioning discipline and metrics',
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 8),
+          PremiumDropdownField<int>(
+            label: 'Select Activity',
+            value: _selectedActivityId,
+            items: _activities.map((a) {
+              return DropdownMenuItem<int>(
+                value: a['id'] as int,
+                child: Text(
+                  a['name'] as String? ?? 'Cardio',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: colors.textPrimary,
+                  ),
+                ),
+              );
+            }).toList(),
+            onChanged: (val) => setState(() => _selectedActivityId = val),
+          ),
+          const SizedBox(height: 16),
 
           // Duration & Distance Row
           Row(
             children: [
               Expanded(
-                child: _buildTextField(
+                child: PremiumTextField(
                   controller: _durationController,
                   focusNode: _durationFocus,
                   label: 'Duration (Minutes) *',
@@ -260,9 +241,9 @@ class _CardioScreenState extends State<CardioScreen>
                   prefixIcon: Icons.timer_outlined,
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
-                child: _buildTextField(
+                child: PremiumTextField(
                   controller: _distanceController,
                   focusNode: _distanceFocus,
                   label: 'Distance (km)',
@@ -277,13 +258,13 @@ class _CardioScreenState extends State<CardioScreen>
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // Calories & Heart Rate Row
           Row(
             children: [
               Expanded(
-                child: _buildTextField(
+                child: PremiumTextField(
                   controller: _caloriesController,
                   focusNode: _caloriesFocus,
                   label: 'Calories Burned',
@@ -295,9 +276,9 @@ class _CardioScreenState extends State<CardioScreen>
                   prefixIcon: Icons.local_fire_department_outlined,
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
-                child: _buildTextField(
+                child: PremiumTextField(
                   controller: _heartRateController,
                   focusNode: _heartRateFocus,
                   label: 'Avg Heart Rate (bpm)',
@@ -311,13 +292,13 @@ class _CardioScreenState extends State<CardioScreen>
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // Speed & Incline Row
           Row(
             children: [
               Expanded(
-                child: _buildTextField(
+                child: PremiumTextField(
                   controller: _speedController,
                   focusNode: _speedFocus,
                   label: 'Speed (km/h)',
@@ -330,9 +311,9 @@ class _CardioScreenState extends State<CardioScreen>
                   prefixIcon: Icons.speed_outlined,
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
-                child: _buildTextField(
+                child: PremiumTextField(
                   controller: _inclineController,
                   focusNode: _inclineFocus,
                   label: 'Incline (%)',
@@ -347,10 +328,10 @@ class _CardioScreenState extends State<CardioScreen>
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // Notes
-          _buildTextField(
+          PremiumTextField(
             controller: _notesController,
             focusNode: _notesFocus,
             label: 'Session Notes',
@@ -364,100 +345,35 @@ class _CardioScreenState extends State<CardioScreen>
           const SizedBox(height: 24),
 
           // Submit Button
-          ElevatedButton(
-            onPressed: _submitting ? null : _submitCardio,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.cyan,
-              foregroundColor: Colors.black,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              elevation: 2,
-            ),
-            child: _submitting
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.black,
-                    ),
-                  )
-                : const Text(
-                    'Record Cardio Session',
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5),
-                  ),
+          PremiumButton(
+            text: 'Record Cardio Session',
+            loading: _submitting,
+            onPressed: _submitCardio,
+            icon: const Icon(Icons.check, size: 18, color: Colors.white),
+            height: 48,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    FocusNode? focusNode,
-    TextInputAction? textInputAction,
-    ValueChanged<String>? onSubmitted,
-    TextInputType keyboardType = TextInputType.text,
-    IconData? prefixIcon,
-    int maxLines = 1,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: TextField(
-        controller: controller,
-        focusNode: focusNode,
-        keyboardType: keyboardType,
-        textInputAction: textInputAction,
-        onSubmitted: onSubmitted,
-        maxLines: maxLines,
-        style: const TextStyle(color: Colors.white, fontSize: 14),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle:
-              const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-          prefixIcon: prefixIcon != null
-              ? Icon(prefixIcon, color: AppColors.textSecondary, size: 20)
-              : null,
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHistoryList() {
+  Widget _buildHistoryList(AppThemeColors colors) {
     if (_history.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.directions_run,
-                size: 48, color: AppColors.textSecondary),
-            SizedBox(height: 12),
-            Text('No cardio sessions recorded yet',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 15)),
-          ],
-        ),
+      return const EmptyStateWidget(
+        icon: Icons.directions_run,
+        title: 'No Cardio History',
+        description:
+            'You haven\'t logged any cardio sessions yet. Complete your prescribed conditioning today.',
       );
     }
 
     return RefreshIndicator(
       onRefresh: _loadData,
-      color: AppColors.cyan,
+      color: colors.primary,
       child: ListView.separated(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         itemCount: _history.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (context, idx) {
           final item = _history[idx];
           final activityName = item['activity_name'] as String? ?? 'Cardio';
@@ -466,13 +382,8 @@ class _CardioScreenState extends State<CardioScreen>
           final distance = item['distance_km'];
           final calories = item['calories_burned'];
 
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
-            ),
+          return PremiumCard(
+            padding: const EdgeInsets.all(AppSpacing.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -481,43 +392,53 @@ class _CardioScreenState extends State<CardioScreen>
                   children: [
                     Text(
                       activityName,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800,
                           fontSize: 16,
-                          color: Colors.white),
+                          color: colors.textPrimary),
                     ),
                     Text(
                       date,
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary),
+                      style: TextStyle(
+                          fontSize: 12, color: colors.textSecondary),
                     ),
                   ],
                 ),
                 const SizedBox(height: 10),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
                   children: [
-                    _buildStatBadge(
-                        Icons.timer_outlined, '$duration min', AppColors.cyan),
-                    if (distance != null) ...[
-                      const SizedBox(width: 8),
-                      _buildStatBadge(
-                          Icons.straighten, '$distance km', AppColors.primary),
-                    ],
-                    if (calories != null) ...[
-                      const SizedBox(width: 8),
-                      _buildStatBadge(Icons.local_fire_department,
-                          '$calories kcal', AppColors.amber),
-                    ],
+                    StatusBadge(
+                      icon: Icon(Icons.timer_outlined,
+                          size: 12, color: colors.cyan),
+                      label: '$duration min',
+                      color: colors.cyan,
+                    ),
+                    if (distance != null)
+                      StatusBadge(
+                        icon: Icon(Icons.straighten,
+                            size: 12, color: colors.primary),
+                        label: '$distance km',
+                        color: colors.primary,
+                      ),
+                    if (calories != null)
+                      StatusBadge(
+                        icon: Icon(Icons.local_fire_department,
+                            size: 12, color: colors.amber),
+                        label: '$calories kcal',
+                        color: colors.amber,
+                      ),
                   ],
                 ),
                 if (item['notes'] != null &&
                     (item['notes'] as String).isNotEmpty) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Text(
                     item['notes'] as String,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textSecondary,
+                        color: colors.textMuted,
                         fontStyle: FontStyle.italic),
                   ),
                 ],
@@ -525,26 +446,6 @@ class _CardioScreenState extends State<CardioScreen>
             ),
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildStatBadge(IconData icon, String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(
-                  color: color, fontSize: 12, fontWeight: FontWeight.w600)),
-        ],
       ),
     );
   }

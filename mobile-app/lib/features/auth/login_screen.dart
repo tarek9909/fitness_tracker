@@ -3,17 +3,21 @@ import '../../core/api/api_client.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/push/push_registration_service.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/theme_controller.dart';
+import '../../core/widgets/premium_widgets.dart';
 
 class LoginScreen extends StatefulWidget {
   final ApiClient apiClient;
   final AuthSession authSession;
   final PushRegistrationService? pushRegistrationService;
+  final ThemeController? themeController;
 
   const LoginScreen({
     super.key,
     required this.apiClient,
     required this.authSession,
     this.pushRegistrationService,
+    this.themeController,
   });
 
   @override
@@ -106,125 +110,154 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    final colors = AppThemeColors.of(context);
+
+    return PremiumScaffold(
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Brand Logo
-                Center(
-                  child: Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [AppColors.primary, AppColors.cyan],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (widget.themeController != null) ...[
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: PremiumIconButton(
+                        icon: colors.isDark
+                            ? Icons.light_mode_outlined
+                            : Icons.dark_mode_outlined,
+                        tooltip: colors.isDark
+                            ? 'Switch to Light Theme'
+                            : 'Switch to Dark Theme',
+                        onPressed: () {
+                          widget.themeController!.setThemeMode(
+                            colors.isDark ? ThemeMode.light : ThemeMode.dark,
+                          );
+                        },
                       ),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: AppColors.primaryGlow,
-                          blurRadius: 20,
-                          offset: Offset(0, 8),
-                        ),
-                      ],
                     ),
-                    child:
-                        const Icon(Icons.bolt, size: 40, color: Colors.white),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'FITNESS TRACKER',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Your daily training, nutrition & progress command center',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 36),
+                    const SizedBox(height: 12),
+                  ],
 
-                if (_errorMessage != null)
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    margin: const EdgeInsets.only(bottom: 20),
-                    decoration: BoxDecoration(
-                      color: AppColors.rose.withValues(alpha: 0.15),
-                      border: Border.all(
-                          color: AppColors.rose.withValues(alpha: 0.3)),
-                      borderRadius: BorderRadius.circular(12),
+                  // Architectural Brand Monogram (Clean, matte, non-radiant)
+                  Center(
+                    child: Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: colors.surfaceElevated,
+                        borderRadius: BorderRadius.circular(AppRadii.xl),
+                        border: Border.all(
+                          color: colors.primary.withValues(alpha: 0.4),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          Icons.bolt,
+                          size: 32,
+                          color: colors.primary,
+                        ),
+                      ),
                     ),
-                    child: Row(
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'FITNESS TRACKER',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.6,
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Precision athletic training, nutrition & daily command center',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colors.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Structured Login Form Card
+                  PremiumCard(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Icon(Icons.error_outline,
-                            color: AppColors.rose, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _errorMessage!,
-                            style: const TextStyle(
-                                color: AppColors.rose, fontSize: 13),
+                        if (_errorMessage != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                            margin: const EdgeInsets.only(bottom: 20),
+                            decoration: BoxDecoration(
+                              color: colors.roseMuted,
+                              border: Border.all(
+                                  color: colors.rose.withValues(alpha: 0.3)),
+                              borderRadius: BorderRadius.circular(AppRadii.md),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.error_outline,
+                                    color: colors.rose, size: 18),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    _errorMessage!,
+                                    style: TextStyle(
+                                      color: colors.rose,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+
+                        PremiumTextField(
+                          label: 'Email Address',
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          prefixIcon: Icons.email_outlined,
+                          onSubmitted: (_) {
+                            FocusScope.of(context).requestFocus(_passwordFocusNode);
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        PremiumTextField(
+                          label: 'Password',
+                          controller: _passwordController,
+                          focusNode: _passwordFocusNode,
+                          obscureText: true,
+                          textInputAction: TextInputAction.done,
+                          prefixIcon: Icons.lock_outline,
+                          onSubmitted: (_) {
+                            if (!_isLoading) _handleLogin();
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                        PremiumButton(
+                          text: 'Sign In',
+                          loading: _isLoading,
+                          onPressed: _handleLogin,
+                          height: 48,
                         ),
                       ],
                     ),
                   ),
-
-                TextField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.next,
-                  onSubmitted: (_) {
-                    FocusScope.of(context).requestFocus(_passwordFocusNode);
-                  },
-                  decoration: const InputDecoration(
-                    labelText: 'Email Address',
-                    prefixIcon: Icon(Icons.email_outlined),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _passwordController,
-                  focusNode: _passwordFocusNode,
-                  obscureText: true,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) {
-                    if (!_isLoading) _handleLogin();
-                  },
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: Icon(Icons.lock_outline),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _handleLogin,
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text('Sign In'),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

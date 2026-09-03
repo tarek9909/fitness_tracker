@@ -7,15 +7,17 @@ import {
   Library, 
   Apple, 
   UserCheck, 
-  BarChart3, 
-  Bell, 
+  BarChart3,
+  Bell,
   Send,
   Settings,
   LogOut,
-  Sparkles,
-  X
+  Activity,
+  X,
+  Shield
 } from 'lucide-react';
 import { useAuth } from '../auth/auth-context';
+import { IconButton, NavButton } from './ui';
 
 export type NavTab = 
   | 'dashboard' 
@@ -48,14 +50,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const navItems = [
     { id: 'dashboard' as NavTab, label: 'Overview', icon: LayoutDashboard },
-    { id: 'users' as NavTab, label: 'Users Directory', icon: Users },
-    { id: 'workout-plans' as NavTab, label: 'Workout Plans', icon: Dumbbell },
+    { id: 'users' as NavTab, label: 'Users & Clients', icon: Users },
+    { id: 'workout-plans' as NavTab, label: 'Workout Protocols', icon: Dumbbell },
     { id: 'diet-plans' as NavTab, label: 'Diet Protocols', icon: Utensils },
     { id: 'exercises' as NavTab, label: 'Exercise Library', icon: Library },
     { id: 'foods' as NavTab, label: 'Food Database', icon: Apple },
     { id: 'assignments' as NavTab, label: 'Plan Assignments', icon: UserCheck },
     { id: 'reminders' as NavTab, label: 'Reminder Rules', icon: Bell },
-    { id: 'notifications' as NavTab, label: 'Notifications & Dispatch', icon: Send },
+    { id: 'notifications' as NavTab, label: 'Push & Dispatch', icon: Send },
     { id: 'analytics' as NavTab, label: 'Analytics & Audit', icon: BarChart3 },
     { id: 'settings' as NavTab, label: 'Platform Settings', icon: Settings },
   ];
@@ -69,9 +71,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.65)',
-            backdropFilter: 'blur(4px)',
-            zIndex: 90,
+            backgroundColor: 'rgba(4, 7, 13, 0.75)',
+            backdropFilter: 'blur(6px)',
+            zIndex: 1050,
           }}
           aria-hidden="true"
         />
@@ -81,14 +83,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className={`sidebar-nav ${mobileOpen ? 'open' : ''}`}
         style={{
           width: '260px',
-          backgroundColor: 'var(--bg-secondary)',
-          borderRight: '1px solid var(--border-color)',
+          backgroundColor: 'var(--bg-primary)',
+          borderRight: '1px solid var(--border-subtle)',
           display: 'flex',
           flexDirection: 'column',
           height: '100vh',
           position: 'sticky',
           top: 0,
-          zIndex: 95,
+          zIndex: 1100,
+          boxShadow: 'var(--shadow-sm)',
         }}
       >
         {/* Brand Header */}
@@ -97,84 +100,70 @@ export const Sidebar: React.FC<SidebarProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid var(--border-color)',
+          borderBottom: '1px solid var(--border-subtle)',
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{
               width: '36px',
               height: '36px',
               borderRadius: 'var(--radius-md)',
-              background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-cyan))',
+              background: 'linear-gradient(135deg, var(--accent-primary), #059669)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: 'var(--shadow-glow)',
+              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
             }}>
-              <Sparkles size={20} color="#fff" />
+              <Activity size={19} color="#ffffff" strokeWidth={2.5} />
             </div>
             <div>
-              <h1 style={{ fontSize: '1.1rem', fontWeight: 800, letterSpacing: '-0.02em' }}>FITNESS OS</h1>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Admin Center
-              </span>
+              <div style={{ fontSize: '1.05rem', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+                FITNESS OS
+              </div>
+              <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+                Operations Console
+              </div>
             </div>
           </div>
 
           {onCloseMobile && (
-            <button
-              onClick={onCloseMobile}
+            <IconButton
+              icon={<X size={18} />}
+              label="Close Navigation"
+              size="sm"
               className="mobile-close-btn"
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--text-muted)',
-                cursor: 'pointer',
-                padding: '0.25rem',
-              }}
-              aria-label="Close Sidebar"
-            >
-              <X size={20} />
-            </button>
+              onClick={onCloseMobile}
+            />
           )}
         </div>
 
         {/* Navigation Links */}
         <nav 
           aria-label="Main Navigation"
-          style={{ flex: 1, padding: '1rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', overflowY: 'auto' }}
+          style={{
+            flex: 1,
+            padding: '1rem 0.75rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.25rem',
+            overflowY: 'auto',
+          }}
         >
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id || (item.id === 'users' && activeTab === 'user-detail');
             return (
-              <button
+              <NavButton
                 key={item.id}
+                active={isActive}
+                icon={<Icon size={18} />}
                 onClick={() => {
                   onSelectTab(item.id);
                   if (onCloseMobile) onCloseMobile();
                 }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  borderRadius: 'var(--radius-md)',
-                  border: 'none',
-                  background: isActive ? 'var(--accent-glow)' : 'transparent',
-                  color: isActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                  fontWeight: isActive ? 600 : 500,
-                  fontSize: '0.875rem',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.15s ease',
-                  outline: 'none',
-                }}
-                className="nav-item-btn"
               >
-                <Icon size={18} color={isActive ? 'var(--accent-primary)' : 'currentColor'} />
-                <span>{item.label}</span>
-              </button>
+                {item.label}
+              </NavButton>
             );
           })}
         </nav>
@@ -182,40 +171,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* User Footer */}
         <div style={{
           padding: '1rem 1.25rem',
-          borderTop: '1px solid var(--border-color)',
+          borderTop: '1px solid var(--border-subtle)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          backgroundColor: 'rgba(0,0,0,0.15)',
+          backgroundColor: 'rgba(9, 13, 22, 0.4)',
         }}>
-          <div style={{ overflow: 'hidden' }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-              {user?.firstName} {user?.lastName}
+          <div style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: 'var(--radius-full)',
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border-color)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                color: 'var(--accent-primary)',
+                flexShrink: 0,
+              }}
+            >
+              {user?.firstName?.[0] || 'A'}
             </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', textTransform: 'capitalize' }}>
-              {user?.role?.replace('_', ' ')}
+            <div style={{ overflow: 'hidden' }}>
+              <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                {user?.firstName} {user?.lastName}
+              </div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <Shield size={10} color="var(--accent-primary)" />
+                <span style={{ textTransform: 'capitalize' }}>
+                  {user?.role?.replace('_', ' ') || 'Admin'}
+                </span>
+              </div>
             </div>
           </div>
-          <button
+          <IconButton
+            icon={<LogOut size={16} />}
+            label="Sign Out"
+            size="sm"
             onClick={logout}
-            title="Logout"
-            aria-label="Logout"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--text-muted)',
-              cursor: 'pointer',
-              padding: '0.4rem',
-              borderRadius: 'var(--radius-sm)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-rose)'}
-            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
-          >
-            <LogOut size={18} />
-          </button>
+          />
         </div>
       </aside>
     </>

@@ -7,6 +7,8 @@ import 'core/storage/secure_storage_service.dart';
 import 'core/storage/local_cache.dart';
 import 'core/sync/sync_coordinator.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_controller.dart';
+import 'core/widgets/premium_widgets.dart';
 import 'features/auth/login_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/cardio/cardio_screen.dart';
@@ -24,9 +26,11 @@ void main() async {
     storage: storage,
     authSession: authSession,
   );
+  final themeController = ThemeController(storage: storage);
 
   await authSession.initSession();
   await syncCoordinator.initCoordinator();
+  await themeController.init();
 
   final apiClient = ApiClient(
     authSession: authSession,
@@ -65,6 +69,7 @@ void main() async {
     apiClient: apiClient,
     localCache: localCache,
     pushRegistrationService: pushRegistrationService,
+    themeController: themeController,
   ));
 }
 
@@ -74,6 +79,7 @@ class FitnessApp extends StatelessWidget {
   final ApiClient apiClient;
   final LocalCache? localCache;
   final PushRegistrationService? pushRegistrationService;
+  final ThemeController? themeController;
 
   const FitnessApp({
     super.key,
@@ -82,17 +88,22 @@ class FitnessApp extends StatelessWidget {
     required this.apiClient,
     this.localCache,
     this.pushRegistrationService,
+    this.themeController,
   });
 
   @override
   Widget build(BuildContext context) {
+    final effectiveThemeController = themeController ?? ThemeController();
+
     return ListenableBuilder(
-      listenable: authSession,
+      listenable: Listenable.merge([authSession, effectiveThemeController]),
       builder: (context, _) {
         return MaterialApp(
           title: 'Fitness Platform',
           debugShowCheckedModeBanner: false,
-          theme: AppTheme.darkTheme,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: effectiveThemeController.themeMode,
           home: authSession.isAuthenticated
               ? MainNavigationShell(
                   apiClient: apiClient,
@@ -100,11 +111,13 @@ class FitnessApp extends StatelessWidget {
                   syncCoordinator: syncCoordinator,
                   localCache: localCache ?? LocalCache(authSession.storage),
                   pushRegistrationService: pushRegistrationService,
+                  themeController: effectiveThemeController,
                 )
               : LoginScreen(
                   apiClient: apiClient,
                   authSession: authSession,
                   pushRegistrationService: pushRegistrationService,
+                  themeController: effectiveThemeController,
                 ),
         );
       },
@@ -118,6 +131,7 @@ class MainNavigationShell extends StatefulWidget {
   final AuthSession authSession;
   final SyncCoordinator syncCoordinator;
   final PushRegistrationService? pushRegistrationService;
+  final ThemeController? themeController;
 
   const MainNavigationShell({
     super.key,
@@ -126,6 +140,7 @@ class MainNavigationShell extends StatefulWidget {
     required this.authSession,
     required this.syncCoordinator,
     this.pushRegistrationService,
+    this.themeController,
   });
 
   @override
@@ -136,17 +151,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   int _currentIndex = 0;
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && widget.authSession.isAuthenticated) {
-        widget.syncCoordinator.resumeAfterAuthentication();
-      }
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final colors = AppThemeColors.of(context);
+
     final screens = [
       HomeScreen(
           apiClient: widget.apiClient,
@@ -155,19 +162,36 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       CardioScreen(apiClient: widget.apiClient),
       HistoryScreen(apiClient: widget.apiClient, localCache: widget.localCache),
       WeightScreen(apiClient: widget.apiClient),
-      _buildProfileScreen(),
+      _buildProfileScreen(colors),
     ];
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('FITNESS OS',
-            style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
-        backgroundColor: AppColors.surface,
-        elevation: 0,
+    return PremiumScaffold(
+      appBar: PremiumAppBar(
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: colors.primaryMuted,
+                borderRadius: BorderRadius.circular(AppRadii.sm),
+              ),
+              child: Icon(Icons.bolt, color: colors.primary, size: 18),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'FITNESS OS',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 18,
+                letterSpacing: 0.8,
+                color: colors.textPrimary,
+              ),
+            ),
+          ],
+        ),
         actions: [
-          IconButton(
-            icon:
-                const Icon(Icons.notifications_outlined, color: AppColors.cyan),
+          PremiumIconButton(
+            icon: Icons.notifications_outlined,
             tooltip: 'Notification Center',
             onPressed: () {
               Navigator.push(
@@ -179,40 +203,42 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               );
             },
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Column(
         children: [
-          _buildSyncStatusBanner(),
+          _buildSyncStatusBanner(colors),
           Expanded(child: screens[_currentIndex]),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
+      bottomNavigationBar: PremiumNavigationBar(
         currentIndex: _currentIndex,
         onTap: (idx) => setState(() => _currentIndex = idx),
-        backgroundColor: AppColors.surface,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: AppColors.textMuted,
-        type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.today),
+          PremiumNavigationBarItem(
+            icon: Icons.today_outlined,
+            activeIcon: Icons.today,
             label: 'Today',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.directions_run),
+          PremiumNavigationBarItem(
+            icon: Icons.directions_run_outlined,
+            activeIcon: Icons.directions_run,
             label: 'Cardio',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history),
+          PremiumNavigationBarItem(
+            icon: Icons.history_outlined,
+            activeIcon: Icons.history,
             label: 'History',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.monitor_weight_outlined),
+          PremiumNavigationBarItem(
+            icon: Icons.monitor_weight_outlined,
+            activeIcon: Icons.monitor_weight,
             label: 'Weight',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
+          PremiumNavigationBarItem(
+            icon: Icons.person_outline,
+            activeIcon: Icons.person,
             label: 'Profile',
           ),
         ],
@@ -220,7 +246,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     );
   }
 
-  Widget _buildSyncStatusBanner() {
+  Widget _buildSyncStatusBanner(AppThemeColors colors) {
     return ListenableBuilder(
       listenable: widget.syncCoordinator,
       builder: (context, _) {
@@ -233,10 +259,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         }
 
         final isError = failed > 0 || authRequired > 0;
-        final bgColor = isError
-            ? AppColors.rose.withValues(alpha: 0.2)
-            : AppColors.amber.withValues(alpha: 0.2);
-        final textColor = isError ? AppColors.rose : AppColors.amber;
+        final bgColor = isError ? colors.roseMuted : colors.amberMuted;
+        final textColor = isError ? colors.rose : colors.amber;
         final icon = isError ? Icons.warning_amber_rounded : Icons.sync;
         final text = authRequired > 0
             ? '$authRequired mutation(s) require sign-in to resume'
@@ -263,13 +287,11 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     ),
                   ),
                 ),
-                TextButton(
+                PremiumButton(
+                  text: 'View Queue',
+                  isSecondary: true,
                   onPressed: () => _showSyncQueueDialog(context),
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    foregroundColor: textColor,
-                  ),
-                  child: const Text('View Queue'),
+                  height: 28,
                 ),
               ],
             ),
@@ -280,19 +302,16 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   }
 
   void _showSyncQueueDialog(BuildContext context) {
-    showModalBottomSheet(
+    final colors = AppThemeColors.of(context);
+    showPremiumModalSheet(
       context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
       builder: (ctx) {
         return ListenableBuilder(
           listenable: widget.syncCoordinator,
           builder: (ctx, _) {
             final ops = widget.syncCoordinator.operations;
             return Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -300,59 +319,77 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Offline Mutation Queue',
                         style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: colors.textPrimary),
                       ),
-                      TextButton(
+                      PremiumButton(
+                        text: 'Sync Now',
                         onPressed: () => widget.syncCoordinator.flushQueue(),
-                        child: const Text('Sync Now'),
+                        height: 32,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   if (ops.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 32),
                       child: Center(
                         child: Text(
                           'Queue is empty. All operations synchronized.',
-                          style: TextStyle(color: AppColors.textSecondary),
+                          style: TextStyle(color: colors.textSecondary),
                         ),
                       ),
                     )
                   else
-                    Expanded(
+                    SizedBox(
+                      height: 360,
                       child: ListView.builder(
                         itemCount: ops.length,
                         itemBuilder: (ctx, idx) {
                           final op = ops[idx];
-                          return Card(
+                          return Container(
                             margin: const EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              title: Text('${op.method} ${op.endpoint}'),
+                            padding: const EdgeInsets.all(AppSpacing.sm),
+                            decoration: BoxDecoration(
+                              color: colors.surfaceElevated,
+                              borderRadius: BorderRadius.circular(AppRadii.md),
+                              border: Border.all(color: colors.border),
+                            ),
+                            child: PremiumListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text('${op.method} ${op.endpoint}',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                      color: colors.textPrimary)),
                               subtitle: Text(
                                 op.errorMessage ??
                                     'Status: ${op.status.name} (Retries: ${op.retryCount})',
                                 style: TextStyle(
                                   color: op.status == SyncOperationStatus.failed
-                                      ? AppColors.rose
-                                      : AppColors.textSecondary,
+                                      ? colors.rose
+                                      : colors.textSecondary,
                                   fontSize: 12,
                                 ),
                               ),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.refresh, size: 20),
+                                  PremiumIconButton(
+                                    icon: Icons.refresh,
+                                    size: 18,
+                                    color: colors.cyan,
                                     onPressed: () => widget.syncCoordinator
                                         .retryOperation(op.operationId),
                                   ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline,
-                                        size: 20),
+                                  PremiumIconButton(
+                                    icon: Icons.delete_outline,
+                                    size: 18,
+                                    color: colors.rose,
                                     onPressed: () => widget.syncCoordinator
                                         .discardOperation(op.operationId),
                                   ),
@@ -372,89 +409,193 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     );
   }
 
-  Widget _buildProfileScreen() {
+  Widget _buildProfileScreen(AppThemeColors colors) {
     final user = widget.authSession.currentUser;
+    final themeController = widget.themeController;
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: AppColors.primaryGlow,
-                  child: Text(
-                    user?.firstName.isNotEmpty == true
-                        ? user!.firstName[0]
-                        : 'U',
-                    style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary),
-                  ),
+        // User Profile Header Card
+        PremiumCard(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: colors.primaryMuted,
+                child: Text(
+                  user?.firstName.isNotEmpty == true ? user!.firstName[0] : 'U',
+                  style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: colors.primary),
                 ),
-                const SizedBox(width: 16),
-                Column(
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       '${user?.firstName} ${user?.lastName ?? ""}',
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: colors.textPrimary),
                     ),
+                    const SizedBox(height: 2),
                     Text(
                       user?.email ?? '',
-                      style: const TextStyle(
-                          fontSize: 13, color: AppColors.textSecondary),
+                      style: TextStyle(
+                          fontSize: 13, color: colors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Appearance & Theme Selector Card (Light / Dark / System)
+        if (themeController != null) ...[
+          PremiumCard(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'APPEARANCE & THEME',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                    color: colors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildThemeModeButton(
+                        label: 'System',
+                        icon: Icons.brightness_auto,
+                        isSelected: themeController.themeMode == ThemeMode.system,
+                        onTap: () => themeController.setThemeMode(ThemeMode.system),
+                        colors: colors,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildThemeModeButton(
+                        label: 'Light',
+                        icon: Icons.light_mode_outlined,
+                        isSelected: themeController.themeMode == ThemeMode.light,
+                        onTap: () => themeController.setThemeMode(ThemeMode.light),
+                        colors: colors,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildThemeModeButton(
+                        label: 'Dark',
+                        icon: Icons.dark_mode_outlined,
+                        isSelected: themeController.themeMode == ThemeMode.dark,
+                        onTap: () => themeController.setThemeMode(ThemeMode.dark),
+                        colors: colors,
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
           ),
-        ),
-        const SizedBox(height: 16),
-        ListTile(
-          tileColor: AppColors.surface,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          leading: const Icon(Icons.show_chart, color: AppColors.cyan),
-          title: const Text('Progress & Body Analytics'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ProgressScreen(apiClient: widget.apiClient),
+          const SizedBox(height: 16),
+        ],
+
+        // Feature Navigation Tiles
+        PremiumCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              PremiumListTile(
+                leading: Icon(Icons.show_chart, color: colors.cyan),
+                title: Text('Progress & Body Analytics',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: colors.textPrimary)),
+                trailing: Icon(Icons.chevron_right,
+                    size: 20, color: colors.textMuted),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          ProgressScreen(apiClient: widget.apiClient),
+                    ),
+                  );
+                },
               ),
-            );
-          },
-        ),
-        const SizedBox(height: 12),
-        ListTile(
-          tileColor: AppColors.surface,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          leading: const Icon(Icons.notifications_active_outlined,
-              color: AppColors.primary),
-          title: const Text('Notification History & Preferences'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    NotificationsScreen(apiClient: widget.apiClient),
+              Divider(height: 1, color: colors.border),
+              PremiumListTile(
+                leading: Icon(Icons.notifications_active_outlined,
+                    color: colors.primary),
+                title: Text('Notification History & Preferences',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: colors.textPrimary)),
+                trailing: Icon(Icons.chevron_right,
+                    size: 20, color: colors.textMuted),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          NotificationsScreen(apiClient: widget.apiClient),
+                    ),
+                  );
+                },
               ),
-            );
-          },
+            ],
+          ),
         ),
         const SizedBox(height: 24),
-        ElevatedButton.icon(
+
+        // Sign Out Button
+        PremiumButton(
+          text: 'Sign Out',
+          isDanger: true,
+          icon: const Icon(Icons.logout, size: 18, color: Colors.white),
           onPressed: () async {
+            final confirm = await showPremiumDialog<bool>(
+              context: context,
+              title: 'Sign Out',
+              content: Text(
+                'Are you sure you want to sign out of Fitness OS? Any unsynchronized offline mutations will be cleared.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: colors.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+              actions: [
+                PremiumButton(
+                  text: 'Cancel',
+                  isSecondary: true,
+                  onPressed: () => Navigator.pop(context, false),
+                ),
+                PremiumButton(
+                  text: 'Sign Out',
+                  isDanger: true,
+                  onPressed: () => Navigator.pop(context, true),
+                ),
+              ],
+            );
+            if (confirm != true) return;
+
             final refreshToken = widget.authSession.refreshToken;
             if (refreshToken != null && refreshToken.isNotEmpty) {
               try {
@@ -469,13 +610,50 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             await widget.authSession.clearSession();
             await widget.syncCoordinator.clearQueue();
           },
-          style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.rose.withValues(alpha: 0.2),
-              foregroundColor: AppColors.rose),
-          icon: const Icon(Icons.logout),
-          label: const Text('Sign Out'),
         ),
       ],
+    );
+  }
+
+  Widget _buildThemeModeButton({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required AppThemeColors colors,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.md),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? colors.primaryMuted : colors.surfaceElevated,
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          border: Border.all(
+            color: isSelected ? colors.primary : colors.border,
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: isSelected ? colors.primary : colors.textSecondary,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? colors.primary : colors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
