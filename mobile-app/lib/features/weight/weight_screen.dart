@@ -186,17 +186,24 @@ class _WeightScreenState extends State<WeightScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Weight Goal',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: colors.textPrimary,
+                        Expanded(
+                          child: Text(
+                            'Weight Goal',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: colors.textPrimary,
+                            ),
                           ),
                         ),
-                        StatusBadge(
-                          label: '${goal['progressPct'] ?? 0}% Complete',
-                          color: colors.primary,
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: StatusBadge(
+                            label: '${goal['progressPct'] ?? 0}% Complete',
+                            color: colors.primary,
+                          ),
                         ),
                       ],
                     ),
@@ -210,19 +217,38 @@ class _WeightScreenState extends State<WeightScreen> {
                     ),
                     const SizedBox(height: 12),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Start: ${goal['startWeightKg']} kg',
+                        Expanded(
+                          child: Text(
+                            'Start: ${goal['startWeightKg']} kg',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                                fontSize: 12, color: colors.textMuted)),
-                        Text('Delta: ${goal['weightLostKg']} kg',
+                                fontSize: 12, color: colors.textMuted),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            'Delta: ${goal['weightLostKg']} kg',
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: colors.textPrimary)),
-                        Text('Target: ${goal['targetWeightKg']} kg',
+                                color: colors.textPrimary),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            'Target: ${goal['targetWeightKg']} kg',
+                            textAlign: TextAlign.end,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                                fontSize: 12, color: colors.cyan)),
+                                fontSize: 12, color: colors.cyan),
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -253,20 +279,27 @@ class _WeightScreenState extends State<WeightScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('${e['weight_kg']} kg',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 16,
-                                    color: colors.textPrimary)),
-                            const SizedBox(height: 2),
-                            Text(e['measurement_date'] ?? '',
-                                style: TextStyle(
-                                    fontSize: 12, color: colors.textMuted)),
-                          ],
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('${e['weight_kg']} kg',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 16,
+                                      color: colors.textPrimary)),
+                              const SizedBox(height: 2),
+                              Text(e['measurement_date'] ?? '',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      fontSize: 12, color: colors.textMuted)),
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         StatusBadge(
                           label: 'Recorded',
                           color: colors.primary,

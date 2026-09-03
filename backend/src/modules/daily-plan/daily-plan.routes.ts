@@ -300,6 +300,8 @@ export class DailyPlanService {
       },
       diet: todayDiet,
       workout: todayWorkout,
+      activeWorkoutAssignment: activeWorkoutAssign || null,
+      activeDietAssignment: activeDietAssign || null,
       cardio: {
         target: cardioTarget,
         totalMinutes: totalCardioMinutes,

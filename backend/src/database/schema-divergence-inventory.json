@@ -658,12 +658,10 @@
       "missingInActive": [
         "target_duration_seconds",
         "target_distance_meters",
-        "rir_target",
         "notes"
       ],
       "missingInCanonical": [
-        "set_type",
-        "target_rir"
+        "set_type"
       ]
     },
     {
@@ -716,7 +714,6 @@
         "planned_reps_min_snapshot",
         "planned_reps_max_snapshot",
         "planned_rest_seconds_snapshot",
-        "planned_rir_snapshot",
         "started_at",
         "completed_at"
       ],
@@ -725,7 +722,6 @@
         "planned_sets",
         "reps_min_target",
         "reps_max_target",
-        "rir_target",
         "rest_seconds_target"
       ]
     },

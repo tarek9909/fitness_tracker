@@ -688,7 +688,6 @@ paths:
                 setType: { type: string, enum: [warmup, working, dropset, failure] }
                 weightKg: { type: number, minimum: 0, maximum: 1000 }
                 reps: { type: integer, minimum: 1, maximum: 500 }
-                rir: { type: integer, minimum: 0, maximum: 10 }
                 durationSeconds: { type: integer }
                 distanceMeters: { type: number }
                 notes: { type: string }
@@ -1826,7 +1825,6 @@ paths:
                 targetSets: { type: integer }
                 repsMin: { type: integer }
                 repsMax: { type: integer }
-                rirTarget: { type: integer }
                 restSeconds: { type: integer }
                 notes: { type: string }
       responses:

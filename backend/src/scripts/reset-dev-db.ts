@@ -20,13 +20,16 @@ async function resetDevelopmentDatabase() {
   await db.execute('PRAGMA foreign_keys = OFF');
 
   // 2. Query all existing tables and views
-  const tables = await db.query<{ name: string }>(
-    `SELECT name FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%'`
+  const items = await db.query<{ name: string; type: string }>(
+    `SELECT name, type FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%'`
   );
 
-  for (const t of tables) {
-    await db.execute(`DROP TABLE IF EXISTS "${t.name}"`);
-    await db.execute(`DROP VIEW IF EXISTS "${t.name}"`);
+  for (const item of items) {
+    if (item.type === 'view') {
+      await db.execute(`DROP VIEW IF EXISTS "${item.name}"`);
+    } else {
+      await db.execute(`DROP TABLE IF EXISTS "${item.name}"`);
+    }
   }
 
   // 3. Re-enable foreign keys

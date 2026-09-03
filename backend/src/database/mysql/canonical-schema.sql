@@ -40,6 +40,9 @@ CREATE TABLE IF NOT EXISTS users (
     timezone VARCHAR(100) NOT NULL DEFAULT 'UTC',
     locale VARCHAR(20) NOT NULL DEFAULT 'en',
     status ENUM('pending', 'active', 'disabled') NOT NULL DEFAULT 'active',
+    security_version INT UNSIGNED NOT NULL DEFAULT 1,
+    email_verified_at TIMESTAMP(3) NULL,
+    unit_system VARCHAR(10) NOT NULL DEFAULT 'metric',
     last_login_at TIMESTAMP(3) NULL,
     created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
@@ -88,6 +91,46 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
     CONSTRAINT fk_password_reset_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_password_reset_user (user_id),
     INDEX idx_password_reset_expires (expires_at)
+) ENGINE=InnoDB;
+
+-- =====================================================================
+-- 4b. AUTH OTP CHALLENGES
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS auth_otp_challenges (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id BIGINT UNSIGNED NULL,
+    purpose VARCHAR(50) NOT NULL,
+    destination_email VARCHAR(255) NOT NULL,
+    otp_hash VARCHAR(128) NOT NULL,
+    expires_at TIMESTAMP(3) NOT NULL,
+    consumed_at TIMESTAMP(3) NULL,
+    failed_attempts INT UNSIGNED NOT NULL DEFAULT 0,
+    max_attempts INT UNSIGNED NOT NULL DEFAULT 5,
+    last_sent_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    CONSTRAINT fk_otp_challenges_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_otp_challenges_user (user_id, purpose),
+    INDEX idx_otp_challenges_dest (destination_email, purpose)
+) ENGINE=InnoDB;
+
+-- =====================================================================
+-- 4c. USER EMAIL CHANGE REQUESTS
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS user_email_change_requests (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    new_email VARCHAR(255) NOT NULL,
+    current_email_challenge_id VARCHAR(64) NOT NULL,
+    new_email_challenge_id VARCHAR(64) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    expires_at TIMESTAMP(3) NOT NULL,
+    completed_at TIMESTAMP(3) NULL,
+    created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    CONSTRAINT fk_email_change_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_email_change_cur_challenge FOREIGN KEY (current_email_challenge_id) REFERENCES auth_otp_challenges(id) ON DELETE CASCADE,
+    CONSTRAINT fk_email_change_new_challenge FOREIGN KEY (new_email_challenge_id) REFERENCES auth_otp_challenges(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- =====================================================================
@@ -233,9 +276,12 @@ CREATE TABLE IF NOT EXISTS workout_plans (
     description TEXT NULL,
     goal VARCHAR(500) NULL,
     status ENUM('active', 'archived') NOT NULL DEFAULT 'active',
+    owner_user_id BIGINT UNSIGNED NULL,
+    visibility ENUM('admin', 'private') NOT NULL DEFAULT 'admin',
     created_by BIGINT UNSIGNED NULL,
     created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    CONSTRAINT fk_workout_plans_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE SET NULL,
     CONSTRAINT fk_workout_plans_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
     INDEX idx_workout_plans_status (status)
 ) ENGINE=InnoDB;
@@ -298,7 +344,6 @@ CREATE TABLE IF NOT EXISTS workout_plan_exercises (
     target_duration_seconds INT UNSIGNED NULL,
     target_distance_meters DECIMAL(10,2) NULL,
     rest_seconds INT UNSIGNED NULL,
-    rir_target DECIMAL(3,1) NULL,
     notes TEXT NULL,
     is_optional BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -322,7 +367,6 @@ CREATE TABLE IF NOT EXISTS workout_plan_exercise_sets (
     target_weight_kg DECIMAL(6,2) NULL,
     target_duration_seconds INT UNSIGNED NULL,
     target_distance_meters DECIMAL(10,2) NULL,
-    rir_target DECIMAL(3,1) NULL,
     notes VARCHAR(500) NULL,
     created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     CONSTRAINT uq_workout_plan_set UNIQUE (workout_plan_exercise_id, set_number),
@@ -338,9 +382,12 @@ CREATE TABLE IF NOT EXISTS diet_plans (
     name VARCHAR(191) NOT NULL,
     description TEXT NULL,
     status ENUM('active', 'archived') NOT NULL DEFAULT 'active',
+    owner_user_id BIGINT UNSIGNED NULL,
+    visibility ENUM('admin', 'private') NOT NULL DEFAULT 'admin',
     created_by BIGINT UNSIGNED NULL,
     created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    CONSTRAINT fk_diet_plans_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE SET NULL,
     CONSTRAINT fk_diet_plans_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
     INDEX idx_diet_plans_status (status)
 ) ENGINE=InnoDB;
@@ -477,6 +524,7 @@ CREATE TABLE IF NOT EXISTS user_workout_assignments (
     effective_from DATE NOT NULL,
     effective_until DATE NULL,
     status ENUM('active', 'ended', 'cancelled') NOT NULL DEFAULT 'active',
+    assignment_source ENUM('admin', 'self_service') NOT NULL DEFAULT 'admin',
     assigned_by BIGINT UNSIGNED NULL,
     notes TEXT NULL,
     created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -499,6 +547,7 @@ CREATE TABLE IF NOT EXISTS user_diet_assignments (
     effective_from DATE NOT NULL,
     effective_until DATE NULL,
     status ENUM('active', 'ended', 'cancelled') NOT NULL DEFAULT 'active',
+    assignment_source ENUM('admin', 'self_service') NOT NULL DEFAULT 'admin',
     assigned_by BIGINT UNSIGNED NULL,
     notes TEXT NULL,
     created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -517,6 +566,7 @@ CREATE TABLE IF NOT EXISTS user_diet_assignments (
 CREATE TABLE IF NOT EXISTS user_weight_goals (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT UNSIGNED NOT NULL,
+    goal_type VARCHAR(30) NULL DEFAULT 'lose_weight',
     starting_weight_kg DECIMAL(6,2) NOT NULL,
     target_weight_kg DECIMAL(6,2) NOT NULL,
     start_date DATE NOT NULL,
@@ -668,7 +718,6 @@ CREATE TABLE IF NOT EXISTS workout_session_exercises (
     planned_reps_min_snapshot INT UNSIGNED NULL,
     planned_reps_max_snapshot INT UNSIGNED NULL,
     planned_rest_seconds_snapshot INT UNSIGNED NULL,
-    planned_rir_snapshot DECIMAL(3,1) NULL,
     started_at TIMESTAMP(3) NULL,
     completed_at TIMESTAMP(3) NULL,
     notes TEXT NULL,
@@ -694,7 +743,6 @@ CREATE TABLE IF NOT EXISTS workout_sets (
     reps INT UNSIGNED NULL,
     duration_seconds INT UNSIGNED NULL,
     distance_meters DECIMAL(10,2) NULL,
-    rir DECIMAL(3,1) NULL,
     rpe DECIMAL(3,1) NULL,
     completed BOOLEAN NOT NULL DEFAULT TRUE,
     performed_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),

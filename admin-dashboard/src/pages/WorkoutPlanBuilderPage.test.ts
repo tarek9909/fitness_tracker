@@ -6,20 +6,17 @@ import { describe, it, expect } from 'vitest';
 describe('Workout Plan Builder & Version Lifecycle Unit Suite (Req #51-52)', () => {
   describe('Exercise Target Validation', () => {
     it('validates working sets and rep range parameters', () => {
-      const validateTargets = (sets: number, repsMin: number, repsMax: number, rir: number) => {
+      const validateTargets = (sets: number, repsMin: number, repsMax: number) => {
         if (sets < 1) return { valid: false, error: 'Target sets must be at least 1' };
         if (repsMin < 1) return { valid: false, error: 'Min reps must be at least 1' };
         if (repsMax < repsMin) return { valid: false, error: 'Max reps cannot be less than Min reps' };
-        if (rir < 0 || rir > 10) return { valid: false, error: 'RIR must be between 0 and 10' };
         return { valid: true };
       };
 
-      expect(validateTargets(4, 8, 12, 2).valid).toBe(true);
-      expect(validateTargets(0, 8, 12, 2).valid).toBe(false);
-      expect(validateTargets(3, 0, 10, 2).valid).toBe(false);
-      expect(validateTargets(3, 12, 8, 2).valid).toBe(false);
-      expect(validateTargets(3, 8, 12, 11).valid).toBe(false);
-      expect(validateTargets(3, 8, 12, -1).valid).toBe(false);
+      expect(validateTargets(4, 8, 12).valid).toBe(true);
+      expect(validateTargets(0, 8, 12).valid).toBe(false);
+      expect(validateTargets(3, 0, 10).valid).toBe(false);
+      expect(validateTargets(3, 12, 8).valid).toBe(false);
     });
 
     it('correctly formats reps display strings for single, range, or unconfigured reps', () => {
@@ -84,19 +81,18 @@ describe('Workout Plan Builder & Version Lifecycle Unit Suite (Req #51-52)', () 
     });
 
     it('generates expected set target breakdown for preview and athlete execution', () => {
-      const generateSetBreakdown = (targetSets: number, repsMin: number, repsMax: number, rirTarget: number, restSeconds: number) => {
+      const generateSetBreakdown = (targetSets: number, repsMin: number, repsMax: number, restSeconds: number) => {
         return Array.from({ length: targetSets }).map((_, idx) => ({
           setNumber: idx + 1,
           repsRange: `${repsMin}–${repsMax}`,
-          rir: rirTarget,
           restSeconds,
         }));
       };
 
-      const sets = generateSetBreakdown(3, 8, 12, 2, 90);
+      const sets = generateSetBreakdown(3, 8, 12, 90);
       expect(sets).toHaveLength(3);
-      expect(sets[0]).toEqual({ setNumber: 1, repsRange: '8–12', rir: 2, restSeconds: 90 });
-      expect(sets[2]).toEqual({ setNumber: 3, repsRange: '8–12', rir: 2, restSeconds: 90 });
+      expect(sets[0]).toEqual({ setNumber: 1, repsRange: '8–12', restSeconds: 90 });
+      expect(sets[2]).toEqual({ setNumber: 3, repsRange: '8–12', restSeconds: 90 });
     });
 
     it('initializes add exercise form with blank exerciseId without auto-selecting first exercise', () => {
@@ -105,7 +101,6 @@ describe('Workout Plan Builder & Version Lifecycle Unit Suite (Req #51-52)', () 
         targetSets: '' as number | '',
         repsMin: '' as number | '',
         repsMax: '' as number | '',
-        rirTarget: '' as number | '',
         restSeconds: '' as number | '',
         notes: '',
         isOptional: false,

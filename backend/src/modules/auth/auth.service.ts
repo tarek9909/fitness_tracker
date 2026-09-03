@@ -1,11 +1,14 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'node:crypto';
 import { AuthRepository } from './auth.repository.js';
-import { UnauthorizedError, ForbiddenError, ValidationError } from '../../shared/errors/app-error.js';
-import { generateSecureToken, hashToken, signAccessToken } from '../../shared/utils/crypto-utils.js';
 import { env } from '../../config/env.js';
-import { UserAuthPayload } from '../../shared/types/index.js';
 import { getDatabasePool } from '../../database/pool.js';
+import { signAccessToken, generateSecureToken, hashToken } from '../../shared/utils/crypto-utils.js';
+import { UserAuthPayload } from '../../shared/types/index.js';
+import { UnauthorizedError, ForbiddenError, ValidationError, AppError } from '../../shared/errors/app-error.js';
 import { emailService } from '../../shared/services/email.service.js';
+import { otpService } from '../../shared/services/otp.service.js';
+import { logger } from '../../config/logger.js';
 
 export interface LoginResult {
   user: {
@@ -49,6 +52,7 @@ export class AuthService {
       roleId: user.role_id,
       roleName: user.role_name,
       email: user.email,
+      securityVersion: user.security_version ?? 1,
     };
 
     const accessToken = signAccessToken(payload);
@@ -144,6 +148,7 @@ export class AuthService {
         roleId: user.role_id,
         roleName: user.role_name,
         email: user.email,
+        securityVersion: user.security_version ?? 1,
       };
 
       const accessToken = signAccessToken(payload);
@@ -200,5 +205,195 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(password, 12);
     const updated = await this.repo.resetPassword(hashToken(rawToken), passwordHash);
     if (!updated) throw new UnauthorizedError('Password reset token is invalid or expired', 'PASSWORD_RESET_INVALID');
+  }
+
+  // --- OTP Self-Service Security Flows ---
+
+  async requestPasswordResetOtp(email: string): Promise<{ challengeId: string }> {
+    const user = await this.repo.findUserByEmail(email);
+    if (!user) {
+      // Enumeration-resistant: return random UUID without revealing lack of account
+      return { challengeId: crypto.randomUUID() };
+    }
+    const { challengeId } = await otpService.createChallenge({
+      userId: user.id,
+      purpose: 'password_reset',
+      destinationEmail: user.email,
+      expiryMinutes: 15,
+    });
+    return { challengeId };
+  }
+
+  async verifyPasswordResetOtp(challengeId: string, otp: string, newPassword: string): Promise<void> {
+    const verification = await otpService.verifyChallenge({
+      challengeId,
+      purpose: 'password_reset',
+      otp,
+    });
+    if (!verification.userId) {
+      throw new UnauthorizedError('Invalid password reset challenge', 'PASSWORD_RESET_INVALID');
+    }
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await this.db.execute(
+      `UPDATE users 
+       SET password_hash = ?, security_version = security_version + 1, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = ?`,
+      [passwordHash, verification.userId]
+    );
+    await this.db.execute(
+      `UPDATE user_refresh_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = ? AND revoked_at IS NULL`,
+      [verification.userId]
+    );
+  }
+
+  async requestPasswordChangeOtp(userId: number): Promise<{ challengeId: string }> {
+    const user = await this.repo.findUserById(userId);
+    if (!user) {
+      throw new UnauthorizedError('User not found', 'USER_NOT_FOUND');
+    }
+    const { challengeId } = await otpService.createChallenge({
+      userId: user.id,
+      purpose: 'password_change',
+      destinationEmail: user.email,
+      expiryMinutes: 10,
+    });
+    return { challengeId };
+  }
+
+  async verifyPasswordChangeOtp(
+    userId: number,
+    challengeId: string,
+    otp: string,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<void> {
+    const user = await this.repo.findUserById(userId);
+    if (!user) {
+      throw new UnauthorizedError('User not found', 'USER_NOT_FOUND');
+    }
+    const isValid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!isValid) {
+      throw new UnauthorizedError('Current password is incorrect', 'INVALID_CREDENTIALS');
+    }
+    await otpService.verifyChallenge({
+      challengeId,
+      purpose: 'password_change',
+      otp,
+    });
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await this.db.execute(
+      `UPDATE users 
+       SET password_hash = ?, security_version = security_version + 1, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = ?`,
+      [passwordHash, userId]
+    );
+    await this.db.execute(
+      `UPDATE user_refresh_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = ? AND revoked_at IS NULL`,
+      [userId]
+    );
+  }
+
+  async requestEmailChange(
+    userId: number,
+    newEmailRaw: string
+  ): Promise<{ currentEmailChallengeId: string; newEmailChallengeId: string }> {
+    const newEmail = newEmailRaw.trim().toLowerCase();
+    const user = await this.repo.findUserById(userId);
+    if (!user) {
+      throw new UnauthorizedError('User not found', 'USER_NOT_FOUND');
+    }
+    if (user.email.toLowerCase() === newEmail) {
+      throw new AppError('New email address must be different from current email', 400, 'INVALID_EMAIL');
+    }
+    const existing = await this.repo.findUserByEmail(newEmail);
+    if (existing) {
+      throw new AppError('This email address is already in use by another account', 409, 'EMAIL_ALREADY_EXISTS');
+    }
+    await this.db.execute(
+      `UPDATE user_email_change_requests SET status = 'cancelled' WHERE user_id = ? AND status = 'pending'`,
+      [userId]
+    );
+    const curChallenge = await otpService.createChallenge({
+      userId,
+      purpose: 'email_change_current',
+      destinationEmail: user.email,
+      expiryMinutes: 15,
+    });
+    const newChallenge = await otpService.createChallenge({
+      userId,
+      purpose: 'email_change_new',
+      destinationEmail: newEmail,
+      expiryMinutes: 15,
+    });
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    await this.db.execute(
+      `INSERT INTO user_email_change_requests (
+        user_id, new_email, current_email_challenge_id, new_email_challenge_id,
+        status, expires_at, created_at
+      ) VALUES (?, ?, ?, ?, 'pending', ?, CURRENT_TIMESTAMP)`,
+      [userId, newEmail, curChallenge.challengeId, newChallenge.challengeId, expiresAt]
+    );
+    return {
+      currentEmailChallengeId: curChallenge.challengeId,
+      newEmailChallengeId: newChallenge.challengeId,
+    };
+  }
+
+  async verifyEmailChange(
+    userId: number,
+    currentEmailOtp: string,
+    newEmailOtp: string,
+    password: string
+  ): Promise<{ email: string }> {
+    const user = await this.repo.findUserById(userId);
+    if (!user) {
+      throw new UnauthorizedError('User not found', 'USER_NOT_FOUND');
+    }
+    const isValid = await bcrypt.compare(password, user.password_hash);
+    if (!isValid) {
+      throw new UnauthorizedError('Invalid password confirmation', 'INVALID_CREDENTIALS');
+    }
+    const pendingReq = await this.db.queryOne<any>(
+      `SELECT * FROM user_email_change_requests 
+       WHERE user_id = ? AND status = 'pending' 
+       ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+    if (!pendingReq) {
+      throw new AppError('No pending email change request found', 400, 'REQUEST_NOT_FOUND');
+    }
+    if (new Date(pendingReq.expires_at).getTime() < Date.now()) {
+      await this.db.execute(`UPDATE user_email_change_requests SET status = 'expired' WHERE id = ?`, [pendingReq.id]);
+      throw new AppError('Email change request has expired. Please submit a new request.', 400, 'REQUEST_EXPIRED');
+    }
+    await otpService.verifyChallenge({
+      challengeId: pendingReq.current_email_challenge_id,
+      purpose: 'email_change_current',
+      otp: currentEmailOtp,
+    });
+    await otpService.verifyChallenge({
+      challengeId: pendingReq.new_email_challenge_id,
+      purpose: 'email_change_new',
+      otp: newEmailOtp,
+    });
+    const existing = await this.repo.findUserByEmail(pendingReq.new_email);
+    if (existing && existing.id !== userId) {
+      throw new AppError('This email address is already in use by another account', 409, 'EMAIL_ALREADY_EXISTS');
+    }
+    await this.db.execute(
+      `UPDATE users 
+       SET email = ?, email_verified_at = CURRENT_TIMESTAMP, security_version = security_version + 1, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = ?`,
+      [pendingReq.new_email, userId]
+    );
+    await this.db.execute(
+      `UPDATE user_email_change_requests SET status = 'completed', completed_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [pendingReq.id]
+    );
+    await this.db.execute(
+      `UPDATE user_refresh_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = ? AND revoked_at IS NULL`,
+      [userId]
+    );
+    return { email: pendingReq.new_email };
   }
 }

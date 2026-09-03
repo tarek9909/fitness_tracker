@@ -62,7 +62,6 @@ void main() {
             'reps_min_target': 8,
             'reps_max_target': 12,
             'target_weight_kg': 65.0,
-            'rir_target': 2,
             'sets': <dynamic>[],
           }
         ],
@@ -99,7 +98,6 @@ void main() {
                       'set_number': body['setNumber'],
                       'weight_kg': body['weightKg'],
                       'reps': body['reps'],
-                      'rir': body['rir'],
                       'completed': 1,
                     }
                   ],
@@ -138,17 +136,14 @@ void main() {
       // Verify dialog is open
       expect(find.text('Log Set 1'), findsOneWidget);
 
-      // Verify inputs pre-filled with planned target (65kg, 8 reps, 2 rir) instead of fake 80kg/10reps
+      // Verify inputs pre-filled with planned target (65kg, 8 reps) instead of fake 80kg/10reps
       final weightField = tester.widget<PremiumTextField>(
           find.byKey(const Key('set_dialog_weight_input')));
       final repsField = tester.widget<PremiumTextField>(
           find.byKey(const Key('set_dialog_reps_input')));
-      final rirField = tester.widget<PremiumTextField>(
-          find.byKey(const Key('set_dialog_rir_input')));
 
       expect(weightField.controller.text, equals('65'));
       expect(repsField.controller.text, equals('8'));
-      expect(rirField.controller.text, equals('2'));
 
       // Tap Save Set
       await tester.tap(find.byKey(const Key('set_dialog_save_button')));
@@ -162,7 +157,6 @@ void main() {
       expect(sentBody['setNumber'], equals(1));
       expect(sentBody['weightKg'], equals(65.0));
       expect(sentBody['reps'], equals(8));
-      expect(sentBody['rir'], equals(2));
       expect(sentBody['completed'], isTrue);
     });
 
@@ -182,7 +176,6 @@ void main() {
             'reps_min_target': null,
             'reps_max_target': null,
             'target_weight_kg': null,
-            'rir_target': null,
             'sets': <dynamic>[],
           }
         ],
@@ -228,13 +221,10 @@ void main() {
           find.byKey(const Key('set_dialog_weight_input')));
       final repsField = tester.widget<PremiumTextField>(
           find.byKey(const Key('set_dialog_reps_input')));
-      final rirField = tester.widget<PremiumTextField>(
-          find.byKey(const Key('set_dialog_rir_input')));
 
       // Must NOT invent fake defaults like 80kg or 10 reps
       expect(weightField.controller.text, isEmpty);
       expect(repsField.controller.text, isEmpty);
-      expect(rirField.controller.text, isEmpty);
 
       // Attempt to save without reps -> triggers validation error
       await tester.tap(find.byKey(const Key('set_dialog_save_button')));
@@ -248,8 +238,6 @@ void main() {
           find.byKey(const Key('set_dialog_weight_input')), '0');
       await tester.enterText(
           find.byKey(const Key('set_dialog_reps_input')), '15');
-      await tester.enterText(
-          find.byKey(const Key('set_dialog_rir_input')), '1');
       await tester.pumpAndSettle();
 
       // Tap Save Set
@@ -264,7 +252,6 @@ void main() {
       expect(sentBody['setNumber'], equals(1));
       expect(sentBody['weightKg'], equals(0.0));
       expect(sentBody['reps'], equals(15));
-      expect(sentBody['rir'], equals(1));
     });
 
     testWidgets(
@@ -283,14 +270,12 @@ void main() {
             'reps_min_target': 10,
             'reps_max_target': 12,
             'target_weight_kg': 28.0,
-            'rir_target': 2,
             'sets': [
               {
                 'id': 401,
                 'set_number': 1,
                 'weight_kg': 32.5,
                 'reps': 10,
-                'rir': 1,
                 'completed': 1,
               }
             ],
@@ -331,7 +316,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify Set 1 is shown as completed with logged values
-      expect(find.text('32.5 kg × 10 reps (RIR 1)'), findsOneWidget);
+      expect(find.text('32.5 kg × 10 reps'), findsOneWidget);
       expect(find.text('Edit'), findsOneWidget);
 
       // Tap Edit
@@ -346,12 +331,9 @@ void main() {
           find.byKey(const Key('set_dialog_weight_input')));
       final repsField = tester.widget<PremiumTextField>(
           find.byKey(const Key('set_dialog_reps_input')));
-      final rirField = tester.widget<PremiumTextField>(
-          find.byKey(const Key('set_dialog_rir_input')));
 
       expect(weightField.controller.text, equals('32.5'));
       expect(repsField.controller.text, equals('10'));
-      expect(rirField.controller.text, equals('1'));
 
       // Update reps to 11
       await tester.enterText(
@@ -370,7 +352,6 @@ void main() {
       expect(sentBody['setNumber'], equals(1));
       expect(sentBody['weightKg'], equals(32.5));
       expect(sentBody['reps'], equals(11));
-      expect(sentBody['rir'], equals(1));
     });
 
     testWidgets(
@@ -557,7 +538,6 @@ void main() {
                       'set_number': body['setNumber'],
                       'weight_kg': body['weightKg'],
                       'reps': body['reps'],
-                      'rir': body['rir'],
                       'completed': 1,
                     }
                   ],
@@ -600,8 +580,6 @@ void main() {
           find.byKey(const Key('set_dialog_weight_input')), '24');
       await tester.enterText(
           find.byKey(const Key('set_dialog_reps_input')), '20');
-      await tester.enterText(
-          find.byKey(const Key('set_dialog_rir_input')), '3');
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('set_dialog_save_button')));
@@ -614,7 +592,6 @@ void main() {
       expect(sentBody['setNumber'], equals(1));
       expect(sentBody['weightKg'], equals(24.0));
       expect(sentBody['reps'], equals(20));
-      expect(sentBody['rir'], equals(3));
     });
 
     testWidgets(
@@ -694,7 +671,6 @@ void main() {
       expect(sentBody['durationSeconds'], equals(90));
       expect(sentBody.containsKey('weightKg'), isFalse);
       expect(sentBody.containsKey('reps'), isFalse);
-      expect(sentBody.containsKey('rir'), isFalse);
     });
 
     testWidgets(
@@ -736,7 +712,6 @@ void main() {
                     {
                       'weight_kg': 45.0,
                       'reps': 8,
-                      'rir': 2,
                     }
                   ],
                 },
@@ -761,7 +736,7 @@ void main() {
 
       // Verify that previous performance was loaded and displayed
       expect(
-          find.text('Last session: 45.0 kg × 8 reps (RIR 2)'), findsOneWidget);
+          find.text('Last session: 45.0 kg × 8 reps'), findsOneWidget);
     });
 
     testWidgets(
@@ -781,7 +756,6 @@ void main() {
                 'id': 991,
                 'set_number': 1,
                 'reps': 12,
-                'rir': 2,
                 'completed': 1,
               }
             ],
@@ -814,7 +788,7 @@ void main() {
 
       // Verify that the locally cached session was restored and rendered
       expect(find.text('Locally Restored Pull-ups'), findsOneWidget);
-      expect(find.text('12 reps (RIR 2)'), findsOneWidget);
+      expect(find.text('12 reps'), findsOneWidget);
     });
   });
 }

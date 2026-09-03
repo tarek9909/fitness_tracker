@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/storage/local_cache.dart';
@@ -24,17 +25,38 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
   Map<String, dynamic>? _session;
   bool _isLoading = true;
   late final LocalCache _localCache;
+  Timer? _workoutTimer;
+  int _elapsedSeconds = 0;
 
   String get _activeSessionCacheKey {
     final userId = widget.apiClient.authSession.currentUser?.id;
     return 'active_workout_session.${userId ?? 'anonymous'}';
   }
 
+  String get _formattedTimer {
+    final m = (_elapsedSeconds ~/ 60).toString().padLeft(2, '0');
+    final s = (_elapsedSeconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
   @override
   void initState() {
     super.initState();
     _localCache = LocalCache(widget.apiClient.authSession.storage);
+    _workoutTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() {
+          _elapsedSeconds++;
+        });
+      }
+    });
     _startOrResumeSession();
+  }
+
+  @override
+  void dispose() {
+    _workoutTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _persistSessionLocally(Map<String, dynamic>? session) async {
@@ -138,7 +160,6 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
     String setType = 'working',
     double? weight,
     int? reps,
-    int? rir,
     int? durationSeconds,
     double? distanceMeters,
     String? notes,
@@ -171,13 +192,11 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
       case 'reps_only':
       case 'bodyweight_reps':
         if (reps != null) body['reps'] = reps;
-        if (rir != null) body['rir'] = rir;
         break;
       case 'weight_reps':
       default:
         if (weight != null) body['weightKg'] = weight;
         if (reps != null) body['reps'] = reps;
-        if (rir != null) body['rir'] = rir;
         break;
     }
 
@@ -218,7 +237,6 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
             'set_type': setType,
             if (weight != null) 'weight_kg': weight,
             if (reps != null) 'reps': reps,
-            if (rir != null) 'rir': rir,
             if (durationSeconds != null) 'duration_seconds': durationSeconds,
             if (distanceMeters != null) 'distance_meters': distanceMeters,
             if (notes != null) 'notes': notes,
@@ -427,28 +445,157 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
     }
 
     final exercises = (_session?['exercises'] as List<dynamic>? ?? []);
+    final totalExercises = exercises.length;
+    final completedExercises = exercises.where((e) {
+      final sList = (e['sets'] as List<dynamic>? ?? []);
+      final targetS = e['planned_sets'] ?? e['plannedSets'] ?? e['target_sets'] ?? e['targetSets'];
+      final targetCount = targetS is int
+          ? targetS
+          : (int.tryParse(targetS?.toString() ?? '') ?? sList.length);
+      final doneSets =
+          sList.where((s) => s['completed'] == 1 || s['completed'] == true).length;
+      return targetCount > 0 && doneSets >= targetCount;
+    }).length;
 
     return PremiumScaffold(
       appBar: PremiumAppBar(
-        titleText: 'Live Workout Tracker',
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.pop(context),
+          tooltip: 'Exit Workout',
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Live Workout Tracker',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1,
+                color: colors.textSecondary,
+              ),
+            ),
+            Text(
+              _session?['workout_name_snapshot'] as String? ?? 'Workout Session',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: colors.textPrimary,
+              ),
+            ),
+          ],
+        ),
         actions: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: colors.surfaceElevated,
+              borderRadius: BorderRadius.circular(AppRadii.full),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.timer, size: 14, color: colors.primary),
+                const SizedBox(width: 4),
+                Text(
+                  _formattedTimer,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    color: colors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
           Padding(
-            padding: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.only(right: 8),
             child: PremiumButton(
               text: 'Finish',
               onPressed: _showFinishWorkoutDialog,
-              icon:
-                  const Icon(Icons.check_circle, size: 16, color: Colors.white),
-              height: 36,
+              icon: const Icon(Icons.check, size: 16),
+              height: 34,
             ),
           ),
         ],
       ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: PremiumButton(
+            text: 'Complete Workout',
+            icon: const Icon(Icons.done_all, size: 18),
+            onPressed: _showFinishWorkoutDialog,
+            height: 50,
+          ),
+        ),
+      ),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: exercises.length,
+        itemCount: exercises.length + 1,
         itemBuilder: (ctx, idx) {
-          final ex = exercises[idx] as Map<String, dynamic>;
+          if (idx == 0) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Progress',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: colors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '$completedExercises / $totalExercises Exercises',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: colors.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: List.generate(
+                        totalExercises > 0 ? totalExercises : 1, (i) {
+                      final isFinished = i < completedExercises;
+                      final isCurrent = i == completedExercises;
+                      return Expanded(
+                        child: Container(
+                          height: 6,
+                          margin: EdgeInsets.only(
+                              right: i < totalExercises - 1 ? 4 : 0),
+                          decoration: BoxDecoration(
+                            color: isFinished
+                                ? colors.primary
+                                : (isCurrent
+                                    ? colors.primary.withValues(alpha: 0.4)
+                                    : colors.surfaceElevated),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          final ex = exercises[idx - 1] as Map<String, dynamic>;
           final sets = (ex['sets'] as List<dynamic>? ?? []);
           final trackingType =
               (ex['tracking_type'] ?? ex['trackingType'] ?? 'weight_reps')
@@ -496,10 +643,11 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                   : 'Target: $plannedSets Sets')
               : (targetRepsDesc.isNotEmpty ? 'Target: $targetRepsDesc' : '');
 
-          final prevPerf = ex['previous_performance'] ??
+          final dynamic prevPerf = ex['previous_performance'] ??
               ex['previousPerformance'] ??
               ex['last_session_performance'] ??
               ex['history'];
+          final Map? prevPerfMap = prevPerf is Map ? prevPerf : null;
           String? prevPerfDesc;
           if (prevPerf is Map) {
             final maxW = prevPerf['maxWeightKg'] ??
@@ -511,17 +659,15 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
               final first = recentSets.first as Map<String, dynamic>;
               final fw = first['weight_kg'] ?? first['weightKg'];
               final fr = first['reps'];
-              final frir = first['rir'];
               prevPerfDesc =
-                  'Last session: ${fw != null ? '$fw kg' : ''}${fw != null && fr != null ? ' × ' : ''}${fr != null ? '$fr reps' : ''}${frir != null ? ' (RIR $frir)' : ''}';
+                  'Last session: ${fw != null ? '$fw kg' : ''}${fw != null && fr != null ? ' × ' : ''}${fr != null ? '$fr reps' : ''}';
             } else if (prevPerf['weight_kg'] != null ||
                 prevPerf['weightKg'] != null ||
                 prevPerf['reps'] != null) {
               final pw = prevPerf['weight_kg'] ?? prevPerf['weightKg'];
               final pr = prevPerf['reps'];
-              final prir = prevPerf['rir'];
               prevPerfDesc =
-                  'Last session: ${pw != null ? '$pw kg' : ''}${pw != null && pr != null ? ' × ' : ''}${pr != null ? '$pr reps' : ''}${prir != null ? ' (RIR $prir)' : ''}';
+                  'Last session: ${pw != null ? '$pw kg' : ''}${pw != null && pr != null ? ' × ' : ''}${pr != null ? '$pr reps' : ''}';
             } else if (maxW != null) {
               prevPerfDesc = 'Previous Best: $maxW kg';
             }
@@ -529,45 +675,104 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
             prevPerfDesc = 'Last session: $prevPerf';
           }
 
+          final isExerciseCompleted = plannedSets != null &&
+              plannedSets > 0 &&
+              sets.where((s) => s is Map && (s['completed'] == 1 || s['completed'] == true)).length >=
+                  plannedSets;
+
           return Container(
             margin: const EdgeInsets.only(bottom: 16),
             child: PremiumCard(
-              padding: const EdgeInsets.all(AppSpacing.md),
+              padding: const EdgeInsets.all(18),
+              ambientGlow: !isExerciseCompleted,
+              border: BorderSide(
+                color: isExerciseCompleted
+                    ? colors.border
+                    : colors.primary.withValues(alpha: 0.3),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
-                          ex['exercise_name'] ??
-                              ex['exerciseName'] ??
-                              'Exercise',
-                          style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold),
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: isExerciseCompleted
+                              ? colors.surfaceElevated
+                              : colors.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isExerciseCompleted
+                                ? colors.border
+                                : colors.primary.withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            isExerciseCompleted
+                                ? Icons.check
+                                : Icons.fitness_center,
+                            color: colors.primary,
+                            size: 22,
+                          ),
                         ),
                       ),
-                      if (targetHeader.isNotEmpty)
-                        Text(
-                          targetHeader,
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: colors.cyan,
-                              fontWeight: FontWeight.w600),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              ex['exercise_name'] ??
+                                  ex['exerciseName'] ??
+                                  'Exercise',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                decoration: isExerciseCompleted
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                                color: isExerciseCompleted
+                                    ? colors.textMuted
+                                    : colors.textPrimary,
+                              ),
+                            ),
+                            if (targetHeader.isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                targetHeader,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: colors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                            if (prevPerfDesc != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                prevPerfDesc,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: colors.primary.withValues(alpha: 0.8),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
+                      ),
                     ],
                   ),
-                  if (prevPerfDesc != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      prevPerfDesc,
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: colors.amber,
-                          fontWeight: FontWeight.w500),
-                    ),
-                  ],
                   const SizedBox(height: 12),
                   if (totalSets == 0) ...[
                     Container(
@@ -580,11 +785,16 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'No planned sets configured.',
-                            style: TextStyle(
-                                color: colors.textMuted, fontSize: 13),
+                          Expanded(
+                            child: Text(
+                              'No planned sets configured.',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  color: colors.textMuted, fontSize: 13),
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           PremiumButton(
                             key: Key('add_set_button_${ex['id']}'),
                             text: 'Add Set',
@@ -593,8 +803,7 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                                 exercise: ex,
                                 setNumber: 1,
                                 trackingType: trackingType,
-                                previousPerformance:
-                                    prevPerf is Map ? prevPerf : null,
+                                previousPerformance: prevPerfMap,
                               );
                             },
                             icon: const Icon(Icons.add, size: 16),
@@ -606,10 +815,14 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                   ] else ...[
                     ...List.generate(totalSets, (sIdx) {
                       final setNum = sIdx + 1;
-                      final loggedSet = sets.firstWhere(
-                        (s) => (s['set_number'] ?? s['setNumber']) == setNum,
-                        orElse: () => null,
-                      ) as Map<String, dynamic>?;
+                      Map<String, dynamic>? loggedSet;
+                      for (final s in sets) {
+                        if (s is Map &&
+                            (s['set_number'] ?? s['setNumber']) == setNum) {
+                          loggedSet = Map<String, dynamic>.from(s);
+                          break;
+                        }
+                      }
                       final isDone = loggedSet != null &&
                           (loggedSet['completed'] == 1 ||
                               loggedSet['completed'] == true);
@@ -645,11 +858,10 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                           completedSummary = '$weight kg in $dur s';
                         } else if (trackingType == 'reps_only' ||
                             trackingType == 'bodyweight_reps') {
-                          completedSummary =
-                              '${loggedSet['reps'] ?? 0} reps (RIR ${loggedSet['rir'] ?? 0})';
+                          completedSummary = '${loggedSet['reps'] ?? 0} reps';
                         } else {
                           completedSummary =
-                              '${loggedSet['weight_kg'] ?? loggedSet['weightKg'] ?? 0} kg × ${loggedSet['reps'] ?? 0} reps (RIR ${loggedSet['rir'] ?? 0})';
+                              '${loggedSet['weight_kg'] ?? loggedSet['weightKg'] ?? 0} kg × ${loggedSet['reps'] ?? 0} reps';
                         }
                       }
 
@@ -673,16 +885,23 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                             Text('Set $setNum',
                                 style: const TextStyle(
                                     fontWeight: FontWeight.bold, fontSize: 13)),
-                            if (isDone)
-                              Text(
-                                completedSummary,
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                isDone ? completedSummary : '—',
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: colors.textPrimary),
-                              )
-                            else
-                              Text('—',
-                                  style: TextStyle(color: colors.textMuted)),
+                                    fontWeight: isDone
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                    color: isDone
+                                        ? colors.textPrimary
+                                        : colors.textMuted),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                             PremiumButton(
                               key: Key('log_set_button_${ex['id']}_$setNum'),
                               text: isDone ? 'Edit' : 'Log Set',
@@ -693,8 +912,7 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                                   setNumber: setNum,
                                   trackingType: trackingType,
                                   loggedSet: loggedSet,
-                                  previousPerformance:
-                                      prevPerf is Map ? prevPerf : null,
+                                  previousPerformance: prevPerfMap,
                                 );
                               },
                               height: 30,
@@ -716,8 +934,7 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                               exercise: ex,
                               setNumber: sets.length + 1,
                               trackingType: trackingType,
-                              previousPerformance:
-                                  prevPerf is Map ? prevPerf : null,
+                              previousPerformance: prevPerfMap,
                             );
                           },
                           height: 30,
@@ -761,13 +978,6 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
         exercise['planned_reps_max_snapshot'] ??
         previousPerformance?['reps'];
 
-    final dynamic loggedRir = loggedSet?['rir'];
-    final dynamic targetRir = exercise['rir_target'] ??
-        exercise['planned_rir_snapshot'] ??
-        exercise['target_rir'] ??
-        exercise['targetRir'] ??
-        previousPerformance?['rir'];
-
     final dynamic loggedDuration =
         loggedSet?['duration_seconds'] ?? loggedSet?['durationSeconds'];
     final dynamic loggedDistance =
@@ -795,30 +1005,18 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
       initialReps = targetReps.toString();
     }
 
-    String initialRir = '';
-    if (loggedRir != null) {
-      initialRir = loggedRir.toString();
-    } else if (targetRir != null) {
-      initialRir = (targetRir is num && targetRir % 1 == 0)
-          ? targetRir.toInt().toString()
-          : targetRir.toString();
-    }
-
     final initialDuration = loggedDuration?.toString() ?? '';
     final initialDistance = loggedDistance?.toString() ?? '';
 
     final weightCtrl = TextEditingController(text: initialWeight);
     final repsCtrl = TextEditingController(text: initialReps);
-    final rirCtrl = TextEditingController(text: initialRir);
     final durationCtrl = TextEditingController(text: initialDuration);
     final distanceCtrl = TextEditingController(text: initialDistance);
 
     final repsFocus = FocusNode();
-    final rirFocus = FocusNode();
 
     String? weightError;
     String? repsError;
-    String? rirError;
     String? distanceError;
     String? durationError;
 
@@ -891,30 +1089,11 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                         controller: repsCtrl,
                         focusNode: repsFocus,
                         keyboardType: TextInputType.number,
-                        textInputAction: TextInputAction.next,
-                        onSubmitted: (_) {
-                          FocusScope.of(context).requestFocus(rirFocus);
-                        },
+                        textInputAction: TextInputAction.done,
                         errorText: repsError,
                         onChanged: (_) {
                           if (repsError != null) {
                             setDialogState(() => repsError = null);
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      PremiumTextField(
-                        key: const Key('set_dialog_rir_input'),
-                        label: 'RIR (Reps in Reserve)',
-                        hint: targetRir != null ? '$targetRir' : '0 - 10',
-                        controller: rirCtrl,
-                        focusNode: rirFocus,
-                        keyboardType: TextInputType.number,
-                        textInputAction: TextInputAction.done,
-                        errorText: rirError,
-                        onChanged: (_) {
-                          if (rirError != null) {
-                            setDialogState(() => rirError = null);
                           }
                         },
                       ),
@@ -968,7 +1147,6 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                   text: 'Save Set',
                   onPressed: () {
                     int? parsedReps;
-                    int? parsedRir;
                     double? parsedWeight;
                     int? parsedDuration;
                     double? parsedDistance;
@@ -1017,19 +1195,6 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                           }
                         }
                       }
-
-                      final rirText = rirCtrl.text.trim();
-                      if (rirText.isNotEmpty) {
-                        parsedRir = int.tryParse(rirText);
-                        if (parsedRir == null ||
-                            parsedRir < 0 ||
-                            parsedRir > 10) {
-                          setDialogState(() {
-                            rirError = 'RIR must be an integer from 0 to 10';
-                          });
-                          return;
-                        }
-                      }
                     }
 
                     Navigator.pop(ctx);
@@ -1039,7 +1204,6 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                       trackingType: trackingType,
                       weight: parsedWeight,
                       reps: parsedReps,
-                      rir: parsedRir,
                       durationSeconds: parsedDuration,
                       distanceMeters: parsedDistance,
                     );

@@ -37,17 +37,47 @@ export class DietPlanRepository {
     carbsGramsTarget?: number | null;
     fatGramsTarget?: number | null;
     createdBy?: number | null;
+    ownerUserId?: number | null;
+    visibility?: string;
   }, client: DbConnection = this.db): Promise<number> {
     const sql = `
-      INSERT INTO diet_plans (name, description, status, created_by)
-      VALUES (?, ?, 'active', ?)
+      INSERT INTO diet_plans (name, description, status, created_by, owner_user_id, visibility)
+      VALUES (?, ?, 'active', ?, ?, ?)
     `;
     const res = await client.execute(sql, [
       data.name,
       data.description || null,
       data.createdBy || null,
+      data.ownerUserId || null,
+      data.visibility || 'admin',
     ]);
     return res.insertId;
+  }
+
+  async findPlansForUser(userId: number): Promise<any[]> {
+    const sql = `
+      SELECT dp.*, 
+             (CASE WHEN dp.status = 'archived' THEN 1 ELSE 0 END) as is_archived,
+             (SELECT COUNT(*) FROM diet_plan_versions dpv WHERE dpv.diet_plan_id = dp.id) as version_count,
+             (SELECT dpv.version_number FROM diet_plan_versions dpv WHERE dpv.diet_plan_id = dp.id AND dpv.status = 'published' ORDER BY dpv.version_number DESC LIMIT 1) as active_version_number,
+             (SELECT dpv.daily_calorie_target FROM diet_plan_versions dpv WHERE dpv.diet_plan_id = dp.id ORDER BY dpv.version_number DESC LIMIT 1) as daily_calories_target,
+             (SELECT dpv.daily_calorie_target FROM diet_plan_versions dpv WHERE dpv.diet_plan_id = dp.id ORDER BY dpv.version_number DESC LIMIT 1) as daily_calorie_target
+      FROM diet_plans dp
+      WHERE dp.owner_user_id = ? OR dp.visibility = 'admin'
+      ORDER BY dp.id DESC
+    `;
+    return this.db.query(sql, [userId]);
+  }
+
+  async updatePlan(planId: number, data: Partial<{ name: string; description: string | null; isArchived: number }>): Promise<void> {
+    const set: string[] = [];
+    const values: any[] = [];
+    if (data.name !== undefined) { set.push('name = ?'); values.push(data.name); }
+    if (data.description !== undefined) { set.push('description = ?'); values.push(data.description); }
+    if (data.isArchived !== undefined) { set.push('status = ?'); values.push(data.isArchived ? 'archived' : 'active'); }
+    if (set.length === 0) return;
+    const sql = `UPDATE diet_plans SET ${set.join(', ')} WHERE id = ?`;
+    await this.db.execute(sql, [...values, planId]);
   }
 
   async findVersionsByPlanId(planId: number): Promise<any[]> {

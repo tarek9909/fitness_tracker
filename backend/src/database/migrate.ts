@@ -486,6 +486,159 @@ const migrations: Migration[] = [
       await backfillColumnData(db, 'user_daily_summaries', 'weight_logging_adherence_pct', 'weight_logging_pct', 'weight_logging_pct');
     },
   },
+  {
+    version: '005-self-service-and-rir-removal',
+    up: async (db) => {
+      logger.info('Running migration 005: self-service configuration fields, OTP security tables, and RIR removal');
+
+      // 1. New user columns
+      await ensureColumnExists(db, 'users', 'security_version', 'INTEGER NOT NULL DEFAULT 1');
+      await ensureColumnExists(db, 'users', 'email_verified_at', 'DATETIME NULL');
+      await ensureColumnExists(db, 'users', 'unit_system', "VARCHAR(10) NOT NULL DEFAULT 'metric'");
+
+      // 2. Private plan owner and visibility
+      await ensureColumnExists(db, 'workout_plans', 'owner_user_id', 'INTEGER NULL');
+      await ensureColumnExists(db, 'workout_plans', 'visibility', "VARCHAR(20) NOT NULL DEFAULT 'admin'");
+      await ensureColumnExists(db, 'diet_plans', 'owner_user_id', 'INTEGER NULL');
+      await ensureColumnExists(db, 'diet_plans', 'visibility', "VARCHAR(20) NOT NULL DEFAULT 'admin'");
+
+      // 3. Assignment source
+      await ensureColumnExists(db, 'user_workout_assignments', 'assignment_source', "VARCHAR(20) NOT NULL DEFAULT 'admin'");
+      await ensureColumnExists(db, 'user_diet_assignments', 'assignment_source', "VARCHAR(20) NOT NULL DEFAULT 'admin'");
+
+      // 4. Weight goal type
+      await ensureColumnExists(db, 'user_weight_goals', 'goal_type', "VARCHAR(30) NULL DEFAULT 'lose_weight'");
+
+      // 5. Auth OTP Challenges table
+      if (env.dbClient === 'sqlite') {
+        await db.execute(`
+          CREATE TABLE IF NOT EXISTS auth_otp_challenges (
+            id VARCHAR(64) PRIMARY KEY,
+            user_id INTEGER NULL,
+            purpose VARCHAR(50) NOT NULL,
+            destination_email VARCHAR(255) NOT NULL,
+            otp_hash VARCHAR(128) NOT NULL,
+            expires_at DATETIME NOT NULL,
+            consumed_at DATETIME NULL,
+            failed_attempts INTEGER NOT NULL DEFAULT 0,
+            max_attempts INTEGER NOT NULL DEFAULT 5,
+            last_sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+          )
+        `);
+        await db.execute(`CREATE INDEX IF NOT EXISTS idx_otp_challenges_user ON auth_otp_challenges(user_id, purpose)`);
+        await db.execute(`CREATE INDEX IF NOT EXISTS idx_otp_challenges_dest ON auth_otp_challenges(destination_email, purpose)`);
+
+        await db.execute(`
+          CREATE TABLE IF NOT EXISTS user_email_change_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            new_email VARCHAR(255) NOT NULL,
+            current_email_challenge_id VARCHAR(64) NOT NULL,
+            new_email_challenge_id VARCHAR(64) NOT NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'pending',
+            expires_at DATETIME NOT NULL,
+            completed_at DATETIME NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (current_email_challenge_id) REFERENCES auth_otp_challenges(id) ON DELETE CASCADE,
+            FOREIGN KEY (new_email_challenge_id) REFERENCES auth_otp_challenges(id) ON DELETE CASCADE
+          )
+        `);
+      } else {
+        await db.execute(`
+          CREATE TABLE IF NOT EXISTS auth_otp_challenges (
+            id VARCHAR(64) PRIMARY KEY,
+            user_id BIGINT UNSIGNED NULL,
+            purpose VARCHAR(50) NOT NULL,
+            destination_email VARCHAR(255) NOT NULL,
+            otp_hash VARCHAR(128) NOT NULL,
+            expires_at TIMESTAMP(3) NOT NULL,
+            consumed_at TIMESTAMP(3) NULL,
+            failed_attempts INT UNSIGNED NOT NULL DEFAULT 0,
+            max_attempts INT UNSIGNED NOT NULL DEFAULT 5,
+            last_sent_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            CONSTRAINT fk_otp_challenges_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            INDEX idx_otp_challenges_user (user_id, purpose),
+            INDEX idx_otp_challenges_dest (destination_email, purpose)
+          ) ENGINE=InnoDB
+        `);
+
+        await db.execute(`
+          CREATE TABLE IF NOT EXISTS user_email_change_requests (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id BIGINT UNSIGNED NOT NULL,
+            new_email VARCHAR(255) NOT NULL,
+            current_email_challenge_id VARCHAR(64) NOT NULL,
+            new_email_challenge_id VARCHAR(64) NOT NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'pending',
+            expires_at TIMESTAMP(3) NOT NULL,
+            completed_at TIMESTAMP(3) NULL,
+            created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            CONSTRAINT fk_email_change_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            CONSTRAINT fk_email_change_cur_challenge FOREIGN KEY (current_email_challenge_id) REFERENCES auth_otp_challenges(id) ON DELETE CASCADE,
+            CONSTRAINT fk_email_change_new_challenge FOREIGN KEY (new_email_challenge_id) REFERENCES auth_otp_challenges(id) ON DELETE CASCADE
+          ) ENGINE=InnoDB
+        `);
+      }
+
+      // 6. Complete RIR Removal
+      if (env.dbClient === 'sqlite') {
+        const hasRirTarget = await db.queryOne<{ count: number }>(
+          `SELECT COUNT(*) as count FROM pragma_table_info('workout_plan_exercises') WHERE name = 'rir_target'`
+        );
+        if ((hasRirTarget?.count || 0) > 0) {
+          await db.execute(`ALTER TABLE workout_plan_exercises DROP COLUMN rir_target`);
+        }
+
+        const hasSetRirTarget = await db.queryOne<{ count: number }>(
+          `SELECT COUNT(*) as count FROM pragma_table_info('workout_plan_exercise_sets') WHERE name = 'rir_target'`
+        );
+        if ((hasSetRirTarget?.count || 0) > 0) {
+          await db.execute(`ALTER TABLE workout_plan_exercise_sets DROP COLUMN rir_target`);
+        }
+
+        const hasSessionRir = await db.queryOne<{ count: number }>(
+          `SELECT COUNT(*) as count FROM pragma_table_info('workout_session_exercises') WHERE name = 'planned_rir_snapshot'`
+        );
+        if ((hasSessionRir?.count || 0) > 0) {
+          await db.execute(`ALTER TABLE workout_session_exercises DROP COLUMN planned_rir_snapshot`);
+        }
+
+        const hasSetRir = await db.queryOne<{ count: number }>(
+          `SELECT COUNT(*) as count FROM pragma_table_info('workout_sets') WHERE name = 'rir'`
+        );
+        if ((hasSetRir?.count || 0) > 0) {
+          await db.execute(`ALTER TABLE workout_sets DROP COLUMN rir`);
+        }
+      } else {
+        // MySQL dialect: drop check constraints and columns if present
+        try {
+          await db.execute(`ALTER TABLE workout_plan_exercises DROP CHECK chk_workout_rir`);
+        } catch { /* constraint may not exist */ }
+        try {
+          await db.execute(`ALTER TABLE workout_plan_exercises DROP COLUMN rir_target`);
+        } catch { /* column may already be dropped */ }
+
+        try {
+          await db.execute(`ALTER TABLE workout_plan_exercise_sets DROP COLUMN rir_target`);
+        } catch { /* column may already be dropped */ }
+
+        try {
+          await db.execute(`ALTER TABLE workout_session_exercises DROP COLUMN planned_rir_snapshot`);
+        } catch { /* column may already be dropped */ }
+
+        try {
+          await db.execute(`ALTER TABLE workout_sets DROP CHECK chk_workout_set_rir`);
+        } catch { /* constraint may not exist */ }
+        try {
+          await db.execute(`ALTER TABLE workout_sets DROP COLUMN rir`);
+        } catch { /* column may already be dropped */ }
+      }
+    },
+  },
 ];
 
 export async function runMigrations(customDb?: DatabasePool) {

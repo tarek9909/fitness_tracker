@@ -5,6 +5,7 @@ export interface UserAuthPayload {
   roleId: number;
   roleName: string;
   email: string;
+  securityVersion?: number;
   sessionId?: number;
 }
 

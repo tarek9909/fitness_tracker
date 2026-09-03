@@ -8,6 +8,7 @@ import { AuthenticatedRequest } from '../../shared/types/index.js';
 import { recordAuditEvent } from '../../shared/utils/audit-utils.js';
 import { getDatabasePool } from '../../database/pool.js';
 import { parsePositiveInt } from '../../shared/utils/request-utils.js';
+import { assertCanViewDietPlan, assertCanModifyDietPlan } from './diet-plan-ownership.js';
 
 export class DietPlanService {
   private repo = new DietPlanRepository();
@@ -17,6 +18,10 @@ export class DietPlanService {
     return this.repo.findAllPlans();
   }
 
+  async getPlansForUser(userId: number) {
+    return this.repo.findPlansForUser(userId);
+  }
+
   async getPlanById(planId: number) {
     const plan = await this.repo.findPlanById(planId);
     if (!plan) throw new NotFoundError('Diet plan not found');
@@ -24,7 +29,17 @@ export class DietPlanService {
     return { ...plan, versions };
   }
 
-  async createPlan(data: { name: string; description?: string; dailyCaloriesTarget?: number; proteinGramsTarget?: number; carbsGramsTarget?: number; fatGramsTarget?: number; createdBy?: number }) {
+  async createPlan(data: {
+    name: string;
+    description?: string;
+    dailyCaloriesTarget?: number;
+    proteinGramsTarget?: number;
+    carbsGramsTarget?: number;
+    fatGramsTarget?: number;
+    createdBy?: number;
+    ownerUserId?: number;
+    visibility?: string;
+  }) {
     const planId = await this.db.withTransaction(async (conn) => {
       const planId = await this.repo.createPlan(data, conn);
       await this.repo.createVersion({
@@ -41,6 +56,142 @@ export class DietPlanService {
       return planId;
     });
     return this.getPlanById(planId);
+  }
+
+  async clonePlan(sourcePlanId: number, targetUserId: number, customName?: string) {
+    const sourcePlan = await this.repo.findPlanById(sourcePlanId);
+    if (!sourcePlan) throw new NotFoundError('Source diet plan not found');
+
+    const versions = await this.repo.findVersionsByPlanId(sourcePlanId);
+    const sourceVersion = versions.find((v: any) => v.status === 'published') || versions[0];
+    if (!sourceVersion) {
+      throw new NotFoundError('Source diet plan has no versions');
+    }
+    const sourceMeals = await this.repo.getMealsForVersion(sourceVersion.id);
+
+    const newPlanName = customName || `${sourcePlan.name} (My Plan)`;
+
+    return this.db.withTransaction(async (conn) => {
+      const planId = await this.repo.createPlan({
+        name: newPlanName,
+        description: sourcePlan.description,
+        dailyCaloriesTarget: sourceVersion.daily_calorie_target ?? sourceVersion.daily_calories_target,
+        proteinGramsTarget: sourceVersion.daily_protein_target_g,
+        carbsGramsTarget: sourceVersion.daily_carbs_target_g,
+        fatGramsTarget: sourceVersion.daily_fat_target_g,
+        createdBy: targetUserId,
+        ownerUserId: targetUserId,
+        visibility: 'private',
+      }, conn);
+
+      const versionId = await this.repo.createVersion({
+        dietPlanId: planId,
+        versionNumber: 1,
+        title: 'Version 1 Draft',
+        status: 'draft',
+        dailyCaloriesTarget: sourceVersion.daily_calorie_target ?? sourceVersion.daily_calories_target,
+        dailyProteinTargetG: sourceVersion.daily_protein_target_g,
+        dailyCarbsTargetG: sourceVersion.daily_carbs_target_g,
+        dailyFatTargetG: sourceVersion.daily_fat_target_g,
+        createdBy: targetUserId,
+      }, conn);
+
+      for (const meal of sourceMeals) {
+        const newMealId = await this.repo.createMeal({
+          dietPlanVersionId: versionId,
+          name: meal.name,
+          scheduledTime: meal.scheduled_time,
+          orderIndex: meal.order_index,
+          notes: meal.notes,
+        }, conn);
+
+        for (const group of meal.optionGroups || []) {
+          const newGroupId = await this.repo.createOptionGroup({
+            dietMealId: newMealId,
+            name: group.name,
+            isRequired: group.is_required,
+            minSelections: group.min_selections,
+            maxSelections: group.max_selections,
+            orderIndex: group.order_index,
+          }, conn);
+
+          for (const opt of group.options || []) {
+            await this.repo.createOption({
+              dietMealOptionGroupId: newGroupId,
+              foodId: opt.food_id,
+              customLabel: opt.custom_label,
+              servingQuantity: opt.serving_quantity,
+              servingUnitId: opt.serving_unit_id,
+              calories: opt.calories,
+              proteinG: opt.protein_g,
+              carbsG: opt.carbs_g,
+              fatG: opt.fat_g,
+              isDefault: opt.is_default,
+              orderIndex: opt.order_index,
+            }, conn);
+          }
+        }
+      }
+
+      return this.getPlanById(planId);
+    });
+  }
+
+  async updatePlan(planId: number, data: Partial<{ name: string; description?: string; isArchived?: boolean }>) {
+    await this.getPlanById(planId);
+    await this.repo.updatePlan(planId, {
+      name: data.name,
+      description: data.description,
+      isArchived: data.isArchived ? 1 : 0,
+    });
+    return this.getPlanById(planId);
+  }
+
+  async activatePlanForUser(userId: number, planId: number) {
+    const plan = await this.repo.findPlanById(planId);
+    if (!plan) throw new NotFoundError('Diet plan not found');
+
+    const publishedVersion = await this.db.queryOne<any>(
+      `SELECT * FROM diet_plan_versions 
+       WHERE diet_plan_id = ? AND status = 'published' 
+       ORDER BY version_number DESC LIMIT 1`,
+      [planId]
+    );
+    if (!publishedVersion) {
+      throw new ValidationError('Diet plan must have a published version before it can be activated');
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    return this.db.withTransaction(async (conn) => {
+      await conn.execute(
+        `UPDATE user_diet_assignments 
+         SET status = 'completed', effective_until = ?, updated_at = CURRENT_TIMESTAMP 
+         WHERE user_id = ? AND status = 'active'`,
+        [todayStr, userId]
+      );
+
+      const res = await conn.execute(
+        `INSERT INTO user_diet_assignments (
+           user_id, diet_plan_version_id, assignment_source, effective_from, status
+         ) VALUES (?, ?, 'self_service', ?, 'active')`,
+        [userId, publishedVersion.id, todayStr]
+      );
+
+      await conn.execute(
+        `UPDATE daily_tasks 
+         SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP 
+         WHERE user_id = ? AND task_type = 'diet' AND status = 'pending' AND task_date >= ?`,
+        [userId, todayStr]
+      );
+
+      return {
+        assignmentId: res.insertId,
+        dietPlanId: planId,
+        versionId: publishedVersion.id,
+        effectiveFrom: todayStr,
+      };
+    });
   }
 
   async createNewVersion(planId: number, fromVersionId?: number, createdBy?: number) {
@@ -588,6 +739,10 @@ const createPlanSchema = z.object({
   dailyCaloriesTarget: z.number().int().min(500).max(10000).optional(),
 });
 
+const updatePlanSchema = createPlanSchema.partial().extend({
+  isArchived: z.boolean().optional(),
+});
+
 const cloneVersionSchema = z.object({
   fromVersionId: z.number().int().positive().optional(),
 });
@@ -645,6 +800,51 @@ const updateOptionSchema = addOptionSchema.partial();
 
 export class DietPlanController {
   private service = new DietPlanService();
+  private db = getDatabasePool();
+
+  private async getPlanForVersion(versionId: number) {
+    return this.db.queryOne<any>(
+      `SELECT dp.* FROM diet_plans dp
+       JOIN diet_plan_versions dpv ON dpv.diet_plan_id = dp.id
+       WHERE dpv.id = ?`,
+      [versionId]
+    );
+  }
+
+  private async getPlanForMeal(mealId: number) {
+    return this.db.queryOne<any>(
+      `SELECT dp.* FROM diet_plans dp
+       JOIN diet_plan_versions dpv ON dpv.diet_plan_id = dp.id
+       JOIN diet_meals dm ON dm.diet_plan_version_id = dpv.id
+       WHERE dm.id = ?`,
+      [mealId]
+    );
+  }
+
+  private async getPlanForGroup(groupId: number) {
+    return this.db.queryOne<any>(
+      `SELECT dp.* FROM diet_plans dp
+       JOIN diet_plan_versions dpv ON dpv.diet_plan_id = dp.id
+       JOIN diet_meals dm ON dm.diet_plan_version_id = dpv.id
+       JOIN diet_meal_option_groups dmog ON dmog.diet_meal_id = dm.id
+       WHERE dmog.id = ?`,
+      [groupId]
+    );
+  }
+
+  private async getPlanForOption(optionId: number) {
+    return this.db.queryOne<any>(
+      `SELECT dp.* FROM diet_plans dp
+       JOIN diet_plan_versions dpv ON dpv.diet_plan_id = dp.id
+       JOIN diet_meals dm ON dm.diet_plan_version_id = dpv.id
+       JOIN diet_meal_option_groups dmog ON dmog.diet_meal_id = dm.id
+       JOIN diet_meal_options dmo ON dmo.diet_meal_option_group_id = dmog.id
+       WHERE dmo.id = ?`,
+      [optionId]
+    );
+  }
+
+  // --- Admin Endpoints ---
 
   async listPlans(request: FastifyRequest, reply: FastifyReply) {
     const plans = await this.service.getPlans();
@@ -652,123 +852,223 @@ export class DietPlanController {
   }
 
   async getPlan(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
     const params = request.params as { id: string };
     const planId = parsePositiveInt(params.id, 'planId');
     const plan = await this.service.getPlanById(planId);
+    assertCanViewDietPlan(plan, auth);
     return reply.status(200).send({ success: true, data: plan });
   }
 
   async createPlan(request: FastifyRequest, reply: FastifyReply) {
     const body = createPlanSchema.parse(request.body);
     const auth = (request as AuthenticatedRequest).user;
-    const plan = await this.service.createPlan({ ...body, createdBy: auth.userId });
+    const plan = await this.service.createPlan({ ...body, createdBy: auth.userId, visibility: 'admin' });
     await recordAuditEvent(request, 'diet_plan.created', 'diet_plan', plan.id, { name: plan.name });
     return reply.status(201).send({ success: true, data: plan });
   }
 
+  async updatePlan(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
+    const params = request.params as { id: string };
+    const planId = parsePositiveInt(params.id, 'planId');
+    const existing = await this.service.getPlanById(planId);
+    assertCanModifyDietPlan(existing, auth);
+    const body = updatePlanSchema.parse(request.body);
+    const plan = await this.service.updatePlan(planId, body);
+    await recordAuditEvent(request, 'diet_plan.updated', 'diet_plan', plan.id, body);
+    return reply.status(200).send({ success: true, data: plan });
+  }
+
+  async deletePlan(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
+    const params = request.params as { id: string };
+    const planId = parsePositiveInt(params.id, 'planId');
+    const existing = await this.service.getPlanById(planId);
+    assertCanModifyDietPlan(existing, auth);
+    await this.service.updatePlan(planId, { isArchived: true });
+    return reply.status(200).send({ success: true, data: { message: 'Diet plan archived successfully' } });
+  }
+
   async getVersion(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
     const params = request.params as { versionId: string };
     const versionId = parsePositiveInt(params.versionId, 'versionId');
+    const plan = await this.getPlanForVersion(versionId);
+    assertCanViewDietPlan(plan, auth);
     const version = await this.service.getVersionDetails(versionId);
     return reply.status(200).send({ success: true, data: version });
   }
 
   async updateVersion(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
     const params = request.params as { versionId: string };
     const versionId = parsePositiveInt(params.versionId, 'versionId');
+    const plan = await this.getPlanForVersion(versionId);
+    assertCanModifyDietPlan(plan, auth);
     const body = updateVersionSchema.parse(request.body);
     const version = await this.service.updateVersion(versionId, body);
     return reply.status(200).send({ success: true, data: version });
   }
 
   async createVersion(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
     const params = request.params as { id: string };
     const planId = parsePositiveInt(params.id, 'planId');
+    const plan = await this.service.getPlanById(planId);
+    assertCanModifyDietPlan(plan, auth);
     const body = cloneVersionSchema.parse(request.body || {});
-    const auth = (request as AuthenticatedRequest).user;
-    const version = await this.service.createNewVersion(
-      planId,
-      body.fromVersionId,
-      auth.userId
-    );
+    const version = await this.service.createNewVersion(planId, body.fromVersionId, auth.userId);
     await recordAuditEvent(request, 'diet_plan_version.cloned', 'diet_plan_version', version.id, { planId, fromVersionId: body.fromVersionId });
     return reply.status(201).send({ success: true, data: version });
   }
 
   async publishVersion(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
     const params = request.params as { versionId: string };
     const versionId = parsePositiveInt(params.versionId, 'versionId');
+    const plan = await this.getPlanForVersion(versionId);
+    assertCanModifyDietPlan(plan, auth);
     const version = await this.service.publishVersion(versionId);
     await recordAuditEvent(request, 'diet_plan_version.published', 'diet_plan_version', version.id, { versionNumber: version.version_number });
     return reply.status(200).send({ success: true, data: version });
   }
 
   async addMeal(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
     const params = request.params as { versionId: string };
     const versionId = parsePositiveInt(params.versionId, 'versionId');
+    const plan = await this.getPlanForVersion(versionId);
+    assertCanModifyDietPlan(plan, auth);
     const body = addMealSchema.parse(request.body);
     const version = await this.service.addMeal(versionId, body);
     return reply.status(201).send({ success: true, data: version });
   }
 
   async updateMeal(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
     const params = request.params as { mealId: string };
     const mealId = parsePositiveInt(params.mealId, 'mealId');
+    const plan = await this.getPlanForMeal(mealId);
+    assertCanModifyDietPlan(plan, auth);
     const body = updateMealSchema.parse(request.body);
     const version = await this.service.updateMeal(mealId, body);
     return reply.status(200).send({ success: true, data: version });
   }
 
   async deleteMeal(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
     const params = request.params as { mealId: string };
     const mealId = parsePositiveInt(params.mealId, 'mealId');
+    const plan = await this.getPlanForMeal(mealId);
+    assertCanModifyDietPlan(plan, auth);
     const result = await this.service.deleteMeal(mealId);
     return reply.status(200).send({ success: true, data: result });
   }
 
   async addGroup(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
     const params = request.params as { mealId: string };
     const mealId = parsePositiveInt(params.mealId, 'mealId');
+    const plan = await this.getPlanForMeal(mealId);
+    assertCanModifyDietPlan(plan, auth);
     const body = addGroupSchema.parse(request.body);
     const result = await this.service.addOptionGroup(mealId, body);
     return reply.status(201).send({ success: true, data: result });
   }
 
   async updateGroup(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
     const params = request.params as { groupId: string };
     const groupId = parsePositiveInt(params.groupId, 'groupId');
+    const plan = await this.getPlanForGroup(groupId);
+    assertCanModifyDietPlan(plan, auth);
     const body = updateGroupSchema.parse(request.body);
     const result = await this.service.updateOptionGroup(groupId, body);
     return reply.status(200).send({ success: true, data: result });
   }
 
   async deleteGroup(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
     const params = request.params as { groupId: string };
     const groupId = parsePositiveInt(params.groupId, 'groupId');
+    const plan = await this.getPlanForGroup(groupId);
+    assertCanModifyDietPlan(plan, auth);
     const result = await this.service.deleteOptionGroup(groupId);
     return reply.status(200).send({ success: true, data: result });
   }
 
   async addOption(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
     const params = request.params as { groupId: string };
     const groupId = parsePositiveInt(params.groupId, 'groupId');
+    const plan = await this.getPlanForGroup(groupId);
+    assertCanModifyDietPlan(plan, auth);
     const body = addOptionSchema.parse(request.body);
     const result = await this.service.addOption(groupId, body);
     return reply.status(201).send({ success: true, data: result });
   }
 
   async updateOption(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
     const params = request.params as { optionId: string };
     const optionId = parsePositiveInt(params.optionId, 'optionId');
+    const plan = await this.getPlanForOption(optionId);
+    assertCanModifyDietPlan(plan, auth);
     const body = updateOptionSchema.parse(request.body);
     const result = await this.service.updateOption(optionId, body);
     return reply.status(200).send({ success: true, data: result });
   }
 
   async deleteOption(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
     const params = request.params as { optionId: string };
     const optionId = parsePositiveInt(params.optionId, 'optionId');
+    const plan = await this.getPlanForOption(optionId);
+    assertCanModifyDietPlan(plan, auth);
     const result = await this.service.deleteOption(optionId);
+    return reply.status(200).send({ success: true, data: result });
+  }
+
+  // --- Self-Service User Endpoints (/me/diet-plans) ---
+
+  async listMyPlans(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
+    const plans = await this.service.getPlansForUser(auth.userId);
+    return reply.status(200).send({ success: true, data: plans });
+  }
+
+  async createMyPlan(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
+    const body = createPlanSchema.parse(request.body);
+    const plan = await this.service.createPlan({
+      ...body,
+      createdBy: auth.userId,
+      ownerUserId: auth.userId,
+      visibility: 'private',
+    });
+    await recordAuditEvent(request, 'diet_plan.created', 'diet_plan', plan.id, { name: plan.name, isPrivate: true });
+    return reply.status(201).send({ success: true, data: plan });
+  }
+
+  async cloneMyPlan(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
+    const params = request.params as { id: string };
+    const planId = parsePositiveInt(params.id, 'planId');
+    const sourcePlan = await this.service.getPlanById(planId);
+    assertCanViewDietPlan(sourcePlan, auth);
+    const body = z.object({ name: z.string().min(1).max(150).optional() }).parse(request.body || {});
+    const cloned = await this.service.clonePlan(planId, auth.userId, body.name);
+    return reply.status(201).send({ success: true, data: cloned });
+  }
+
+  async activateMyPlan(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
+    const params = request.params as { id: string };
+    const planId = parsePositiveInt(params.id, 'planId');
+    const plan = await this.service.getPlanById(planId);
+    assertCanViewDietPlan(plan, auth);
+    const result = await this.service.activatePlanForUser(auth.userId, planId);
     return reply.status(200).send({ success: true, data: result });
   }
 }
@@ -776,9 +1076,12 @@ export class DietPlanController {
 export async function dietPlansRoutes(fastify: FastifyInstance) {
   const controller = new DietPlanController();
 
+  // Admin Diet Plans Endpoints
   fastify.get('/admin/diet-plans', { preHandler: [authenticate, requireAdmin] }, (req, res) => controller.listPlans(req, res));
   fastify.post('/admin/diet-plans', { preHandler: [authenticate, requireAdmin] }, (req, res) => controller.createPlan(req, res));
   fastify.get('/admin/diet-plans/:id', { preHandler: [authenticate, requireAdmin] }, (req, res) => controller.getPlan(req, res));
+  fastify.patch('/admin/diet-plans/:id', { preHandler: [authenticate, requireAdmin] }, (req, res) => controller.updatePlan(req, res));
+  fastify.delete('/admin/diet-plans/:id', { preHandler: [authenticate, requireAdmin] }, (req, res) => controller.deletePlan(req, res));
   fastify.post('/admin/diet-plans/:id/versions', { preHandler: [authenticate, requireAdmin] }, (req, res) => controller.createVersion(req, res));
 
   fastify.get('/admin/diet-versions/:versionId', { preHandler: [authenticate, requireAdmin] }, (req, res) => controller.getVersion(req, res));
@@ -796,4 +1099,28 @@ export async function dietPlansRoutes(fastify: FastifyInstance) {
   fastify.post('/admin/diet-option-groups/:groupId/options', { preHandler: [authenticate, requireAdmin] }, (req, res) => controller.addOption(req, res));
   fastify.patch('/admin/diet-options/:optionId', { preHandler: [authenticate, requireAdmin] }, (req, res) => controller.updateOption(req, res));
   fastify.delete('/admin/diet-options/:optionId', { preHandler: [authenticate, requireAdmin] }, (req, res) => controller.deleteOption(req, res));
+
+  // Self-Service User Diet Plans (/me/diet-plans)
+  fastify.get('/me/diet-plans', { preHandler: [authenticate] }, (req, res) => controller.listMyPlans(req, res));
+  fastify.post('/me/diet-plans', { preHandler: [authenticate] }, (req, res) => controller.createMyPlan(req, res));
+  fastify.get('/me/diet-plans/:id', { preHandler: [authenticate] }, (req, res) => controller.getPlan(req, res));
+  fastify.put('/me/diet-plans/:id', { preHandler: [authenticate] }, (req, res) => controller.updatePlan(req, res));
+  fastify.patch('/me/diet-plans/:id', { preHandler: [authenticate] }, (req, res) => controller.updatePlan(req, res));
+  fastify.delete('/me/diet-plans/:id', { preHandler: [authenticate] }, (req, res) => controller.deletePlan(req, res));
+  fastify.post('/me/diet-plans/:id/clone', { preHandler: [authenticate] }, (req, res) => controller.cloneMyPlan(req, res));
+  fastify.post('/me/diet-plans/:id/activate', { preHandler: [authenticate] }, (req, res) => controller.activateMyPlan(req, res));
+
+  fastify.get('/me/diet-plans/:id/versions/:versionId', { preHandler: [authenticate] }, (req, res) => controller.getVersion(req, res));
+  fastify.post('/me/diet-plans/:id/versions/:versionId/publish', { preHandler: [authenticate] }, (req, res) => controller.publishVersion(req, res));
+  fastify.post('/me/diet-plans/:id/versions/:versionId/meals', { preHandler: [authenticate] }, (req, res) => controller.addMeal(req, res));
+  fastify.put('/me/diet-plans/:id/meals/:mealId', { preHandler: [authenticate] }, (req, res) => controller.updateMeal(req, res));
+  fastify.patch('/me/diet-plans/:id/meals/:mealId', { preHandler: [authenticate] }, (req, res) => controller.updateMeal(req, res));
+  fastify.delete('/me/diet-plans/:id/meals/:mealId', { preHandler: [authenticate] }, (req, res) => controller.deleteMeal(req, res));
+  fastify.post('/me/diet-plans/:id/meals/:mealId/option-groups', { preHandler: [authenticate] }, (req, res) => controller.addGroup(req, res));
+  fastify.post('/me/diet-plans/:id/meals/:mealId/groups', { preHandler: [authenticate] }, (req, res) => controller.addGroup(req, res));
+  fastify.put('/me/diet-plans/:id/option-groups/:groupId', { preHandler: [authenticate] }, (req, res) => controller.updateGroup(req, res));
+  fastify.delete('/me/diet-plans/:id/option-groups/:groupId', { preHandler: [authenticate] }, (req, res) => controller.deleteGroup(req, res));
+  fastify.post('/me/diet-plans/:id/option-groups/:groupId/options', { preHandler: [authenticate] }, (req, res) => controller.addOption(req, res));
+  fastify.put('/me/diet-plans/:id/options/:optionId', { preHandler: [authenticate] }, (req, res) => controller.updateOption(req, res));
+  fastify.delete('/me/diet-plans/:id/options/:optionId', { preHandler: [authenticate] }, (req, res) => controller.deleteOption(req, res));
 }

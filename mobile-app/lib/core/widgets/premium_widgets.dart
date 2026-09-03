@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
@@ -9,6 +10,7 @@ class PremiumCard extends StatelessWidget {
   final VoidCallback? onTap;
   final Color? color;
   final BorderSide? border;
+  final bool ambientGlow;
 
   const PremiumCard({
     super.key,
@@ -17,6 +19,7 @@ class PremiumCard extends StatelessWidget {
     this.onTap,
     this.color,
     this.border,
+    this.ambientGlow = false,
   });
 
   @override
@@ -26,11 +29,19 @@ class PremiumCard extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(
         color: color ?? colors.card,
-        borderRadius: BorderRadius.circular(AppRadii.lg),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
         border: Border.fromBorderSide(
           border ?? BorderSide(color: colors.border),
         ),
-        boxShadow: color == null ? colors.cardShadow : null,
+        boxShadow: ambientGlow
+            ? const [
+                BoxShadow(
+                  color: Color(0x1AD4FF00),
+                  blurRadius: 30,
+                  offset: Offset(0, 10),
+                ),
+              ]
+            : (color == null ? colors.cardShadow : null),
       ),
       child: child,
     );
@@ -38,7 +49,7 @@ class PremiumCard extends StatelessWidget {
     if (onTap != null) {
       return InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadii.lg),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
         child: cardContent,
       );
     }
@@ -76,7 +87,7 @@ class PremiumButton extends StatelessWidget {
     final colors = AppThemeColors.of(context);
 
     Color bg = colors.primary;
-    Color fg = Colors.white;
+    Color fg = colors.onPrimary;
 
     if (isDanger) {
       bg = isOutlined ? Colors.transparent : colors.rose;
@@ -106,7 +117,7 @@ class PremiumButton extends StatelessWidget {
           disabledForegroundColor: fg.withValues(alpha: 0.6),
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadii.md),
+            borderRadius: BorderRadius.circular(AppRadii.lg),
             side: borderSide,
           ),
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -129,12 +140,16 @@ class PremiumButton extends StatelessWidget {
                     icon!,
                     const SizedBox(width: 8),
                   ],
-                  Text(
-                    text,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: fg,
+                  Flexible(
+                    child: Text(
+                      text,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: fg,
+                      ),
                     ),
                   ),
                 ],
@@ -221,13 +236,17 @@ class StatusBadge extends StatelessWidget {
             icon!,
             const SizedBox(width: 5),
           ],
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: color,
-              letterSpacing: 0.2,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: color,
+                letterSpacing: 0.2,
+              ),
             ),
           ),
         ],
@@ -264,15 +283,20 @@ class MetricCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
-                  color: colors.textSecondary,
+              Expanded(
+                child: Text(
+                  title.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                    color: colors.textSecondary,
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
@@ -286,6 +310,8 @@ class MetricCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w900,
@@ -602,14 +628,19 @@ class PremiumModalSheet extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: colors.textPrimary,
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: colors.textPrimary,
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
               PremiumIconButton(
                 icon: Icons.close,
                 size: 18,
@@ -837,21 +868,24 @@ class PremiumSwitchTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AppThemeColors.of(context);
-    return SwitchListTile(
-      title: Text(
-        title,
-        style: TextStyle(
-            fontWeight: FontWeight.w600, color: colors.textPrimary),
+    return Material(
+      color: Colors.transparent,
+      child: SwitchListTile(
+        title: Text(
+          title,
+          style: TextStyle(
+              fontWeight: FontWeight.w600, color: colors.textPrimary),
+        ),
+        subtitle: subtitle != null
+            ? Text(subtitle!,
+                style: TextStyle(fontSize: 12, color: colors.textSecondary))
+            : null,
+        value: value,
+        onChanged: onChanged,
+        secondary: secondary,
+        activeThumbColor: colors.primary,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
-      subtitle: subtitle != null
-          ? Text(subtitle!,
-              style: TextStyle(fontSize: 12, color: colors.textSecondary))
-          : null,
-      value: value,
-      onChanged: onChanged,
-      secondary: secondary,
-      activeThumbColor: colors.primary,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     );
   }
 }
@@ -876,21 +910,24 @@ class PremiumCheckboxTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AppThemeColors.of(context);
-    return CheckboxListTile(
-      title: Text(
-        title,
-        style: TextStyle(
-            fontWeight: FontWeight.w600, color: colors.textPrimary),
+    return Material(
+      color: Colors.transparent,
+      child: CheckboxListTile(
+        title: Text(
+          title,
+          style: TextStyle(
+              fontWeight: FontWeight.w600, color: colors.textPrimary),
+        ),
+        subtitle: subtitle != null
+            ? Text(subtitle!,
+                style: TextStyle(fontSize: 12, color: colors.textSecondary))
+            : null,
+        value: value,
+        onChanged: onChanged,
+        secondary: secondary,
+        activeColor: colors.primary,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
-      subtitle: subtitle != null
-          ? Text(subtitle!,
-              style: TextStyle(fontSize: 12, color: colors.textSecondary))
-          : null,
-      value: value,
-      onChanged: onChanged,
-      secondary: secondary,
-      activeColor: colors.primary,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     );
   }
 }
@@ -1229,34 +1266,48 @@ class PremiumNavigationBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AppThemeColors.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surface,
-        border: Border(
-          top: BorderSide(color: colors.border),
-        ),
-      ),
-      child: BottomNavigationBar(
-        currentIndex: currentIndex,
-        onTap: onTap,
-        backgroundColor: colors.surface,
-        selectedItemColor: colors.primary,
-        unselectedItemColor: colors.textMuted,
-        type: BottomNavigationBarType.fixed,
-        elevation: 0,
-        selectedLabelStyle:
-            const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-        unselectedLabelStyle:
-            const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
-        items: items
-            .map(
-              (it) => BottomNavigationBarItem(
-                icon: Icon(it.icon),
-                activeIcon: Icon(it.activeIcon ?? it.icon),
-                label: it.label,
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: colors.surface.withValues(alpha: 0.8),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            border: Border(
+              top: BorderSide(color: colors.border),
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0DD4FF00),
+                blurRadius: 30,
+                offset: Offset(0, -10),
               ),
-            )
-            .toList(),
+            ],
+          ),
+          child: BottomNavigationBar(
+            currentIndex: currentIndex,
+            onTap: onTap,
+            backgroundColor: Colors.transparent,
+            selectedItemColor: colors.primary,
+            unselectedItemColor: colors.textMuted,
+            type: BottomNavigationBarType.fixed,
+            elevation: 0,
+            selectedLabelStyle:
+                const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+            unselectedLabelStyle:
+                const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
+            items: items
+                .map(
+                  (it) => BottomNavigationBarItem(
+                    icon: Icon(it.icon),
+                    activeIcon: Icon(it.activeIcon ?? it.icon),
+                    label: it.label,
+                  ),
+                )
+                .toList(),
+          ),
+        ),
       ),
     );
   }
@@ -1382,12 +1433,16 @@ class PremiumChoiceButton extends StatelessWidget {
               Icon(icon, size: 14, color: color),
               const SizedBox(width: 6),
             ],
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? color : colors.textPrimary,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isSelected ? color : colors.textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ],

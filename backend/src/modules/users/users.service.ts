@@ -56,7 +56,10 @@ export class UsersService {
     firstName?: string;
     lastName?: string;
     phone?: string;
-    heightCm?: number;
+    dateOfBirth?: string | null;
+    heightCm?: number | null;
+    gender?: string | null;
+    unitSystem?: string;
     timezone?: string;
     locale?: string;
     status?: string;
@@ -66,7 +69,10 @@ export class UsersService {
       first_name: fields.firstName,
       last_name: fields.lastName,
       phone: fields.phone,
+      date_of_birth: fields.dateOfBirth,
       height_cm: fields.heightCm,
+      gender: fields.gender,
+      unit_system: fields.unitSystem,
       timezone: fields.timezone,
       locale: fields.locale,
       status: fields.status,
@@ -93,6 +99,12 @@ export class UsersService {
 
   async updateNotificationSettings(userId: number, settings: any) {
     return this.repo.updateNotificationSettings(userId, settings);
+  }
+
+  async getFitnessConfiguration(userId: number) {
+    const config = await this.repo.getFitnessConfiguration(userId);
+    if (!config) throw new NotFoundError('User not found');
+    return config;
   }
 
   async getUserMonitoring(userId: number) {

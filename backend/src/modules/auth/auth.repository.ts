@@ -12,6 +12,7 @@ export interface UserEntity {
   timezone: string;
   locale: string;
   status: string;
+  security_version?: number;
 }
 
 export class AuthRepository {

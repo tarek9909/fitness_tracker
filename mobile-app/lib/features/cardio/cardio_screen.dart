@@ -390,13 +390,18 @@ class _CardioScreenState extends State<CardioScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      activityName,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                          color: colors.textPrimary),
+                    Expanded(
+                      child: Text(
+                        activityName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            color: colors.textPrimary),
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Text(
                       date,
                       style: TextStyle(

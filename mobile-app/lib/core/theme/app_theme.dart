@@ -3,41 +3,42 @@ import 'package:flutter/material.dart';
 /// Static and baseline Design Tokens for the Fitness OS Mobile App.
 /// Backwards-compatible constants are preserved for test suites.
 class AppColors {
-  // Dark Palette Baseline
-  static const Color background = Color(0xFF0B0F19);
-  static const Color surface = Color(0xFF111827);
-  static const Color surfaceElevated = Color(0xFF1E293B);
-  static const Color card = Color(0xFF131D31);
-  static const Color cardHover = Color(0xFF1E2C48);
-  static const Color border = Color(0x1FFFFFFF); // 12% white micro-border
-  static const Color borderHover = Color(0x38FFFFFF); // 22% white
+  // Dark Palette Baseline (Kinetic Wellness)
+  static const Color background = Color(0xFF131313); // Neutral Black #131313 / #121212
+  static const Color surface = Color(0xFF1E1E1E); // Tonal surface #1E1E1E
+  static const Color surfaceElevated = Color(0xFF252525); // Form fields, inner cards
+  static const Color card = Color(0xFF1E1E1E); // Elevated containers
+  static const Color cardHover = Color(0xFF2A2A2A);
+  static const Color border = Color(0x14FFFFFF); // 8% white micro-border
+  static const Color borderHover = Color(0x28FFFFFF); // 16% white
 
-  // Brand & Semantic Accents (Sophisticated, non-radiant, architectural)
-  static const Color primary = Color(0xFF10B981); // Restrained emerald
-  static const Color primaryDark = Color(0xFF059669);
-  static const Color primaryMuted = Color(0x1F10B981); // 12% emerald tint
-  static const Color primaryGlow = Color(0x2410B981); // subtle non-radiant
+  // Brand & Semantic Accents (Kinetic Wellness)
+  static const Color primary = Color(0xFFD4FF00); // Electric Lime
+  static const Color primaryDark = Color(0xFFB0D500);
+  static const Color primaryMuted = Color(0x26D4FF00); // 15% electric lime tint
+  static const Color primaryGlow = Color(0x1AD4FF00); // subtle ambient glow
+  static const Color onPrimary = Color(0xFF121212); // High-contrast dark on lime
 
-  // Cool secondary accent (Slate / Ice Blue)
-  static const Color cyan = Color(0xFF38BDF8);
-  static const Color cyanMuted = Color(0x1F38BDF8);
+  // Cool secondary accent (Hydration / Wellness Cyan)
+  static const Color cyan = Color(0xFF00EEFC); // Vibrant Cyan
+  static const Color cyanMuted = Color(0x2600EEFC);
 
   // Muted Violet accent
   static const Color violet = Color(0xFF818CF8);
   static const Color violetMuted = Color(0x1F818CF8);
 
   // Warm Amber for Attention / Warnings
-  static const Color amber = Color(0xFFF59E0B);
-  static const Color amberMuted = Color(0x1FF59E0B);
+  static const Color amber = Color(0xFFFFB95F);
+  static const Color amberMuted = Color(0x26FFB95F);
 
   // Crimson / Rose for Destructive / Error states
-  static const Color rose = Color(0xFFF43F5E);
-  static const Color roseMuted = Color(0x1FF43F5E);
+  static const Color rose = Color(0xFFFFB4AB);
+  static const Color roseMuted = Color(0x26FFB4AB);
 
   // Dark Typography Tokens
-  static const Color textPrimary = Color(0xFFF8FAFC);
-  static const Color textSecondary = Color(0xFF94A3B8);
-  static const Color textMuted = Color(0xFF64748B);
+  static const Color textPrimary = Color(0xFFE5E2E1);
+  static const Color textSecondary = Color(0xFFC5C9AC);
+  static const Color textMuted = Color(0xFF747878);
 
   // Light Palette Tokens
   static const Color lightBackground = Color(0xFFF8FAFC);
@@ -91,6 +92,7 @@ class AppThemeColors {
 
   Color get primary => isDark ? AppColors.primary : AppColors.lightPrimary;
   Color get primaryMuted => isDark ? AppColors.primaryMuted : AppColors.lightPrimaryMuted;
+  Color get onPrimary => isDark ? AppColors.onPrimary : Colors.white;
 
   Color get cyan => isDark ? AppColors.cyan : AppColors.lightCyan;
   Color get cyanMuted => isDark ? AppColors.cyanMuted : AppColors.lightCyanMuted;
@@ -109,7 +111,13 @@ class AppThemeColors {
   Color get textMuted => isDark ? AppColors.textMuted : AppColors.lightTextMuted;
 
   List<BoxShadow> get cardShadow => isDark
-      ? const []
+      ? const [
+          BoxShadow(
+            color: Color(0x0DD4FF00), // 5% electric lime ambient glow
+            blurRadius: 30,
+            offset: Offset(0, 10),
+          ),
+        ]
       : const [
           BoxShadow(
             color: Color(0x08000000),
@@ -132,7 +140,7 @@ class AppRadii {
   static const double sm = 8.0;
   static const double md = 12.0;
   static const double lg = 16.0;
-  static const double xl = 22.0;
+  static const double xl = 24.0; // 24px rounded cards matching Stitch
   static const double full = 999.0;
 }
 
@@ -143,19 +151,20 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: AppColors.background,
+      fontFamily: 'Inter',
       colorScheme: const ColorScheme.dark(
         primary: AppColors.primary,
-        onPrimary: Colors.white,
+        onPrimary: AppColors.onPrimary,
         surface: AppColors.surface,
         onSurface: AppColors.textPrimary,
         error: AppColors.rose,
-        onError: Colors.white,
+        onError: Colors.black,
       ),
       cardTheme: CardThemeData(
         color: AppColors.card,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.lg),
+          borderRadius: BorderRadius.circular(AppRadii.xl),
           side: const BorderSide(color: AppColors.border),
         ),
       ),
@@ -175,11 +184,11 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
+          foregroundColor: AppColors.onPrimary,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadii.md),
+            borderRadius: BorderRadius.circular(AppRadii.lg),
           ),
           textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
         ),

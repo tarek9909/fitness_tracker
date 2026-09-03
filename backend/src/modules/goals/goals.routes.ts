@@ -36,23 +36,27 @@ export class GoalsRepository {
 
   async createWeightGoal(data: {
     userId: number;
+    goalType?: string | null;
     startWeightKg: number;
     targetWeightKg: number;
     startDate: string;
     targetDate?: string | null;
     notes?: string | null;
+    createdBy?: number | null;
   }): Promise<number> {
     const sql = `
-      INSERT INTO user_weight_goals (user_id, starting_weight_kg, target_weight_kg, start_date, target_date, status, notes)
-      VALUES (?, ?, ?, ?, ?, 'active', ?)
+      INSERT INTO user_weight_goals (user_id, goal_type, starting_weight_kg, target_weight_kg, start_date, target_date, status, notes, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)
     `;
     const res = await this.db.execute(sql, [
       data.userId,
+      data.goalType || 'lose_weight',
       data.startWeightKg,
       data.targetWeightKg,
       data.startDate,
       data.targetDate || null,
       data.notes || null,
+      data.createdBy || null,
     ]);
     return res.insertId;
   }
@@ -342,9 +346,10 @@ export class GoalsRepository {
 }
 
 const createWeightGoalSchema = z.object({
+  goalType: z.string().optional().nullable(),
   startWeightKg: z.number().min(20).max(500),
   targetWeightKg: z.number().min(20).max(500),
-  startDate: z.string().refine(isDateOnly, 'Use YYYY-MM-DD'),
+  startDate: z.string().refine(isDateOnly, 'Use YYYY-MM-DD').optional(),
   targetDate: z.string().refine(isDateOnly, 'Use YYYY-MM-DD').optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
 });
@@ -400,6 +405,7 @@ const adherenceConfigSchema = z.object({
 export class GoalsController {
   private repo = new GoalsRepository();
   private usersRepo = new UsersRepository();
+  private db = getDatabasePool();
 
   async getWeightGoals(request: FastifyRequest, reply: FastifyReply) {
     const params = request.params as { userId: string };
@@ -539,12 +545,114 @@ export class GoalsController {
       },
     });
   }
+
+  async setMyWeightGoal(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
+    const user = await this.usersRepo.findById(auth.userId);
+    const today = getUserLocalDate(user?.timezone || 'UTC');
+    const body = createWeightGoalSchema.parse(request.body);
+    const startDate = body.startDate || today;
+
+    await this.db.execute(
+      `UPDATE user_weight_goals SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND status = 'active'`,
+      [auth.userId]
+    );
+
+    const id = await this.repo.createWeightGoal({
+      userId: auth.userId,
+      goalType: body.goalType || 'lose_weight',
+      startWeightKg: body.startWeightKg,
+      targetWeightKg: body.targetWeightKg,
+      startDate,
+      targetDate: body.targetDate,
+      notes: body.notes,
+      createdBy: auth.userId,
+    });
+
+    const active = await this.repo.getActiveWeightGoal(auth.userId);
+    return reply.status(200).send({ success: true, data: active || { id, ...body, startDate } });
+  }
+
+  async setMyWaterTarget(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
+    const user = await this.usersRepo.findById(auth.userId);
+    const today = getUserLocalDate(user?.timezone || 'UTC');
+    const body = z.object({ dailyTargetMl: z.number().min(500).max(10000) }).parse(request.body);
+
+    const id = await this.repo.createWaterTarget({
+      userId: auth.userId,
+      dailyTargetMl: body.dailyTargetMl,
+      effectiveFrom: today,
+    });
+
+    const active = await this.repo.getActiveWaterTarget(auth.userId, today);
+    return reply.status(200).send({ success: true, data: active || { id, targetMl: body.dailyTargetMl, effectiveFrom: today } });
+  }
+
+  async setMyWaterQuickAdd(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
+    const parsed = waterQuickAddSchema.parse(request.body);
+    const normalized = parsed.options.map((opt, idx) => {
+      if (typeof opt === 'number') {
+        return { amountMl: opt, displayOrder: idx + 1, isActive: true };
+      }
+      return {
+        amountMl: opt.amountMl,
+        displayOrder: opt.displayOrder ?? idx + 1,
+        isActive: opt.isActive ?? true,
+      };
+    });
+    const saved = await this.repo.saveWaterQuickAddForUser(auth.userId, normalized);
+    return reply.status(200).send({ success: true, data: saved });
+  }
+
+  async getMyCardioTargets(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
+    const targets = await this.repo.getCardioTargetsForUser(auth.userId);
+    return reply.status(200).send({ success: true, data: targets });
+  }
+
+  async createMyCardioTarget(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
+    const user = await this.usersRepo.findById(auth.userId);
+    const today = getUserLocalDate(user?.timezone || 'UTC');
+    const body = createCardioTargetSchema.partial({ effectiveFrom: true }).parse(request.body);
+    const effectiveFrom = body.effectiveFrom || today;
+
+    const targetId = await this.repo.createCardioTarget({
+      ...body,
+      userId: auth.userId,
+      effectiveFrom,
+      weekdays: body.weekdays || [1, 2, 3, 4, 5, 6, 7],
+    });
+
+    const targets = await this.repo.getCardioTargetsForUser(auth.userId);
+    const created = targets.find((t: any) => t.id === targetId);
+    return reply.status(201).send({ success: true, data: created || { id: targetId, ...body, effectiveFrom } });
+  }
+
+  async deleteMyCardioTarget(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
+    const params = request.params as { targetId: string };
+    const targetId = parsePositiveInt(params.targetId, 'targetId');
+    const removed = await this.repo.deleteCardioTarget(targetId, auth.userId);
+    if (!removed) {
+      throw new NotFoundError('Cardio target not found or not owned by user');
+    }
+    return reply.status(200).send({ success: true, data: { message: 'Cardio target removed' } });
+  }
 }
 
 export async function goalsRoutes(fastify: FastifyInstance) {
   const controller = new GoalsController();
 
   fastify.get('/me/goals', { preHandler: [authenticate] }, (req, res) => controller.getMyGoals(req, res));
+  fastify.put('/me/goals/weight', { preHandler: [authenticate] }, (req, res) => controller.setMyWeightGoal(req, res));
+  fastify.put('/me/goals/water', { preHandler: [authenticate] }, (req, res) => controller.setMyWaterTarget(req, res));
+  fastify.put('/me/goals/water-quick-add', { preHandler: [authenticate] }, (req, res) => controller.setMyWaterQuickAdd(req, res));
+  fastify.get('/me/goals/cardio', { preHandler: [authenticate] }, (req, res) => controller.getMyCardioTargets(req, res));
+  fastify.post('/me/goals/cardio', { preHandler: [authenticate] }, (req, res) => controller.createMyCardioTarget(req, res));
+  fastify.delete('/me/goals/cardio/:targetId', { preHandler: [authenticate] }, (req, res) => controller.deleteMyCardioTarget(req, res));
 
   // Admin user goal & target management
   fastify.get('/admin/users/:userId/weight-goals', { preHandler: [authenticate, requireAdmin] }, (req, res) =>

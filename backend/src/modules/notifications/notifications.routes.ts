@@ -19,7 +19,7 @@ const registerDeviceSchema = z.object({
 
 const clockValue = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/, 'Time must use HH:MM or HH:MM:SS');
 
-const reminderSchema = z.object({
+const reminderFields = {
   title: z.string().min(1).max(150),
   category: z.enum(['meal', 'workout', 'cardio', 'water', 'weight', 'progress', 'system']),
   mode: z.enum(['fixed_time', 'relative_to_task', 'interval']).default('fixed_time'),
@@ -32,7 +32,9 @@ const reminderSchema = z.object({
   activeWindowEnd: clockValue.optional().nullable(),
   messageTemplate: z.string().min(1).max(5000).optional().nullable(),
   isActive: z.boolean().default(true),
-}).superRefine((value, context) => {
+};
+
+const reminderSchema = z.object(reminderFields).superRefine((value, context) => {
   if (value.mode === 'fixed_time' && !value.fixedTime) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['fixedTime'], message: 'Fixed-time reminders require fixedTime' });
   }
@@ -43,6 +45,8 @@ const reminderSchema = z.object({
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['category'], message: 'Relative reminders must target a task category' });
   }
 });
+
+const updateReminderSchema = z.object(reminderFields).partial();
 
 const adminSendNotificationSchema = z.object({
   userId: z.number().int().positive().optional().nullable(), // null for broadcast to all active users
@@ -354,6 +358,100 @@ export class NotificationsController {
     });
   }
 
+  // --- Self-Service User Reminders ---
+
+  async getMyReminders(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
+    const reminders = await this.db.query(
+      `SELECT *, name as title, trigger_mode as mode
+       FROM reminder_rules
+       WHERE user_id = ? OR (rule_scope = 'system' AND user_id IS NULL AND is_active = 1)
+       ORDER BY id ASC`,
+      [auth.userId]
+    );
+    return reply.status(200).send({ success: true, data: reminders });
+  }
+
+  async createMyReminder(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
+    const body = reminderSchema.parse(request.body);
+    const res = await this.db.execute(
+      `INSERT INTO reminder_rules (
+         user_id, name, category, rule_scope, trigger_mode, fixed_time, offset_minutes,
+         grace_period_minutes, repeat_interval_minutes, max_repeats,
+         active_window_start, active_window_end, is_active, created_by
+       ) VALUES (?, ?, ?, 'user', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        auth.userId,
+        body.title,
+        body.category,
+        body.mode,
+        body.fixedTime || null,
+        body.offsetMinutes || null,
+        body.gracePeriodMinutes || 0,
+        body.repeatIntervalMinutes || null,
+        body.maxRepeats || 1,
+        body.activeWindowStart || null,
+        body.activeWindowEnd || null,
+        body.isActive ? 1 : 0,
+        auth.userId,
+      ]
+    );
+    const created = await this.db.queryOne(
+      `SELECT *, name as title, trigger_mode as mode FROM reminder_rules WHERE id = ?`,
+      [res.insertId]
+    );
+    return reply.status(201).send({ success: true, data: created });
+  }
+
+  async updateMyReminder(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
+    const params = request.params as { id: string };
+    const reminderId = parsePositiveInt(params.id, 'reminderId');
+    const existing = await this.db.queryOne<{ id: number; user_id: number | null }>(
+      'SELECT id, user_id FROM reminder_rules WHERE id = ?',
+      [reminderId]
+    );
+    if (!existing || existing.user_id !== auth.userId) {
+      throw new NotFoundError('Reminder rule not found or not owned by user');
+    }
+    const body = updateReminderSchema.parse(request.body);
+    const setClauses: string[] = [];
+    const values: any[] = [];
+    if (body.title !== undefined) { setClauses.push('name = ?'); values.push(body.title); }
+    if (body.category !== undefined) { setClauses.push('category = ?'); values.push(body.category); }
+    if (body.mode !== undefined) { setClauses.push('trigger_mode = ?'); values.push(body.mode); }
+    if (body.fixedTime !== undefined) { setClauses.push('fixed_time = ?'); values.push(body.fixedTime); }
+    if (body.offsetMinutes !== undefined) { setClauses.push('offset_minutes = ?'); values.push(body.offsetMinutes); }
+    if (body.gracePeriodMinutes !== undefined) { setClauses.push('grace_period_minutes = ?'); values.push(body.gracePeriodMinutes); }
+    if (body.repeatIntervalMinutes !== undefined) { setClauses.push('repeat_interval_minutes = ?'); values.push(body.repeatIntervalMinutes); }
+    if (body.maxRepeats !== undefined) { setClauses.push('max_repeats = ?'); values.push(body.maxRepeats); }
+    if (body.activeWindowStart !== undefined) { setClauses.push('active_window_start = ?'); values.push(body.activeWindowStart); }
+    if (body.activeWindowEnd !== undefined) { setClauses.push('active_window_end = ?'); values.push(body.activeWindowEnd); }
+    if (body.isActive !== undefined) { setClauses.push('is_active = ?'); values.push(body.isActive ? 1 : 0); }
+    setClauses.push('updated_at = CURRENT_TIMESTAMP');
+    await this.db.execute(`UPDATE reminder_rules SET ${setClauses.join(', ')} WHERE id = ?`, [...values, reminderId]);
+    const updated = await this.db.queryOne(
+      `SELECT *, name as title, trigger_mode as mode FROM reminder_rules WHERE id = ?`,
+      [reminderId]
+    );
+    return reply.status(200).send({ success: true, data: updated });
+  }
+
+  async deleteMyReminder(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
+    const params = request.params as { id: string };
+    const reminderId = parsePositiveInt(params.id, 'reminderId');
+    const result = await this.db.execute(
+      'DELETE FROM reminder_rules WHERE id = ? AND user_id = ?',
+      [reminderId, auth.userId]
+    );
+    if (result.affectedRows === 0) {
+      throw new NotFoundError('Reminder rule not found or not owned by user');
+    }
+    return reply.status(200).send({ success: true, data: { message: 'Reminder deleted successfully' } });
+  }
+
   async processReminders(request: FastifyRequest, reply: FastifyReply) {
     const summary = await new ReminderWorker().processOnce();
     await recordAuditEvent(request, 'reminders.processed', 'system_worker', null, {
@@ -547,12 +645,16 @@ export class NotificationsController {
 export async function notificationsRoutes(fastify: FastifyInstance) {
   const controller = new NotificationsController();
 
-  // User notifications
+  // User notifications & reminders
   fastify.get('/me/notifications', { preHandler: [authenticate] }, (req, res) => controller.getMyNotifications(req, res));
   fastify.post('/me/notifications/:id/read', { preHandler: [authenticate] }, (req, res) => controller.markAsRead(req, res));
   fastify.post('/me/notifications/read-all', { preHandler: [authenticate] }, (req, res) => controller.markAllAsRead(req, res));
   fastify.post('/me/notifications/:id/dismiss', { preHandler: [authenticate] }, (req, res) => controller.dismissNotification(req, res));
   fastify.post('/me/devices', { preHandler: [authenticate] }, (req, res) => controller.registerDevice(req, res));
+  fastify.get('/me/reminders', { preHandler: [authenticate] }, (req, res) => controller.getMyReminders(req, res));
+  fastify.post('/me/reminders', { preHandler: [authenticate] }, (req, res) => controller.createMyReminder(req, res));
+  fastify.put('/me/reminders/:id', { preHandler: [authenticate] }, (req, res) => controller.updateMyReminder(req, res));
+  fastify.delete('/me/reminders/:id', { preHandler: [authenticate] }, (req, res) => controller.deleteMyReminder(req, res));
 
   // Admin Reminders CRUD
   fastify.get('/admin/reminders', { preHandler: [authenticate, requireAdmin] }, (req, res) => controller.listReminders(req, res));

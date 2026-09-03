@@ -205,11 +205,16 @@ class _HistoryScreenState extends State<HistoryScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(name,
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
-                            color: colors.textPrimary)),
+                    Expanded(
+                      child: Text(name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                              color: colors.textPrimary)),
+                    ),
+                    const SizedBox(width: 8),
                     Text(date,
                         style: TextStyle(
                             fontSize: 12, color: colors.textSecondary)),
@@ -268,20 +273,27 @@ class _HistoryScreenState extends State<HistoryScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name,
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 15,
-                            color: colors.textPrimary)),
-                    const SizedBox(height: 4),
-                    Text(date,
-                        style: TextStyle(
-                            fontSize: 12, color: colors.textSecondary)),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                              color: colors.textPrimary)),
+                      const SizedBox(height: 4),
+                      Text(date,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 12, color: colors.textSecondary)),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -386,11 +398,16 @@ class _HistoryScreenState extends State<HistoryScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(activity,
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
-                            color: colors.textPrimary)),
+                    Expanded(
+                      child: Text(activity,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                              color: colors.textPrimary)),
+                    ),
+                    const SizedBox(width: 8),
                     Text(date,
                         style: TextStyle(
                             fontSize: 12, color: colors.textSecondary)),
@@ -458,11 +475,16 @@ class _HistoryScreenState extends State<HistoryScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(date,
-                    style: TextStyle(
-                        fontSize: 14,
-                        color: colors.textPrimary,
-                        fontWeight: FontWeight.w600)),
+                Expanded(
+                  child: Text(date,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 14,
+                          color: colors.textPrimary,
+                          fontWeight: FontWeight.w600)),
+                ),
+                const SizedBox(width: 8),
                 StatusBadge(
                   icon: Icon(Icons.monitor_weight,
                       size: 12, color: colors.violet),

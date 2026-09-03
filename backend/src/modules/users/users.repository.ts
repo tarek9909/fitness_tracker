@@ -14,6 +14,9 @@ export interface UserDetail {
   gender: string | null;
   timezone: string;
   locale: string;
+  unit_system?: string;
+  email_verified_at?: string | null;
+  security_version?: number;
   status: string;
   last_login_at: string | null;
   created_at: string;
@@ -55,6 +58,7 @@ export class UsersRepository {
     const sql = `
       SELECT u.id, u.role_id, r.name as role_name, u.first_name, u.last_name, u.email,
              u.phone, u.date_of_birth, u.height_cm, u.gender, u.timezone, u.locale,
+             u.unit_system, u.email_verified_at, u.security_version,
              u.status, u.last_login_at, u.created_at
       FROM users u
       JOIN roles r ON r.id = u.role_id
@@ -71,6 +75,7 @@ export class UsersRepository {
     const sql = `
       SELECT u.id, u.role_id, r.name as role_name, u.first_name, u.last_name, u.email,
              u.phone, u.date_of_birth, u.height_cm, u.gender, u.timezone, u.locale,
+             u.unit_system, u.email_verified_at, u.security_version,
              u.status, u.last_login_at, u.created_at
       FROM users u
       JOIN roles r ON r.id = u.role_id
@@ -137,6 +142,18 @@ export class UsersRepository {
     if (fields.locale !== undefined) {
       setClauses.push('locale = ?');
       values.push(fields.locale);
+    }
+    if (fields.gender !== undefined) {
+      setClauses.push('gender = ?');
+      values.push(fields.gender);
+    }
+    if (fields.date_of_birth !== undefined) {
+      setClauses.push('date_of_birth = ?');
+      values.push(fields.date_of_birth);
+    }
+    if (fields.unit_system !== undefined) {
+      setClauses.push('unit_system = ?');
+      values.push(fields.unit_system);
     }
     if (fields.status !== undefined) {
       setClauses.push('status = ?');
@@ -295,6 +312,79 @@ export class UsersRepository {
     return this.getNotificationSettings(userId);
   }
 
+  async getFitnessConfiguration(userId: number): Promise<any> {
+    const user = await this.findById(userId);
+    if (!user) return null;
+    const today = getUserLocalDate(user.timezone || 'UTC');
+
+    const [weightGoal, waterTarget, waterQuickAdd, cardioTargets, reminders, activeWorkout, activeDiet] =
+      await Promise.all([
+        this.db.queryOne(
+          `SELECT *, starting_weight_kg as start_weight_kg FROM user_weight_goals WHERE user_id = ? AND status = 'active' ORDER BY start_date DESC, id DESC LIMIT 1`,
+          [userId]
+        ),
+        this.db.queryOne(
+          `SELECT *, target_ml as daily_target_ml FROM user_water_targets WHERE user_id = ? AND status = 'active' AND effective_from <= ? AND (effective_until IS NULL OR effective_until >= ?) ORDER BY effective_from DESC, id DESC LIMIT 1`,
+          [userId, today, today]
+        ),
+        this.db.query(
+          `SELECT id, user_id, amount_ml, display_order, is_active FROM user_water_quick_add_options WHERE user_id = ? ORDER BY display_order ASC`,
+          [userId]
+        ),
+        this.db.query(
+          `SELECT uct.*, ca.name as activity_name FROM user_cardio_targets uct LEFT JOIN cardio_activities ca ON ca.id = uct.cardio_activity_id WHERE uct.user_id = ? AND uct.status = 'active' ORDER BY uct.id ASC`,
+          [userId]
+        ),
+        this.db.query(
+          `SELECT *, name as title, trigger_mode as mode FROM reminder_rules WHERE user_id = ? OR (rule_scope = 'system' AND user_id IS NULL AND is_active = 1) ORDER BY id ASC`,
+          [userId]
+        ),
+        this.db.queryOne(
+          `SELECT uwa.*, wp.id as workout_plan_id, wp.name as plan_name, wp.visibility as plan_visibility, wp.owner_user_id as plan_owner_user_id, wpv.version_number
+           FROM user_workout_assignments uwa
+           JOIN workout_plan_versions wpv ON wpv.id = uwa.workout_plan_version_id
+           JOIN workout_plans wp ON wp.id = wpv.workout_plan_id
+           WHERE uwa.user_id = ? AND uwa.status = 'active' AND uwa.effective_from <= ? AND (uwa.effective_until IS NULL OR uwa.effective_until >= ?)
+           ORDER BY uwa.effective_from DESC LIMIT 1`,
+          [userId, today, today]
+        ),
+        this.db.queryOne(
+          `SELECT uda.*, dp.id as diet_plan_id, dp.name as plan_name, dp.visibility as plan_visibility, dp.owner_user_id as plan_owner_user_id, dpv.version_number, dpv.daily_calorie_target
+           FROM user_diet_assignments uda
+           JOIN diet_plan_versions dpv ON dpv.id = uda.diet_plan_version_id
+           JOIN diet_plans dp ON dp.id = dpv.diet_plan_id
+           WHERE uda.user_id = ? AND uda.status = 'active' AND uda.effective_from <= ? AND (uda.effective_until IS NULL OR uda.effective_until >= ?)
+           ORDER BY uda.effective_from DESC LIMIT 1`,
+          [userId, today, today]
+        ),
+      ]);
+
+    return {
+      profile: {
+        id: user.id,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        email: user.email,
+        phone: user.phone,
+        dateOfBirth: user.date_of_birth,
+        heightCm: user.height_cm,
+        gender: user.gender,
+        timezone: user.timezone,
+        locale: user.locale,
+        unitSystem: user.unit_system || 'metric',
+        emailVerifiedAt: user.email_verified_at,
+        securityVersion: user.security_version,
+      },
+      weightGoal: weightGoal || null,
+      waterTarget: waterTarget || { daily_target_ml: 2500, target_ml: 2500 },
+      waterQuickAdd: waterQuickAdd || [],
+      cardioTargets: cardioTargets || [],
+      reminders: reminders || [],
+      activeWorkoutPlan: activeWorkout || null,
+      activeDietPlan: activeDiet || null,
+    };
+  }
+
   async getUserMonitoringDossier(userId: number): Promise<any | null> {
     const user = await this.findById(userId);
     if (!user) return null;
@@ -317,7 +407,7 @@ export class UsersRepository {
       pushDevices,
     ] = await Promise.all([
       this.db.queryOne(
-        `SELECT uwa.*, wp.name as workout_plan_name, wpv.version_number
+        `SELECT uwa.*, wp.name as workout_plan_name, wp.visibility as workout_plan_visibility, wp.owner_user_id as workout_plan_owner_user_id, wpv.version_number
          FROM user_workout_assignments uwa
          JOIN workout_plan_versions wpv ON wpv.id = uwa.workout_plan_version_id
          JOIN workout_plans wp ON wp.id = wpv.workout_plan_id
@@ -326,7 +416,7 @@ export class UsersRepository {
         [userId]
       ),
       this.db.queryOne(
-        `SELECT uda.*, dp.name as diet_plan_name, dpv.version_number
+        `SELECT uda.*, dp.name as diet_plan_name, dp.visibility as diet_plan_visibility, dp.owner_user_id as diet_plan_owner_user_id, dpv.version_number
          FROM user_diet_assignments uda
          JOIN diet_plan_versions dpv ON dpv.id = uda.diet_plan_version_id
          JOIN diet_plans dp ON dp.id = dpv.diet_plan_id

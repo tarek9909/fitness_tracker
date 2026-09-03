@@ -11,4 +11,6 @@ export async function authRoutes(fastify: FastifyInstance) {
   fastify.post('/auth/request-password-reset', (req, res) => controller.forgotPassword(req, res));
   fastify.post('/auth/forgot-password', (req, res) => controller.forgotPassword(req, res));
   fastify.post('/auth/reset-password', (req, res) => controller.resetPassword(req, res));
+  fastify.post('/auth/password-reset/request', (req, res) => controller.passwordResetRequest(req, res));
+  fastify.post('/auth/password-reset/verify', (req, res) => controller.passwordResetVerify(req, res));
 }

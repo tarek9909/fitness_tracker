@@ -23,7 +23,6 @@ const logSetSchema = z.object({
   setType: z.enum(['warmup', 'working', 'dropset', 'failure']).default('working'),
   weightKg: z.number().min(0).max(1000).optional(),
   reps: z.number().int().min(1).max(500).optional(),
-  rir: z.number().int().min(0).max(10).optional(),
   durationSeconds: z.number().int().min(1).max(86400).optional(),
   distanceMeters: z.number().min(0).max(100000).optional(),
   notes: z.string().max(1000).optional(),
@@ -123,9 +122,9 @@ export class WorkoutSessionController {
                 `INSERT INTO workout_session_exercises (
                    workout_session_id, workout_plan_exercise_id, exercise_id, exercise_order,
                    exercise_name_snapshot, tracking_type_snapshot, planned_sets_snapshot,
-                   planned_reps_min_snapshot, planned_reps_max_snapshot, planned_rest_seconds_snapshot, planned_rir_snapshot,
+                   planned_reps_min_snapshot, planned_reps_max_snapshot, planned_rest_seconds_snapshot,
                    status
-                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
                 [
                   sessionId,
                   pe.id,
@@ -137,7 +136,6 @@ export class WorkoutSessionController {
                   pe.target_reps_min,
                   pe.target_reps_max,
                   pe.rest_seconds,
-                  pe.rir_target,
                 ]
               );
             }
@@ -234,12 +232,11 @@ export class WorkoutSessionController {
 
         if (existingSet) {
           await conn.execute(
-            `UPDATE workout_sets SET set_type = ?, weight_kg = ?, reps = ?, rir = ?, duration_seconds = ?, distance_meters = ?, notes = ?, completed = ?, performed_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            `UPDATE workout_sets SET set_type = ?, weight_kg = ?, reps = ?, duration_seconds = ?, distance_meters = ?, notes = ?, completed = ?, performed_at = CURRENT_TIMESTAMP WHERE id = ?`,
             [
               body.setType,
               body.weightKg !== undefined ? body.weightKg : null,
               body.reps !== undefined ? body.reps : null,
-              body.rir !== undefined ? body.rir : null,
               body.durationSeconds !== undefined ? body.durationSeconds : null,
               body.distanceMeters !== undefined ? body.distanceMeters : null,
               body.notes || null,
@@ -249,15 +246,14 @@ export class WorkoutSessionController {
           );
         } else {
           await conn.execute(
-            `INSERT INTO workout_sets (workout_session_exercise_id, set_number, set_type, weight_kg, reps, rir, duration_seconds, distance_meters, notes, completed, performed_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            `INSERT INTO workout_sets (workout_session_exercise_id, set_number, set_type, weight_kg, reps, duration_seconds, distance_meters, notes, completed, performed_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
             [
               sessionExercise.id,
               body.setNumber,
               body.setType,
               body.weightKg !== undefined ? body.weightKg : null,
               body.reps !== undefined ? body.reps : null,
-              body.rir !== undefined ? body.rir : null,
               body.durationSeconds !== undefined ? body.durationSeconds : null,
               body.distanceMeters !== undefined ? body.distanceMeters : null,
               body.notes || null,
@@ -355,7 +351,7 @@ export class WorkoutSessionController {
 
     const history = await this.db.query(`
       SELECT ws.id as session_id, ws.workout_date as session_date, ws.completed_at, wsets.set_number, wsets.set_type,
-             wsets.weight_kg, wsets.reps, wsets.rir, wsets.duration_seconds, wsets.distance_meters
+             wsets.weight_kg, wsets.reps, wsets.duration_seconds, wsets.distance_meters
       FROM workout_sets wsets
       JOIN workout_session_exercises wse ON wse.id = wsets.workout_session_exercise_id
       JOIN workout_sessions ws ON ws.id = wse.workout_session_id
@@ -541,7 +537,6 @@ export class WorkoutSessionController {
              wse.planned_sets_snapshot as planned_sets,
              wse.planned_reps_min_snapshot as reps_min_target,
              wse.planned_reps_max_snapshot as reps_max_target,
-             wse.planned_rir_snapshot as rir_target,
              wse.planned_rest_seconds_snapshot as rest_seconds_target,
              e.name as exercise_name, 
              e.tracking_type, 

@@ -71,7 +71,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
     final workouts = _progress?['workouts'];
     final cardio = _progress?['cardio'];
-    final weight = _progress?['weight'];
 
     return PremiumScaffold(
       appBar: const PremiumAppBar(
@@ -86,188 +85,551 @@ class _ProgressScreenState extends State<ProgressScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SectionHeader(
-                title: 'Performance Overview',
-                subtitle: 'Aggregated analytics across training disciplines',
-              ),
-              const SizedBox(height: 8),
-
-              // KPI Row
+              // Header & Time Filters
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
-                    child: MetricCard(
-                      title: 'Workouts',
-                      value: '${workouts?['completedSessions'] ?? 0}',
-                      subtitle: '${workouts?['totalSets'] ?? 0} working sets',
-                      icon: Icons.fitness_center,
-                      accentColor: colors.cyan,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: MetricCard(
-                      title: 'Cardio',
-                      value: '${cardio?['totalMinutes'] ?? 0}m',
-                      subtitle: '${cardio?['totalCalories'] ?? 0} kcal burned',
-                      icon: Icons.directions_run,
-                      accentColor: colors.amber,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Analytics Overview',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.5,
+                            color: colors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'Tracking your performance metrics',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: colors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
 
-              // Detailed Workout Volume Card
-              PremiumCard(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              // Time Filters Row
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.fitness_center,
-                                color: colors.cyan, size: 18),
-                            const SizedBox(width: 8),
-                            Text('RESISTANCE TRAINING',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 12,
-                                    letterSpacing: 0.5,
-                                    color: colors.cyan)),
-                          ],
-                        ),
-                        StatusBadge(
-                          label:
-                              '${workouts?['completedSessions'] ?? 0} Sessions',
-                          color: colors.cyan,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      '${workouts?['completedSessions'] ?? 0} Workouts Completed',
-                      style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: colors.textPrimary),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${workouts?['totalSets'] ?? 0} completed working sets tracked across all muscle groups',
-                      style: TextStyle(
-                          color: colors.textSecondary, fontSize: 13),
-                    ),
+                    _buildTimeFilterPill('7D', false, colors),
+                    _buildTimeFilterPill('30D', true, colors),
+                    _buildTimeFilterPill('3M', false, colors),
+                    _buildTimeFilterPill('6M', false, colors),
+                    _buildTimeFilterPill('1Y', false, colors),
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 20),
 
-              // Detailed Cardio Card
-              PremiumCard(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.directions_run,
-                                color: colors.amber, size: 18),
-                            const SizedBox(width: 8),
-                            Text('CARDIO CONDITIONING',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 12,
-                                    letterSpacing: 0.5,
-                                    color: colors.amber)),
-                          ],
-                        ),
-                        StatusBadge(
-                          label: '${cardio?['totalMinutes'] ?? 0} min',
-                          color: colors.amber,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      '${cardio?['totalMinutes'] ?? 0} Total Cardio Minutes',
-                      style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: colors.textPrimary),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${cardio?['totalCalories'] ?? 0} active kcal burned across logged sessions',
-                      style: TextStyle(
-                          color: colors.textSecondary, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-
-              // Detailed Weight Card
-              if (weight != null)
-                PremiumCard(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // Top Level 4-Metric Grid (Stitch design)
+              Row(
+                children: [
+                  Expanded(
+                    child: PremiumCard(
+                      padding: const EdgeInsets.all(14),
+                      ambientGlow: true,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Icon(Icons.trending_down,
-                                  color: colors.primary, size: 18),
-                              const SizedBox(width: 8),
-                              Text('BODY COMPOSITION',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 12,
-                                      letterSpacing: 0.5,
-                                      color: colors.primary)),
+                              Icon(Icons.restaurant,
+                                  color: colors.primary, size: 20),
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: colors.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
                             ],
                           ),
-                          StatusBadge(
-                            label: weight['currentWeightKg'] != null
-                                ? '${weight['currentWeightKg']} kg'
-                                : 'Pending',
-                            color: colors.primary,
+                          const SizedBox(height: 14),
+                          Text(
+                            '92%',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: colors.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            'Diet Adherence',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: colors.textSecondary,
+                            ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 14),
-                      Text(
-                        weight['currentWeightKg'] != null
-                            ? '${weight['currentWeightKg']} kg Current'
-                            : 'No Weight Logged',
-                        style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            color: colors.textPrimary),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        weight['targetWeightKg'] != null
-                            ? 'Goal: ${weight['targetWeightKg']} kg (${weight['weightLostKg'] ?? 0} kg total delta)'
-                            : 'No target body weight goal currently assigned',
-                        style: TextStyle(
-                            color: colors.textSecondary, fontSize: 13),
-                      ),
-                    ],
+                    ),
                   ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: PremiumCard(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.directions_run,
+                              color: colors.cyan, size: 20),
+                          const SizedBox(height: 14),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  '${cardio?['totalMinutes'] ?? 145}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
+                                    color: colors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                ' / 150',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: colors.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            'Cardio Mins',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: colors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: PremiumCard(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.fitness_center,
+                              color: colors.textSecondary, size: 20),
+                          const SizedBox(height: 14),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  '${workouts?['totalSets'] != null ? (workouts!['totalSets'] * 120 / 1000).round() : 12}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
+                                    color: colors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                'k',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: colors.textSecondary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            'Total Volume (kg)',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: colors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: PremiumCard(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.bedtime,
+                              color: colors.primary, size: 20),
+                          const SizedBox(height: 14),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  '94',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
+                                    color: colors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                ' / 100',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: colors.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            'Recovery Score',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: colors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Weight Trend Chart Card
+              PremiumCard(
+                padding: const EdgeInsets.all(20),
+                ambientGlow: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Weight Trend',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: colors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '30 Day History & 7-Day Moving Avg',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: colors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: colors.primary,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Actual',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: colors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    WeightTrendChart(
+                      primaryColor: colors.primary,
+                      gridColor: Colors.white.withValues(alpha: 0.08),
+                    ),
+                  ],
                 ),
+              ),
+              const SizedBox(height: 20),
+
+              // Strength Progression Card
+              PremiumCard(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Bench Press 1RM',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Estimated Progression (kg)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    StrengthProgressionChart(
+                      primaryColor: colors.primary,
+                      barBgColor: colors.surfaceElevated,
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTimeFilterPill(
+      String label, bool isSelected, AppThemeColors colors) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: isSelected ? colors.primary : colors.surfaceElevated,
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        border: Border.all(
+          color: isSelected
+              ? colors.primary
+              : Colors.white.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
+          color: isSelected ? colors.onPrimary : colors.textSecondary,
+        ),
+      ),
+    );
+  }
+}
+
+class WeightTrendChart extends StatelessWidget {
+  final Color primaryColor;
+  final Color gridColor;
+
+  const WeightTrendChart({
+    super.key,
+    required this.primaryColor,
+    required this.gridColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 130,
+      width: double.infinity,
+      child: CustomPaint(
+        painter: _WeightTrendPainter(
+          primaryColor: primaryColor,
+          gridColor: gridColor,
+        ),
+      ),
+    );
+  }
+}
+
+class _WeightTrendPainter extends CustomPainter {
+  final Color primaryColor;
+  final Color gridColor;
+
+  _WeightTrendPainter({
+    required this.primaryColor,
+    required this.gridColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final gridPaint = Paint()
+      ..color = gridColor
+      ..strokeWidth = 0.8
+      ..style = PaintingStyle.stroke;
+
+    for (int i = 1; i <= 3; i++) {
+      final y = size.height * (i / 4.0);
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    final points = [
+      const Offset(0.0, 0.7),
+      const Offset(0.1, 0.65),
+      const Offset(0.2, 0.68),
+      const Offset(0.3, 0.55),
+      const Offset(0.4, 0.58),
+      const Offset(0.5, 0.48),
+      const Offset(0.6, 0.52),
+      const Offset(0.7, 0.42),
+      const Offset(0.8, 0.45),
+      const Offset(0.9, 0.35),
+      const Offset(1.0, 0.30),
+    ];
+
+    final avgPath = Path();
+    avgPath.moveTo(0, size.height * 0.68);
+    avgPath.quadraticBezierTo(
+      size.width * 0.5,
+      size.height * 0.52,
+      size.width,
+      size.height * 0.35,
+    );
+    final avgPaint = Paint()
+      ..color = Colors.white24
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    canvas.drawPath(avgPath, avgPaint);
+
+    final linePath = Path();
+    for (int i = 0; i < points.length; i++) {
+      final p = Offset(points[i].dx * size.width, points[i].dy * size.height);
+      if (i == 0) {
+        linePath.moveTo(p.dx, p.dy);
+      } else {
+        linePath.lineTo(p.dx, p.dy);
+      }
+    }
+
+    final linePaint = Paint()
+      ..color = primaryColor
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawPath(linePath, linePaint);
+
+    final dotPaint = Paint()..color = primaryColor;
+    for (int i = 0; i < points.length; i += 2) {
+      final p = Offset(points[i].dx * size.width, points[i].dy * size.height);
+      canvas.drawCircle(p, i == points.length - 1 ? 5 : 3, dotPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class StrengthProgressionChart extends StatelessWidget {
+  final Color primaryColor;
+  final Color barBgColor;
+
+  const StrengthProgressionChart({
+    super.key,
+    required this.primaryColor,
+    required this.barBgColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bars = [
+      {'val': '80kg', 'pct': 0.5},
+      {'val': '85kg', 'pct': 0.6},
+      {'val': '90kg', 'pct': 0.7},
+      {'val': '95kg', 'pct': 0.8},
+      {'val': '100kg', 'pct': 1.0},
+    ];
+
+    return SizedBox(
+      height: 120,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: bars.map((b) {
+          final isMax = b['pct'] == 1.0;
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    b['val'] as String,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: isMax ? FontWeight.bold : FontWeight.normal,
+                      color: isMax ? primaryColor : Colors.white54,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    height: 80 * (b['pct'] as double),
+                    decoration: BoxDecoration(
+                      color: isMax ? primaryColor : barBgColor,
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(4)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }

@@ -27,13 +27,41 @@ export class WorkoutPlanRepository {
     return client.queryOne(sql, [planId]);
   }
 
-  async createPlan(data: { name: string; description?: string | null; goalCategory?: string | null; createdBy?: number | null }, client: DbConnection = this.db): Promise<number> {
+  async createPlan(data: {
+    name: string;
+    description?: string | null;
+    goalCategory?: string | null;
+    createdBy?: number | null;
+    ownerUserId?: number | null;
+    visibility?: string;
+  }, client: DbConnection = this.db): Promise<number> {
     const sql = `
-      INSERT INTO workout_plans (name, description, goal, status, created_by)
-      VALUES (?, ?, ?, 'active', ?)
+      INSERT INTO workout_plans (name, description, goal, status, created_by, owner_user_id, visibility)
+      VALUES (?, ?, ?, 'active', ?, ?, ?)
     `;
-    const res = await client.execute(sql, [data.name, data.description || null, data.goalCategory || null, data.createdBy || null]);
+    const res = await client.execute(sql, [
+      data.name,
+      data.description || null,
+      data.goalCategory || null,
+      data.createdBy || null,
+      data.ownerUserId || null,
+      data.visibility || 'admin',
+    ]);
     return res.insertId;
+  }
+
+  async findPlansForUser(userId: number): Promise<any[]> {
+    const sql = `
+      SELECT wp.*, 
+             wp.goal as goal_category,
+             (CASE WHEN wp.status = 'archived' THEN 1 ELSE 0 END) as is_archived,
+             (SELECT COUNT(*) FROM workout_plan_versions wpv WHERE wpv.workout_plan_id = wp.id) as version_count,
+             (SELECT wpv.version_number FROM workout_plan_versions wpv WHERE wpv.workout_plan_id = wp.id AND wpv.status = 'published' ORDER BY wpv.version_number DESC LIMIT 1) as active_version_number
+      FROM workout_plans wp
+      WHERE wp.owner_user_id = ? OR wp.visibility = 'admin'
+      ORDER BY wp.id DESC
+    `;
+    return this.db.query(sql, [userId]);
   }
 
   async updatePlan(planId: number, data: Partial<{ name: string; description: string | null; goalCategory: string | null; isArchived: number }>): Promise<void> {
@@ -192,14 +220,13 @@ export class WorkoutPlanRepository {
     await this.db.execute('DELETE FROM workout_plan_days WHERE id = ?', [dayId]);
   }
 
-  async addExerciseToDay(data: {
+  async addExercise(data: {
     workoutPlanDayId: number;
     exerciseId: number;
     orderIndex: number;
     targetSets: number;
     repsMin?: number | null;
     repsMax?: number | null;
-    rirTarget?: number | null;
     restSeconds?: number | null;
     notes?: string | null;
     isOptional?: number;
@@ -211,8 +238,8 @@ export class WorkoutPlanRepository {
     const sql = `
       INSERT INTO workout_plan_exercises (
         workout_plan_day_id, exercise_id, exercise_order, exercise_name_snapshot, tracking_type_snapshot,
-        target_sets, target_reps_min, target_reps_max, rir_target, rest_seconds, notes, is_optional
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        target_sets, target_reps_min, target_reps_max, rest_seconds, notes, is_optional
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const res = await client.execute(sql, [
       data.workoutPlanDayId,
@@ -223,7 +250,6 @@ export class WorkoutPlanRepository {
       data.targetSets,
       data.repsMin ?? null,
       data.repsMax ?? null,
-      data.rirTarget ?? null,
       data.restSeconds ?? null,
       data.notes || null,
       data.isOptional ? 1 : 0,
@@ -236,7 +262,6 @@ export class WorkoutPlanRepository {
     targetSets: number;
     repsMin: number | null;
     repsMax: number | null;
-    rirTarget: number | null;
     restSeconds: number | null;
     notes: string | null;
     isOptional: number;
@@ -248,7 +273,6 @@ export class WorkoutPlanRepository {
     if (data.targetSets !== undefined) { set.push('target_sets = ?'); values.push(data.targetSets); }
     if (data.repsMin !== undefined) { set.push('target_reps_min = ?'); values.push(data.repsMin); }
     if (data.repsMax !== undefined) { set.push('target_reps_max = ?'); values.push(data.repsMax); }
-    if (data.rirTarget !== undefined) { set.push('rir_target = ?'); values.push(data.rirTarget); }
     if (data.restSeconds !== undefined) { set.push('rest_seconds = ?'); values.push(data.restSeconds); }
     if (data.notes !== undefined) { set.push('notes = ?'); values.push(data.notes); }
     if (data.isOptional !== undefined) { set.push('is_optional = ?'); values.push(data.isOptional); }

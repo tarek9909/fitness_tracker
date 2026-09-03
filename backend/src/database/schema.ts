@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS users (
     timezone VARCHAR(100) NOT NULL DEFAULT 'UTC',
     locale VARCHAR(20) NOT NULL DEFAULT 'en',
     status VARCHAR(20) NOT NULL DEFAULT 'active',
+    security_version INTEGER NOT NULL DEFAULT 1,
+    email_verified_at DATETIME NULL,
+    unit_system VARCHAR(10) NOT NULL DEFAULT 'metric',
     last_login_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -50,6 +53,36 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
     used_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS auth_otp_challenges (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id INTEGER NULL,
+    purpose VARCHAR(50) NOT NULL,
+    destination_email VARCHAR(255) NOT NULL,
+    otp_hash VARCHAR(128) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    consumed_at DATETIME NULL,
+    failed_attempts INTEGER NOT NULL DEFAULT 0,
+    max_attempts INTEGER NOT NULL DEFAULT 5,
+    last_sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS user_email_change_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    new_email VARCHAR(255) NOT NULL,
+    current_email_challenge_id VARCHAR(64) NOT NULL,
+    new_email_challenge_id VARCHAR(64) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    expires_at DATETIME NOT NULL,
+    completed_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (current_email_challenge_id) REFERENCES auth_otp_challenges(id) ON DELETE CASCADE,
+    FOREIGN KEY (new_email_challenge_id) REFERENCES auth_otp_challenges(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS user_push_devices (
@@ -149,9 +182,12 @@ CREATE TABLE IF NOT EXISTS workout_plans (
     description TEXT NULL,
     goal VARCHAR(500) NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'active',
+    owner_user_id INTEGER NULL,
+    visibility VARCHAR(20) NOT NULL DEFAULT 'admin',
     created_by INTEGER NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE SET NULL,
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
@@ -200,7 +236,6 @@ CREATE TABLE IF NOT EXISTS workout_plan_exercises (
     target_duration_seconds INTEGER NULL,
     target_distance_meters DECIMAL(10,2) NULL,
     rest_seconds INTEGER NULL,
-    rir_target DECIMAL(3,1) NULL,
     notes TEXT NULL,
     is_optional INTEGER NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -220,7 +255,6 @@ CREATE TABLE IF NOT EXISTS workout_plan_exercise_sets (
     target_duration_seconds INTEGER NULL,
     target_distance_meters DECIMAL(10,2) NULL,
     rest_seconds INTEGER NULL,
-    rir_target DECIMAL(3,1) NULL,
     notes VARCHAR(1000) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -233,9 +267,12 @@ CREATE TABLE IF NOT EXISTS diet_plans (
     name VARCHAR(191) NOT NULL,
     description TEXT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'active',
+    owner_user_id INTEGER NULL,
+    visibility VARCHAR(20) NOT NULL DEFAULT 'admin',
     created_by INTEGER NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE SET NULL,
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
@@ -340,6 +377,7 @@ CREATE TABLE IF NOT EXISTS user_workout_assignments (
     effective_from DATE NOT NULL,
     effective_until DATE NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'active',
+    assignment_source VARCHAR(20) NOT NULL DEFAULT 'admin',
     notes TEXT NULL,
     assigned_by INTEGER NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -356,6 +394,7 @@ CREATE TABLE IF NOT EXISTS user_diet_assignments (
     effective_from DATE NOT NULL,
     effective_until DATE NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'active',
+    assignment_source VARCHAR(20) NOT NULL DEFAULT 'admin',
     notes TEXT NULL,
     assigned_by INTEGER NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -368,6 +407,7 @@ CREATE TABLE IF NOT EXISTS user_diet_assignments (
 CREATE TABLE IF NOT EXISTS user_weight_goals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
+    goal_type VARCHAR(30) NULL DEFAULT 'lose_weight',
     starting_weight_kg DECIMAL(6,2) NOT NULL,
     target_weight_kg DECIMAL(6,2) NOT NULL,
     start_date DATE NOT NULL,
@@ -674,7 +714,6 @@ CREATE TABLE IF NOT EXISTS workout_session_exercises (
     planned_reps_min_snapshot INTEGER NULL,
     planned_reps_max_snapshot INTEGER NULL,
     planned_rest_seconds_snapshot INTEGER NULL,
-    planned_rir_snapshot DECIMAL(3,1) NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     notes TEXT NULL,
     started_at DATETIME NULL,
@@ -696,7 +735,6 @@ CREATE TABLE IF NOT EXISTS workout_sets (
     reps INTEGER NULL,
     duration_seconds INTEGER NULL,
     distance_meters DECIMAL(10,2) NULL,
-    rir DECIMAL(3,1) NULL,
     completed INTEGER NOT NULL DEFAULT 1,
     notes VARCHAR(1000) NULL,
     performed_at DATETIME NULL,

@@ -12,10 +12,12 @@ import 'core/widgets/premium_widgets.dart';
 import 'features/auth/login_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/cardio/cardio_screen.dart';
-import 'features/history/history_screen.dart';
-import 'features/weight/weight_screen.dart';
 import 'features/progress/progress_screen.dart';
 import 'features/notifications/notifications_screen.dart';
+import 'features/workout/workout_plans_screen.dart';
+import 'features/diet/diet_plans_screen.dart';
+import 'features/configuration/fitness_configuration_screen.dart';
+import 'features/auth/security_settings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -99,7 +101,7 @@ class FitnessApp extends StatelessWidget {
       listenable: Listenable.merge([authSession, effectiveThemeController]),
       builder: (context, _) {
         return MaterialApp(
-          title: 'Fitness Platform',
+          title: 'Kinetic Wellness',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
@@ -127,18 +129,18 @@ class FitnessApp extends StatelessWidget {
 
 class MainNavigationShell extends StatefulWidget {
   final ApiClient apiClient;
-  final LocalCache localCache;
   final AuthSession authSession;
   final SyncCoordinator syncCoordinator;
+  final LocalCache localCache;
   final PushRegistrationService? pushRegistrationService;
   final ThemeController? themeController;
 
   const MainNavigationShell({
     super.key,
     required this.apiClient,
-    required this.localCache,
     required this.authSession,
     required this.syncCoordinator,
+    required this.localCache,
     this.pushRegistrationService,
     this.themeController,
   });
@@ -160,8 +162,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           authSession: widget.authSession,
           localCache: widget.localCache),
       CardioScreen(apiClient: widget.apiClient),
-      HistoryScreen(apiClient: widget.apiClient, localCache: widget.localCache),
-      WeightScreen(apiClient: widget.apiClient),
+      ProgressScreen(apiClient: widget.apiClient),
+      NotificationsScreen(apiClient: widget.apiClient),
       _buildProfileScreen(colors),
     ];
 
@@ -170,37 +172,40 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              width: 32,
+              height: 32,
               decoration: BoxDecoration(
-                color: colors.primaryMuted,
-                borderRadius: BorderRadius.circular(AppRadii.sm),
+                shape: BoxShape.circle,
+                color: colors.surfaceElevated,
+                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
               ),
-              child: Icon(Icons.bolt, color: colors.primary, size: 18),
+              child: ClipOval(
+                child: Icon(Icons.person, size: 20, color: colors.textSecondary),
+              ),
             ),
             const SizedBox(width: 10),
-            Text(
-              'FITNESS OS',
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 18,
-                letterSpacing: 0.8,
-                color: colors.textPrimary,
+            Expanded(
+              child: Text(
+                'Kinetic Wellness',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                  letterSpacing: -0.3,
+                  color: colors.textPrimary,
+                ),
               ),
             ),
           ],
         ),
         actions: [
           PremiumIconButton(
-            icon: Icons.notifications_outlined,
-            tooltip: 'Notification Center',
+            icon: Icons.sync,
+            color: colors.primary,
+            tooltip: 'Sync Agenda',
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      NotificationsScreen(apiClient: widget.apiClient),
-                ),
-              );
+              widget.syncCoordinator.flushQueue();
             },
           ),
           const SizedBox(width: 8),
@@ -217,24 +222,24 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         onTap: (idx) => setState(() => _currentIndex = idx),
         items: const [
           PremiumNavigationBarItem(
-            icon: Icons.today_outlined,
-            activeIcon: Icons.today,
-            label: 'Today',
+            icon: Icons.home_outlined,
+            activeIcon: Icons.home,
+            label: 'Home',
           ),
           PremiumNavigationBarItem(
-            icon: Icons.directions_run_outlined,
-            activeIcon: Icons.directions_run,
-            label: 'Cardio',
+            icon: Icons.event_note_outlined,
+            activeIcon: Icons.event_note,
+            label: 'Plan',
           ),
           PremiumNavigationBarItem(
-            icon: Icons.history_outlined,
-            activeIcon: Icons.history,
-            label: 'History',
+            icon: Icons.insights_outlined,
+            activeIcon: Icons.insights,
+            label: 'Progress',
           ),
           PremiumNavigationBarItem(
-            icon: Icons.monitor_weight_outlined,
-            activeIcon: Icons.monitor_weight,
-            label: 'Weight',
+            icon: Icons.notifications_outlined,
+            activeIcon: Icons.notifications,
+            label: 'Alerts',
           ),
           PremiumNavigationBarItem(
             icon: Icons.person_outline,
@@ -319,13 +324,18 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Offline Mutation Queue',
-                        style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: colors.textPrimary),
+                      Expanded(
+                        child: Text(
+                          'Offline Mutation Queue',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: colors.textPrimary),
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       PremiumButton(
                         text: 'Sync Now',
                         onPressed: () => widget.syncCoordinator.flushQueue(),
@@ -514,11 +524,110 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           const SizedBox(height: 16),
         ],
 
-        // Feature Navigation Tiles
+        // Self-Service Training & Nutrition Plans
         PremiumCard(
           padding: EdgeInsets.zero,
           child: Column(
             children: [
+              PremiumListTile(
+                leading: Icon(Icons.fitness_center, color: colors.primary),
+                title: Text('My Workout Plans',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: colors.textPrimary)),
+                subtitle: Text('Create and manage private training splits',
+                    style: TextStyle(fontSize: 12, color: colors.textSecondary)),
+                trailing: Icon(Icons.chevron_right,
+                    size: 20, color: colors.textMuted),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          WorkoutPlansScreen(apiClient: widget.apiClient),
+                    ),
+                  );
+                },
+              ),
+              Divider(height: 1, color: colors.border),
+              PremiumListTile(
+                leading: Icon(Icons.restaurant_menu, color: colors.amber),
+                title: Text('My Diet Plans',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: colors.textPrimary)),
+                subtitle: Text('Create and manage private meal plans',
+                    style: TextStyle(fontSize: 12, color: colors.textSecondary)),
+                trailing: Icon(Icons.chevron_right,
+                    size: 20, color: colors.textMuted),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          DietPlansScreen(apiClient: widget.apiClient),
+                    ),
+                  );
+                },
+              ),
+              Divider(height: 1, color: colors.border),
+              PremiumListTile(
+                leading: Icon(Icons.tune, color: colors.cyan),
+                title: Text('Goals & Configuration',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: colors.textPrimary)),
+                subtitle: Text('Profile, water, cardio targets, and reminders',
+                    style: TextStyle(fontSize: 12, color: colors.textSecondary)),
+                trailing: Icon(Icons.chevron_right,
+                    size: 20, color: colors.textMuted),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          FitnessConfigurationScreen(apiClient: widget.apiClient),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Feature & Security Navigation Tiles
+        PremiumCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              PremiumListTile(
+                leading: Icon(Icons.security, color: colors.primary),
+                title: Text('Account Security & OTP',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: colors.textPrimary)),
+                subtitle: Text('Update password or email with OTP verification',
+                    style: TextStyle(fontSize: 12, color: colors.textSecondary)),
+                trailing: Icon(Icons.chevron_right,
+                    size: 20, color: colors.textMuted),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SecuritySettingsScreen(
+                        apiClient: widget.apiClient,
+                        authSession: widget.authSession,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              Divider(height: 1, color: colors.border),
               PremiumListTile(
                 leading: Icon(Icons.show_chart, color: colors.cyan),
                 title: Text('Progress & Body Analytics',
@@ -643,12 +752,16 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               color: isSelected ? colors.primary : colors.textSecondary,
             ),
             const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? colors.primary : colors.textSecondary,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? colors.primary : colors.textSecondary,
+                ),
               ),
             ),
           ],

@@ -108,6 +108,178 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _showForgotPasswordDialog() async {
+    final resetEmailCtrl =
+        TextEditingController(text: _emailController.text.trim());
+    final otpCtrl = TextEditingController();
+    final newPwdCtrl = TextEditingController();
+    String? challengeId;
+    String? error;
+    bool sendingOtp = false;
+    bool verifying = false;
+
+    await showPremiumDialog(
+      context: context,
+      builder: (ctx) {
+        final colors = AppThemeColors.of(ctx);
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: colors.card,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadii.xl),
+                side: BorderSide(color: colors.border),
+              ),
+              title: Text(
+                'Password Recovery',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                  color: colors.textPrimary,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (error != null) ...[
+                      Text(error!,
+                          style: TextStyle(color: colors.rose, fontSize: 13)),
+                      const SizedBox(height: 8),
+                    ],
+                    if (challengeId == null) ...[
+                      Text(
+                        'Enter your account email address. We will send a 6-digit recovery code.',
+                        style: TextStyle(
+                            fontSize: 13, color: colors.textSecondary),
+                      ),
+                      const SizedBox(height: 14),
+                      PremiumTextField(
+                        label: 'Email Address',
+                        controller: resetEmailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                    ] else ...[
+                      Text(
+                        'Enter the 6-digit code sent to ${resetEmailCtrl.text} and your new password.',
+                        style: TextStyle(
+                            fontSize: 13, color: colors.textSecondary),
+                      ),
+                      const SizedBox(height: 14),
+                      PremiumTextField(
+                        label: '6-Digit Recovery Code',
+                        hint: '123456',
+                        controller: otpCtrl,
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 12),
+                      PremiumTextField(
+                        label: 'New Password',
+                        controller: newPwdCtrl,
+                        obscureText: true,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                PremiumButton(
+                  text: 'Cancel',
+                  isSecondary: true,
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+                if (challengeId == null)
+                  PremiumButton(
+                    text: 'Send Code',
+                    loading: sendingOtp,
+                    onPressed: () async {
+                      final email = resetEmailCtrl.text.trim();
+                      if (email.isEmpty || !email.contains('@')) {
+                        setDialogState(
+                            () => error = 'Please enter a valid email');
+                        return;
+                      }
+                      setDialogState(() {
+                        sendingOtp = true;
+                        error = null;
+                      });
+                      try {
+                        final res = await widget.apiClient.post(
+                          '/auth/password-reset/request',
+                          body: {'email': email},
+                        );
+                        final chId =
+                            res is Map<String, dynamic> && res['data'] != null
+                                ? res['data']['challengeId'] as String?
+                                : null;
+                        setDialogState(() {
+                          challengeId = chId ?? 'challenge-active';
+                          sendingOtp = false;
+                        });
+                      } catch (e) {
+                        setDialogState(() {
+                          error = e.toString().replaceAll('Exception: ', '');
+                          sendingOtp = false;
+                        });
+                      }
+                    },
+                  )
+                else
+                  PremiumButton(
+                    text: 'Reset Password',
+                    loading: verifying,
+                    onPressed: () async {
+                      final otp = otpCtrl.text.trim();
+                      final newPwd = newPwdCtrl.text;
+                      if (otp.length != 6) {
+                        setDialogState(
+                            () => error = 'Enter complete 6-digit code');
+                        return;
+                      }
+                      if (newPwd.length < 8) {
+                        setDialogState(() =>
+                            error = 'Password must be at least 8 characters');
+                        return;
+                      }
+                      setDialogState(() {
+                        verifying = true;
+                        error = null;
+                      });
+                      try {
+                        await widget.apiClient.post(
+                          '/auth/password-reset/verify',
+                          body: {
+                            'challengeId': challengeId,
+                            'otp': otp,
+                            'newPassword': newPwd,
+                          },
+                        );
+                        Navigator.pop(ctx);
+                        setState(() {
+                          _emailController.text = resetEmailCtrl.text.trim();
+                        });
+                        if (mounted) {
+                          showPremiumSnackBar(
+                            context,
+                            'Password reset successful! You can now log in.',
+                          );
+                        }
+                      } catch (e) {
+                        setDialogState(() {
+                          error = e.toString().replaceAll('Exception: ', '');
+                          verifying = false;
+                        });
+                      }
+                    },
+                  ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = AppThemeColors.of(context);
@@ -143,22 +315,29 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 12),
                   ],
 
-                  // Architectural Brand Monogram (Clean, matte, non-radiant)
+                  // Atmospheric Brand Icon
                   Center(
                     child: Container(
                       width: 64,
                       height: 64,
                       decoration: BoxDecoration(
                         color: colors.surfaceElevated,
-                        borderRadius: BorderRadius.circular(AppRadii.xl),
+                        shape: BoxShape.circle,
                         border: Border.all(
-                          color: colors.primary.withValues(alpha: 0.4),
-                          width: 1.5,
+                          color: Colors.white.withValues(alpha: 0.08),
+                          width: 1,
                         ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x0DD4FF00),
+                            blurRadius: 20,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
                       ),
                       child: Center(
                         child: Icon(
-                          Icons.bolt,
+                          Icons.fitness_center,
                           size: 32,
                           color: colors.primary,
                         ),
@@ -167,30 +346,29 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    'FITNESS TRACKER',
+                    'Kinetic Wellness',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 22,
+                      fontSize: 26,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 0.6,
+                      letterSpacing: -0.5,
                       color: colors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Precision athletic training, nutrition & daily command center',
+                    'Sign in to your account',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 14,
                       color: colors.textSecondary,
-                      height: 1.4,
                     ),
                   ),
                   const SizedBox(height: 32),
 
                   // Structured Login Form Card
                   PremiumCard(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(28),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -225,16 +403,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
 
                         PremiumTextField(
-                          label: 'Email Address',
+                          label: 'Email',
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.next,
-                          prefixIcon: Icons.email_outlined,
+                          prefixIcon: Icons.mail_outline,
                           onSubmitted: (_) {
                             FocusScope.of(context).requestFocus(_passwordFocusNode);
                           },
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 18),
                         PremiumTextField(
                           label: 'Password',
                           controller: _passwordController,
@@ -246,12 +424,63 @@ class _LoginScreenState extends State<LoginScreen> {
                             if (!_isLoading) _handleLogin();
                           },
                         ),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Remember me',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: colors.textSecondary,
+                              ),
+                            ),
+                            InkWell(
+                              onTap: _showForgotPasswordDialog,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                child: Text(
+                                  'Forgot password?',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: colors.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 24),
                         PremiumButton(
-                          text: 'Sign In',
+                          text: 'Log In',
+                          icon: const Icon(Icons.arrow_forward, size: 18),
                           loading: _isLoading,
                           onPressed: _handleLogin,
-                          height: 48,
+                          height: 50,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          "Don't have an account? ",
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: colors.textSecondary,
+                          ),
+                        ),
+                        Text(
+                          'Sign up',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: colors.primary,
+                          ),
                         ),
                       ],
                     ),

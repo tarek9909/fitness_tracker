@@ -10,6 +10,10 @@ export class WorkoutPlanService {
     return this.repo.findAllPlans();
   }
 
+  async getPlansForUser(userId: number) {
+    return this.repo.findPlansForUser(userId);
+  }
+
   async getPlanById(planId: number) {
     const plan = await this.repo.findPlanById(planId);
     if (!plan) throw new NotFoundError('Workout plan not found');
@@ -17,7 +21,14 @@ export class WorkoutPlanService {
     return { ...plan, versions };
   }
 
-  async createPlan(data: { name: string; description?: string; goalCategory?: string; createdBy?: number }) {
+  async createPlan(data: {
+    name: string;
+    description?: string;
+    goalCategory?: string;
+    createdBy?: number;
+    ownerUserId?: number;
+    visibility?: string;
+  }) {
     const planId = await this.db.withTransaction(async (conn) => {
       const planId = await this.repo.createPlan(data, conn);
       // Automatically create version 1 draft
@@ -44,6 +55,66 @@ export class WorkoutPlanService {
       return planId;
     });
     return this.getPlanById(planId);
+  }
+
+  async clonePlan(sourcePlanId: number, targetUserId: number, customName?: string) {
+    const sourcePlan = await this.repo.findPlanById(sourcePlanId);
+    if (!sourcePlan) throw new NotFoundError('Source workout plan not found');
+
+    const versions = await this.repo.findVersionsByPlanId(sourcePlanId);
+    const sourceVersion = versions.find((v: any) => v.status === 'published') || versions[0];
+    if (!sourceVersion) {
+      throw new NotFoundError('Source workout plan has no versions');
+    }
+    const sourceDetails = await this.getVersionDetails(sourceVersion.id);
+
+    const newPlanName = customName || `${sourcePlan.name} (My Plan)`;
+
+    return this.db.withTransaction(async (conn) => {
+      const planId = await this.repo.createPlan({
+        name: newPlanName,
+        description: sourcePlan.description,
+        goalCategory: sourcePlan.goal,
+        createdBy: targetUserId,
+        ownerUserId: targetUserId,
+        visibility: 'private',
+      }, conn);
+
+      const versionId = await this.repo.createVersion({
+        workoutPlanId: planId,
+        versionNumber: 1,
+        title: 'Version 1 Draft',
+        status: 'draft',
+        createdBy: targetUserId,
+      }, conn);
+
+      for (const day of sourceDetails.days || []) {
+        const dayId = await this.repo.createDay({
+          workoutPlanVersionId: versionId,
+          weekdayNumber: day.weekday,
+          name: day.name,
+          isRestDay: day.is_rest_day,
+          notes: day.notes,
+          orderIndex: day.order_index,
+        }, conn);
+
+        for (const ex of day.exercises || []) {
+          await this.repo.addExercise({
+            workoutPlanDayId: dayId,
+            exerciseId: ex.exercise_id,
+            orderIndex: ex.order_index,
+            targetSets: ex.target_sets,
+            repsMin: ex.reps_min,
+            repsMax: ex.reps_max,
+            restSeconds: ex.rest_seconds,
+            notes: ex.notes,
+            isOptional: ex.is_optional,
+          }, conn);
+        }
+      }
+
+      return this.getPlanById(planId);
+    });
   }
 
   async updatePlan(planId: number, data: Partial<{ name: string; description: string; goalCategory: string; isArchived: boolean }>) {
@@ -99,14 +170,13 @@ export class WorkoutPlanService {
           }, conn);
 
           for (const ex of day.exercises || []) {
-            await this.repo.addExerciseToDay({
+            await this.repo.addExercise({
               workoutPlanDayId: newDayId,
               exerciseId: ex.exercise_id,
               orderIndex: ex.order_index,
               targetSets: ex.target_sets,
               repsMin: ex.reps_min,
               repsMax: ex.reps_max,
-              rirTarget: ex.rir_target,
               restSeconds: ex.rest_seconds,
               notes: ex.notes,
               isOptional: ex.is_optional,
@@ -256,26 +326,20 @@ export class WorkoutPlanService {
     });
   }
 
-  async addExerciseToDay(dayId: number, data: {
+  async addExercise(dayId: number, data: {
     exerciseId: number;
-    targetSets: number;
     orderIndex?: number;
+    targetSets: number;
     repsMin?: number;
     repsMax?: number;
-    rirTarget?: number;
     restSeconds?: number;
     notes?: string;
     isOptional?: boolean;
   }) {
-    if (data.repsMin !== undefined && data.repsMax !== undefined && data.repsMax < data.repsMin) {
-      throw new ValidationError('repsMax cannot be less than repsMin');
-    }
-
     return this.db.withTransaction(async (conn) => {
       const day = await conn.queryOne<any>(
-        `SELECT wpd.workout_plan_version_id, wpv.status 
-         FROM workout_plan_days wpd 
-         JOIN workout_plan_versions wpv ON wpv.id = wpd.workout_plan_version_id 
+        `SELECT wpd.*, wpv.status FROM workout_plan_days wpd
+         JOIN workout_plan_versions wpv ON wpv.id = wpd.workout_plan_version_id
          WHERE wpd.id = ?`,
         [dayId]
       );
@@ -294,8 +358,8 @@ export class WorkoutPlanService {
       const res = await conn.execute(
         `INSERT INTO workout_plan_exercises (
           workout_plan_day_id, exercise_id, exercise_order, exercise_name_snapshot, tracking_type_snapshot,
-          target_sets, target_reps_min, target_reps_max, rir_target, rest_seconds, notes, is_optional
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          target_sets, target_reps_min, target_reps_max, rest_seconds, notes, is_optional
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           dayId,
           data.exerciseId,
@@ -305,7 +369,6 @@ export class WorkoutPlanService {
           data.targetSets,
           data.repsMin ?? null,
           data.repsMax ?? null,
-          data.rirTarget ?? null,
           data.restSeconds ?? null,
           data.notes || null,
           data.isOptional ? 1 : 0,
@@ -313,6 +376,10 @@ export class WorkoutPlanService {
       );
       return { id: res.insertId };
     });
+  }
+
+  async addExerciseToDay(dayId: number, data: any) {
+    return this.addExercise(dayId, data);
   }
 
   async updateExercise(exerciseId: number, data: any) {
@@ -359,7 +426,6 @@ export class WorkoutPlanService {
       if (updatePayload.targetSets !== undefined) { set.push('target_sets = ?'); values.push(updatePayload.targetSets); }
       if (updatePayload.repsMin !== undefined) { set.push('target_reps_min = ?'); values.push(updatePayload.repsMin); }
       if (updatePayload.repsMax !== undefined) { set.push('target_reps_max = ?'); values.push(updatePayload.repsMax); }
-      if (updatePayload.rirTarget !== undefined) { set.push('rir_target = ?'); values.push(updatePayload.rirTarget); }
       if (updatePayload.restSeconds !== undefined) { set.push('rest_seconds = ?'); values.push(updatePayload.restSeconds); }
       if (updatePayload.notes !== undefined) { set.push('notes = ?'); values.push(updatePayload.notes); }
       if (updatePayload.isOptional !== undefined) { set.push('is_optional = ?'); values.push(updatePayload.isOptional ? 1 : 0); }
@@ -386,6 +452,53 @@ export class WorkoutPlanService {
       }
 
       await conn.execute('DELETE FROM workout_plan_exercises WHERE id = ?', [exerciseId]);
+    });
+  }
+
+  async activatePlanForUser(userId: number, planId: number) {
+    const plan = await this.repo.findPlanById(planId);
+    if (!plan) throw new NotFoundError('Workout plan not found');
+
+    const publishedVersion = await this.db.queryOne<any>(
+      `SELECT * FROM workout_plan_versions 
+       WHERE workout_plan_id = ? AND status = 'published' 
+       ORDER BY version_number DESC LIMIT 1`,
+      [planId]
+    );
+    if (!publishedVersion) {
+      throw new ValidationError('Workout plan must have a published version before it can be activated');
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    return this.db.withTransaction(async (conn) => {
+      await conn.execute(
+        `UPDATE user_workout_assignments 
+         SET status = 'completed', effective_until = ?, updated_at = CURRENT_TIMESTAMP 
+         WHERE user_id = ? AND status = 'active'`,
+        [todayStr, userId]
+      );
+
+      const res = await conn.execute(
+        `INSERT INTO user_workout_assignments (
+           user_id, workout_plan_version_id, assignment_source, effective_from, status
+         ) VALUES (?, ?, 'self_service', ?, 'active')`,
+        [userId, publishedVersion.id, todayStr]
+      );
+
+      await conn.execute(
+        `UPDATE daily_tasks 
+         SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP 
+         WHERE user_id = ? AND task_type = 'workout' AND status = 'pending' AND task_date >= ?`,
+        [userId, todayStr]
+      );
+
+      return {
+        assignmentId: res.insertId,
+        workoutPlanId: planId,
+        versionId: publishedVersion.id,
+        effectiveFrom: todayStr,
+      };
     });
   }
 }

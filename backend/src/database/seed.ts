@@ -148,19 +148,19 @@ export async function seedDatabase(customDb?: DatabasePool, targetClient: 'sqlit
     (7, 1, 7, 'Weekend Rest Day', 1, 7)`);
 
   // Workout Plan Exercises for Day 1 (Upper Body A)
-  await safeExecute(`INSERT OR IGNORE INTO workout_plan_exercises (id, workout_plan_day_id, exercise_id, exercise_order, exercise_name_snapshot, tracking_type_snapshot, target_sets, target_reps_min, target_reps_max, rir_target, rest_seconds, notes) VALUES
-    (1, 1, 1, 1, 'Flat Barbell Bench Press', 'weight_reps', 4, 6, 8, 2, 120, 'Pyramid warm-ups, then 4 heavy working sets.'),
-    (2, 1, 6, 2, 'Lat Pulldown (Wide Grip)', 'weight_reps', 4, 8, 12, 2, 90, 'Full stretch at the top, squeeze lats.'),
-    (3, 1, 8, 3, 'Standing Overhead Barbell Press', 'weight_reps', 3, 8, 10, 1, 90, 'Maintain vertical torso, brace glutes.'),
-    (4, 1, 7, 4, 'Seated Cable Row', 'weight_reps', 3, 8, 12, 2, 90, 'Pull towards belly button.'),
-    (5, 1, 11, 5, 'Triceps Rope Pushdown', 'weight_reps', 3, 12, 15, 1, 60, 'Keep elbows tight.')`);
+  await safeExecute(`INSERT OR IGNORE INTO workout_plan_exercises (id, workout_plan_day_id, exercise_id, exercise_order, exercise_name_snapshot, tracking_type_snapshot, target_sets, target_reps_min, target_reps_max, rest_seconds, notes) VALUES
+    (1, 1, 1, 1, 'Flat Barbell Bench Press', 'weight_reps', 4, 6, 8, 120, 'Pyramid warm-ups, then 4 heavy working sets.'),
+    (2, 1, 6, 2, 'Lat Pulldown (Wide Grip)', 'weight_reps', 4, 8, 12, 90, 'Full stretch at the top, squeeze lats.'),
+    (3, 1, 8, 3, 'Standing Overhead Barbell Press', 'weight_reps', 3, 8, 10, 90, 'Maintain vertical torso, brace glutes.'),
+    (4, 1, 7, 4, 'Seated Cable Row', 'weight_reps', 3, 8, 12, 90, 'Pull towards belly button.'),
+    (5, 1, 11, 5, 'Triceps Rope Pushdown', 'weight_reps', 3, 12, 15, 60, 'Keep elbows tight.')`);
 
   // Workout Plan Exercises for Day 2 (Lower Body A)
-  await safeExecute(`INSERT OR IGNORE INTO workout_plan_exercises (id, workout_plan_day_id, exercise_id, exercise_order, exercise_name_snapshot, tracking_type_snapshot, target_sets, target_reps_min, target_reps_max, rir_target, rest_seconds, notes) VALUES
-    (6, 2, 3, 1, 'Barbell Back Squat', 'weight_reps', 4, 6, 8, 2, 150, 'Warm up thoroughly. Descend to depth with upright chest.'),
-    (7, 2, 5, 2, 'Romanian Deadlift (Barbell)', 'weight_reps', 4, 8, 10, 2, 120, 'Feel the hamstring stretch. Keep back straight.'),
-    (8, 2, 4, 3, 'Leg Press 45°', 'weight_reps', 3, 10, 12, 1, 90, 'Full range of motion, avoid locking knees.'),
-    (9, 2, 12, 4, 'Plank', 'duration', 3, NULL, NULL, 0, 60, 'Target: 60 seconds hold per set.')`);
+  await safeExecute(`INSERT OR IGNORE INTO workout_plan_exercises (id, workout_plan_day_id, exercise_id, exercise_order, exercise_name_snapshot, tracking_type_snapshot, target_sets, target_reps_min, target_reps_max, rest_seconds, notes) VALUES
+    (6, 2, 3, 1, 'Barbell Back Squat', 'weight_reps', 4, 6, 8, 150, 'Warm up thoroughly. Descend to depth with upright chest.'),
+    (7, 2, 5, 2, 'Romanian Deadlift (Barbell)', 'weight_reps', 4, 8, 10, 120, 'Feel the hamstring stretch. Keep back straight.'),
+    (8, 2, 4, 3, 'Leg Press 45°', 'weight_reps', 3, 10, 12, 90, 'Full range of motion, avoid locking knees.'),
+    (9, 2, 12, 4, 'Plank', 'duration', 3, NULL, NULL, 60, 'Target: 60 seconds hold per set.')`);
 
   // 10. Diet Plan & Version 1
   await safeExecute(`INSERT OR IGNORE INTO diet_plans (id, name, description, status, created_by) VALUES

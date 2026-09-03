@@ -46,7 +46,6 @@ export const SCHEMA_DIVERGENCE_MAPPINGS: Record<string, TableColumnMapping> = {
       set_type: 'set_type',
       weight_kg: 'weight_kg',
       reps_completed: 'reps_completed',
-      rir: 'rir',
       rpe: 'rpe',
       is_warmup: 'is_warmup',
     },
@@ -234,7 +233,6 @@ export const SCHEMA_DIVERGENCE_MAPPINGS: Record<string, TableColumnMapping> = {
       planned_reps_min_snapshot: 'reps_min_target',
       planned_reps_max_snapshot: 'reps_max_target',
       planned_rest_seconds_snapshot: 'rest_seconds_target',
-      planned_rir_snapshot: 'rir_target',
       exercise_name_snapshot: 'exercise_name',
     },
     activeToCanonical: {
@@ -243,7 +241,6 @@ export const SCHEMA_DIVERGENCE_MAPPINGS: Record<string, TableColumnMapping> = {
       reps_min_target: 'planned_reps_min_snapshot',
       reps_max_target: 'planned_reps_max_snapshot',
       rest_seconds_target: 'planned_rest_seconds_snapshot',
-      rir_target: 'planned_rir_snapshot',
     },
     snapshotColumns: ['exercise_name_snapshot', 'planned_sets_snapshot'],
   },

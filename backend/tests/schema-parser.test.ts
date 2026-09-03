@@ -7,7 +7,7 @@ describe('Runtime SQL Schema Parser & MySQL Audit Suite', () => {
     const canonicalPath = path.resolve(process.cwd(), '../fitness_tracker.db');
     const audit = auditSchemaDiscrepancies(canonicalPath);
 
-    expect(audit.canonicalTableCount).toBe(50);
+    expect(audit.canonicalTableCount).toBe(52);
     expect(audit.canonicalTables).toContain('users');
     expect(audit.canonicalTables).toContain('roles');
     expect(audit.canonicalTables).toContain('workout_sessions');
@@ -18,7 +18,7 @@ describe('Runtime SQL Schema Parser & MySQL Audit Suite', () => {
   it('parseSqlTables accurately parses active SQLite schema.ts', () => {
     const audit = auditSchemaDiscrepancies();
 
-    expect(audit.activeTableCount).toBe(51);
+    expect(audit.activeTableCount).toBe(53);
     expect(audit.activeTables).toContain('worker_locks');
     expect(audit.tablesOnlyInActive).toContain('worker_locks');
   });
@@ -36,8 +36,8 @@ describe('Runtime SQL Schema Parser & MySQL Audit Suite', () => {
     expect(audit.isHarmonized).toBe(true);
     expect(audit.columnDiscrepancies.length).toBe(0);
     expect(audit.tablesOnlyInCanonical.length).toBe(0);
-    expect(audit.canonicalTableCount).toBe(50);
-    expect(audit.activeTableCount).toBe(51);
+    expect(audit.canonicalTableCount).toBe(52);
+    expect(audit.activeTableCount).toBe(53);
   });
 
   it('runMySQLIntegrationTests successfully passes SCHEMA_AUDIT stage and fails closed at CONNECTION stage without live credentials', async () => {

@@ -22,7 +22,10 @@ const updateUserSchema = z.object({
   firstName: z.string().min(1).optional(),
   lastName: z.string().optional(),
   phone: z.string().optional(),
-  heightCm: z.number().min(50).max(300).optional(),
+  dateOfBirth: z.string().nullable().optional(),
+  heightCm: z.number().min(50).max(300).nullable().optional(),
+  gender: z.enum(['male', 'female', 'other', 'prefer_not_to_say']).nullable().optional(),
+  unitSystem: z.enum(['metric', 'imperial']).optional(),
   timezone: z.string().optional(),
   locale: z.string().optional(),
   status: z.enum(['active', 'disabled', 'pending']).optional(),
@@ -193,6 +196,16 @@ export class UsersController {
     return reply.status(200).send({
       success: true,
       data: updated,
+    });
+  }
+
+  // Current User: GET /me/fitness-configuration
+  async getFitnessConfiguration(request: FastifyRequest, reply: FastifyReply) {
+    const auth = (request as AuthenticatedRequest).user;
+    const config = await this.service.getFitnessConfiguration(auth.userId);
+    return reply.status(200).send({
+      success: true,
+      data: config,
     });
   }
 }

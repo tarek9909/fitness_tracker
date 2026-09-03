@@ -166,4 +166,100 @@ export class AuthController {
     await this.service.resetPassword(body.token, body.password);
     return reply.status(200).send({ success: true, data: { message: 'Password has been reset.' } });
   }
+
+  // --- Self-Service OTP Security Endpoints ---
+
+  async passwordResetRequest(request: FastifyRequest, reply: FastifyReply) {
+    const body = z.object({ email: z.string().email() }).parse(request.body);
+    const result = await this.service.requestPasswordResetOtp(body.email);
+    return reply.status(200).send({
+      success: true,
+      data: {
+        challengeId: result.challengeId,
+        message: 'If the account exists, a 6-digit verification code has been sent.',
+      },
+    });
+  }
+
+  async passwordResetVerify(request: FastifyRequest, reply: FastifyReply) {
+    const body = z.object({
+      challengeId: z.string().min(1),
+      otp: z.string().min(4).max(10),
+      newPassword: z.string().min(8).max(128),
+    }).parse(request.body);
+    await this.service.verifyPasswordResetOtp(body.challengeId, body.otp, body.newPassword);
+    return reply.status(200).send({
+      success: true,
+      data: { message: 'Password has been successfully reset. Please log in with your new password.' },
+    });
+  }
+
+  async passwordChangeRequest(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user.userId;
+    const result = await this.service.requestPasswordChangeOtp(userId);
+    return reply.status(200).send({
+      success: true,
+      data: {
+        challengeId: result.challengeId,
+        message: 'Verification code sent to your email address.',
+      },
+    });
+  }
+
+  async passwordChangeVerify(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user.userId;
+    const body = z.object({
+      challengeId: z.string().min(1),
+      otp: z.string().min(4).max(10),
+      currentPassword: z.string().min(1),
+      newPassword: z.string().min(8).max(128),
+    }).parse(request.body);
+    await this.service.verifyPasswordChangeOtp(
+      userId,
+      body.challengeId,
+      body.otp,
+      body.currentPassword,
+      body.newPassword
+    );
+    return reply.status(200).send({
+      success: true,
+      data: { message: 'Password has been successfully changed.' },
+    });
+  }
+
+  async emailChangeRequest(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user.userId;
+    const body = z.object({ newEmail: z.string().email() }).parse(request.body);
+    const result = await this.service.requestEmailChange(userId, body.newEmail);
+    return reply.status(200).send({
+      success: true,
+      data: {
+        currentEmailChallengeId: result.currentEmailChallengeId,
+        newEmailChallengeId: result.newEmailChallengeId,
+        message: 'Verification codes sent to your current and new email addresses.',
+      },
+    });
+  }
+
+  async emailChangeVerify(request: FastifyRequest, reply: FastifyReply) {
+    const userId = (request as any).user.userId;
+    const body = z.object({
+      currentEmailOtp: z.string().min(4).max(10),
+      newEmailOtp: z.string().min(4).max(10),
+      password: z.string().min(1),
+    }).parse(request.body);
+    const result = await this.service.verifyEmailChange(
+      userId,
+      body.currentEmailOtp,
+      body.newEmailOtp,
+      body.password
+    );
+    return reply.status(200).send({
+      success: true,
+      data: {
+        email: result.email,
+        message: 'Email address updated successfully.',
+      },
+    });
+  }
 }

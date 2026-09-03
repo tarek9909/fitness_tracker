@@ -1,14 +1,21 @@
 import { FastifyInstance } from 'fastify';
 import { UsersController } from './users.controller.js';
+import { AuthController } from '../auth/auth.controller.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { requireAdmin } from '../../middleware/authorize.js';
 
 export async function usersRoutes(fastify: FastifyInstance) {
   const controller = new UsersController();
+  const authController = new AuthController();
 
   // /me Endpoints (Self-service authenticated)
   fastify.get('/me', { preHandler: [authenticate] }, (req, res) => controller.getMe(req, res));
   fastify.patch('/me', { preHandler: [authenticate] }, (req, res) => controller.updateMe(req, res));
+  fastify.get('/me/fitness-configuration', { preHandler: [authenticate] }, (req, res) => controller.getFitnessConfiguration(req, res));
+  fastify.post('/me/security/password-change/request', { preHandler: [authenticate] }, (req, res) => authController.passwordChangeRequest(req, res));
+  fastify.post('/me/security/password-change/verify', { preHandler: [authenticate] }, (req, res) => authController.passwordChangeVerify(req, res));
+  fastify.post('/me/security/email-change/request', { preHandler: [authenticate] }, (req, res) => authController.emailChangeRequest(req, res));
+  fastify.post('/me/security/email-change/verify', { preHandler: [authenticate] }, (req, res) => authController.emailChangeVerify(req, res));
   fastify.get('/me/settings', { preHandler: [authenticate] }, (req, res) => controller.getMySettings(req, res));
   fastify.patch('/me/settings', { preHandler: [authenticate] }, (req, res) => controller.updateMySettings(req, res));
   fastify.get('/me/notification-settings', { preHandler: [authenticate] }, (req, res) => controller.getNotificationSettings(req, res));

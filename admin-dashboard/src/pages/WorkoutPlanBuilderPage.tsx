@@ -69,7 +69,6 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
     targetSets: '' as number | '',
     repsMin: '' as number | '',
     repsMax: '' as number | '',
-    rirTarget: '' as number | '',
     restSeconds: '' as number | '',
     notes: '',
     isOptional: false,
@@ -157,7 +156,6 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
       targetSets: '',
       repsMin: '',
       repsMax: '',
-      rirTarget: '',
       restSeconds: '',
       notes: '',
       isOptional: false,
@@ -172,7 +170,6 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
       targetSets: ex.target_sets ?? '',
       repsMin: ex.reps_min ?? '',
       repsMax: ex.reps_max ?? '',
-      rirTarget: ex.rir_target ?? '',
       restSeconds: ex.rest_seconds ?? '',
       notes: ex.notes || '',
       isOptional: Boolean(ex.is_optional),
@@ -204,11 +201,6 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
       return;
     }
 
-    if (exForm.rirTarget !== '' && (Number(exForm.rirTarget) < 0 || Number(exForm.rirTarget) > 10)) {
-      alert('Target RIR must be between 0 and 10');
-      return;
-    }
-
     if (exForm.restSeconds !== '' && Number(exForm.restSeconds) < 0) {
       alert('Rest seconds cannot be negative');
       return;
@@ -221,7 +213,6 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
           targetSets: Number(exForm.targetSets),
           repsMin: Number(exForm.repsMin),
           repsMax: exForm.repsMax !== '' ? Number(exForm.repsMax) : undefined,
-          rirTarget: exForm.rirTarget !== '' ? Number(exForm.rirTarget) : undefined,
           restSeconds: exForm.restSeconds !== '' ? Number(exForm.restSeconds) : undefined,
           notes: exForm.notes ? exForm.notes.trim() : undefined,
           isOptional: Boolean(exForm.isOptional),
@@ -233,7 +224,6 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
           targetSets: Number(exForm.targetSets),
           repsMin: Number(exForm.repsMin),
           repsMax: exForm.repsMax !== '' ? Number(exForm.repsMax) : undefined,
-          rirTarget: exForm.rirTarget !== '' ? Number(exForm.rirTarget) : undefined,
           restSeconds: exForm.restSeconds !== '' ? Number(exForm.restSeconds) : undefined,
           notes: exForm.notes ? exForm.notes.trim() : undefined,
           isOptional: Boolean(exForm.isOptional),
@@ -448,7 +438,6 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
                           </span>
                         </div>
                         <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                          {ex.rir_target !== null && ex.rir_target !== undefined && <span>RIR {ex.rir_target}</span>}
                           {ex.rest_seconds !== null && ex.rest_seconds !== undefined && <span>Rest {ex.rest_seconds}s</span>}
                           {ex.is_optional ? <span style={{ color: 'var(--accent-cyan)' }}>• Optional</span> : null}
                         </div>
@@ -632,7 +621,6 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
                                 {ex.target_sets ? `${ex.target_sets} Sets` : 'Sets unconfigured'} × {ex.reps_min && ex.reps_max ? `${ex.reps_min}–${ex.reps_max} Reps` : (ex.reps_min ? `${ex.reps_min} Reps` : 'Reps unconfigured')}
                               </div>
                               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                                {ex.rir_target !== null && ex.rir_target !== undefined && <span>RIR {ex.rir_target}</span>}
                                 {ex.rest_seconds !== null && ex.rest_seconds !== undefined && <span>Rest {ex.rest_seconds}s</span>}
                               </div>
                             </div>
@@ -699,7 +687,7 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
                                     {ex.reps_min && ex.reps_max ? `${ex.reps_min}–${ex.reps_max} reps` : (ex.reps_min ? `${ex.reps_min} reps` : 'Unconfigured reps')}
                                   </div>
                                   <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
-                                    {ex.rir_target !== null && ex.rir_target !== undefined ? `RIR ${ex.rir_target}` : 'RIR unconfigured'} • {ex.rest_seconds !== null && ex.rest_seconds !== undefined ? `${ex.rest_seconds}s rest` : 'Rest unconfigured'}
+                                    {ex.rest_seconds !== null && ex.rest_seconds !== undefined ? `${ex.rest_seconds}s rest` : 'Rest unconfigured'}
                                   </div>
                                 </div>
                               ))}
@@ -800,18 +788,6 @@ export const WorkoutPlanBuilderPage: React.FC<WorkoutPlanBuilderProps> = ({ plan
               </FormField>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-              <FormField label="Target RIR (0–10)">
-                <NumberInput
-                  id="input-rir-target"
-                  min={0}
-                  max={10}
-                  step={0.5}
-                  placeholder="e.g. 2"
-                  value={exForm.rirTarget}
-                  onChange={(val) => setExForm({ ...exForm, rirTarget: val })}
-                />
-              </FormField>
               <FormField label="Rest (seconds)">
                 <NumberInput
                   id="input-rest-seconds"

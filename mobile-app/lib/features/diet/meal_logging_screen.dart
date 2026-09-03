@@ -201,52 +201,38 @@ class _MealLoggingScreenState extends State<MealLoggingScreen> {
                           letterSpacing: 0.8,
                           color: colors.textSecondary)),
                   const SizedBox(height: 12),
-                  SegmentedButton<String>(
-                    style: ButtonStyle(
-                      backgroundColor:
-                          WidgetStateProperty.resolveWith<Color>((states) {
-                        if (states.contains(WidgetState.selected)) {
-                          return colors.primary;
-                        }
-                        return colors.surfaceElevated;
-                      }),
-                      foregroundColor:
-                          WidgetStateProperty.resolveWith<Color>((states) {
-                        if (states.contains(WidgetState.selected)) {
-                          return Colors.white;
-                        }
-                        return colors.textSecondary;
-                      }),
-                      side: WidgetStateProperty.all(
-                          BorderSide(color: colors.border)),
-                    ),
-                    segments: const [
-                      ButtonSegment(
-                        value: 'completed',
-                        label: Text('Completed',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w700, fontSize: 13)),
-                        icon: Icon(Icons.check_circle_outline, size: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatusSegment(
+                          value: 'completed',
+                          label: 'Completed',
+                          icon: Icons.check_circle_outline,
+                          isSelected: _status == 'completed',
+                          colors: colors,
+                        ),
                       ),
-                      ButtonSegment(
-                        value: 'partial',
-                        label: Text('Partial',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w700, fontSize: 13)),
-                        icon: Icon(Icons.incomplete_circle, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildStatusSegment(
+                          value: 'partial',
+                          label: 'Partial',
+                          icon: Icons.incomplete_circle,
+                          isSelected: _status == 'partial',
+                          colors: colors,
+                        ),
                       ),
-                      ButtonSegment(
-                        value: 'skipped',
-                        label: Text('Skipped',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w700, fontSize: 13)),
-                        icon: Icon(Icons.cancel_outlined, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildStatusSegment(
+                          value: 'skipped',
+                          label: 'Skipped',
+                          icon: Icons.cancel_outlined,
+                          isSelected: _status == 'skipped',
+                          colors: colors,
+                        ),
                       ),
                     ],
-                    selected: {_status},
-                    onSelectionChanged: (val) {
-                      setState(() => _status = val.first);
-                    },
                   ),
                 ],
               ),
@@ -307,22 +293,29 @@ class _MealLoggingScreenState extends State<MealLoggingScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              gName,
-                              style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800,
-                                  color: colors.textPrimary),
+                            Expanded(
+                              child: Text(
+                                gName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: colors.textPrimary),
+                              ),
                             ),
-                            StatusBadge(
-                              label: isMulti
-                                  ? 'Select up to $maxSelections'
-                                  : (minSelections > 0
-                                      ? 'Required'
-                                      : 'Optional'),
-                              color: minSelections > 0
-                                  ? colors.primary
-                                  : colors.cyan,
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: StatusBadge(
+                                label: isMulti
+                                    ? 'Select up to $maxSelections'
+                                    : (minSelections > 0
+                                        ? 'Required'
+                                        : 'Optional'),
+                                color: minSelections > 0
+                                    ? colors.primary
+                                    : colors.cyan,
+                              ),
                             ),
                           ],
                         ),
@@ -447,6 +440,52 @@ class _MealLoggingScreenState extends State<MealLoggingScreen> {
               text: 'Confirm & Save Meal Log',
               icon: const Icon(Icons.check, size: 18, color: Colors.white),
               height: 48,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusSegment({
+    required String value,
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required AppThemeColors colors,
+  }) {
+    return InkWell(
+      onTap: () => setState(() => _status = value),
+      borderRadius: BorderRadius.circular(AppRadii.md),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? colors.primary : colors.surfaceElevated,
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          border: Border.all(
+            color: isSelected ? colors.primary : colors.border,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 15,
+              color: isSelected ? colors.onPrimary : colors.textSecondary,
+            ),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  color: isSelected ? colors.onPrimary : colors.textSecondary,
+                ),
+              ),
             ),
           ],
         ),

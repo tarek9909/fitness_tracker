@@ -29,8 +29,8 @@ void main() {
       ),
     );
 
-    expect(find.text('FITNESS TRACKER'), findsOneWidget);
-    expect(find.text('Email Address'), findsOneWidget);
-    expect(find.text('Sign In'), findsOneWidget);
+    expect(find.text('Kinetic Wellness'), findsOneWidget);
+    expect(find.text('Email'), findsOneWidget);
+    expect(find.text('Log In'), findsOneWidget);
   });
 }

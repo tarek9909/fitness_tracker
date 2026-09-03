@@ -53,13 +53,17 @@ class ApiClient {
     bool canRefresh = true,
   }) async {
     final isMutation = method == 'POST' || method == 'PUT' || method == 'PATCH';
+    final isSecuritySensitive = endpoint.contains('/security/') ||
+        endpoint.contains('/auth/') ||
+        endpoint.contains('/password-reset');
+    final canEnqueue = isMutation && !isSecuritySensitive;
     // Empty-body mutations still need an operation id for safe retries.
     final requestBody = body == null && isMutation
         ? <String, dynamic>{}
         : body == null
             ? null
             : Map<String, dynamic>.from(body);
-    final operationId = isMutation
+    final operationId = canEnqueue
         ? (requestBody?['clientOperationId'] as String? ?? _newOperationId())
         : null;
     if (operationId != null) requestBody!['clientOperationId'] = operationId;
