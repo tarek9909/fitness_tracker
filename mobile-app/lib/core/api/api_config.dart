@@ -20,7 +20,41 @@ class ApiConfig {
   static const String _dartDefinedBaseUrl =
       String.fromEnvironment('API_BASE_URL');
 
+  static String? _activeWorkingBaseUrl;
+
+  static void setActiveWorkingBaseUrl(String url) {
+    _activeWorkingBaseUrl = url;
+  }
+
+  static void resetActiveWorkingBaseUrl() {
+    _activeWorkingBaseUrl = null;
+  }
+
+  static List<String> getCandidateBaseUrls() {
+    if (kReleaseMode || _dartDefinedBaseUrl.trim().isNotEmpty) {
+      return [resolveBaseUrl()];
+    }
+    if (_activeWorkingBaseUrl != null && _activeWorkingBaseUrl!.trim().isNotEmpty) {
+      return [_activeWorkingBaseUrl!.trim()];
+    }
+    if (!kIsWeb && Platform.isAndroid) {
+      return [
+        'http://127.0.0.1:3000/api/v1',      // ADB reverse port-forwarding for USB physical devices
+        'http://localhost:3000/api/v1',      // Localhost
+        'http://192.168.10.210:3000/api/v1', // Local LAN Wi-Fi host IP
+        'http://10.0.2.2:3000/api/v1',       // Android Emulator host loopback
+      ];
+    }
+    return [
+      'http://localhost:3000/api/v1',
+      'http://127.0.0.1:3000/api/v1',
+    ];
+  }
+
   static String resolveBaseUrl() {
+    if (_activeWorkingBaseUrl != null && _activeWorkingBaseUrl!.trim().isNotEmpty) {
+      return _activeWorkingBaseUrl!.trim();
+    }
     return validateAndResolveBaseUrl(
       definedUrl: _dartDefinedBaseUrl,
       isReleaseMode: kReleaseMode,

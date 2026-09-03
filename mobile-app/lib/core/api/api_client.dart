@@ -135,13 +135,9 @@ class ApiClient {
     String method,
     String endpoint,
     Map<String, dynamic>? body,
-  ) {
-    final baseUrl = ApiConfig.resolveBaseUrl();
-    final cleanBase = baseUrl.endsWith('/')
-        ? baseUrl.substring(0, baseUrl.length - 1)
-        : baseUrl;
+  ) async {
+    final candidateUrls = ApiConfig.getCandidateBaseUrls();
     final cleanEndpoint = endpoint.startsWith('/') ? endpoint : '/$endpoint';
-    final uri = Uri.parse('$cleanBase$cleanEndpoint');
     final token = authSession.accessToken;
     final opId = body?['clientOperationId'] as String?;
 
@@ -154,18 +150,59 @@ class ApiClient {
     };
     final payload = body == null ? null : jsonEncode(body);
 
-    switch (method.toUpperCase()) {
-      case 'POST':
-        return _httpClient.post(uri, headers: headers, body: payload);
-      case 'PUT':
-        return _httpClient.put(uri, headers: headers, body: payload);
-      case 'PATCH':
-        return _httpClient.patch(uri, headers: headers, body: payload);
-      case 'DELETE':
-        return _httpClient.delete(uri, headers: headers);
-      default:
-        return _httpClient.get(uri, headers: headers);
+    dynamic lastException;
+
+    for (int i = 0; i < candidateUrls.length; i++) {
+      final baseUrl = candidateUrls[i];
+      final cleanBase = baseUrl.endsWith('/')
+          ? baseUrl.substring(0, baseUrl.length - 1)
+          : baseUrl;
+      final uri = Uri.parse('$cleanBase$cleanEndpoint');
+
+      try {
+        final timeoutDuration =
+            candidateUrls.length > 1 && i < candidateUrls.length - 1
+                ? const Duration(seconds: 3)
+                : const Duration(seconds: 15);
+
+        final Future<http.Response> requestFuture;
+        switch (method.toUpperCase()) {
+          case 'POST':
+            requestFuture =
+                _httpClient.post(uri, headers: headers, body: payload);
+            break;
+          case 'PUT':
+            requestFuture =
+                _httpClient.put(uri, headers: headers, body: payload);
+            break;
+          case 'PATCH':
+            requestFuture =
+                _httpClient.patch(uri, headers: headers, body: payload);
+            break;
+          case 'DELETE':
+            requestFuture = _httpClient.delete(uri, headers: headers);
+            break;
+          default:
+            requestFuture = _httpClient.get(uri, headers: headers);
+            break;
+        }
+
+        final response = await requestFuture.timeout(timeoutDuration);
+        ApiConfig.setActiveWorkingBaseUrl(baseUrl);
+        return response;
+      } catch (e) {
+        lastException = e;
+        if (i == candidateUrls.length - 1) {
+          rethrow;
+        }
+      }
     }
+
+    if (lastException != null) {
+      throw lastException;
+    }
+    throw const SocketException(
+        'Unable to reach backend API on any candidate address');
   }
 
   dynamic _decodeResponse(http.Response response) {
