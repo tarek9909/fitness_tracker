@@ -120,14 +120,16 @@ export async function seedDatabase(customDb?: DatabasePool, targetClient: 'sqlit
     (11, 'Lean Ground Beef 93/7', 1, 100, 152, 21.4, 0.0, 7.3, 0.0),
     (12, 'Sweet Potato (Baked)', 1, 100, 90, 2.0, 20.7, 0.1, 3.3)`);
 
-  // 8. Users (Admin + Demo User)
+  // 8. Users (Admin + Demo User + Tarek)
   const adminPasswordHash = await bcrypt.hash('Admin123!', 10);
   const userPasswordHash = await bcrypt.hash('User123!', 10);
+  const tarekPasswordHash = await bcrypt.hash('Tarek123!', 10);
 
   await safeExecute(`INSERT OR IGNORE INTO users (id, role_id, first_name, last_name, email, password_hash, height_cm, timezone, locale, status) VALUES
     (1, 1, 'Platform', 'Administrator', 'admin@fitnessplatform.com', ?, 182.0, 'UTC', 'en', 'active'),
-    (2, 3, 'John', 'Doe', 'john.doe@fitnessplatform.com', ?, 180.0, 'UTC', 'en', 'active')`,
-    [adminPasswordHash, userPasswordHash]
+    (2, 3, 'John', 'Doe', 'john.doe@fitnessplatform.com', ?, 180.0, 'UTC', 'en', 'active'),
+    (3, 3, 'Tarek', 'Aswad', 'tarek.aswad@fitnessplatform.com', ?, 180.0, 'Asia/Beirut', 'en', 'active')`,
+    [adminPasswordHash, userPasswordHash, tarekPasswordHash]
   );
 
   // 9. Workout Plan & Version 1
@@ -233,7 +235,38 @@ export async function seedDatabase(customDb?: DatabasePool, targetClient: 'sqlit
   await safeExecute(`INSERT OR IGNORE INTO user_notification_settings (user_id, in_app_enabled, push_enabled, local_notifications_enabled) VALUES
     (2, 1, 1, 1)`);
 
-  // 14. Reminder Rules
+  // 14. User Assignments for Tarek (User 3)
+  await safeExecute(`INSERT OR IGNORE INTO user_workout_assignments (id, user_id, workout_plan_version_id, effective_from, status, assigned_by) VALUES
+    (2, 3, 1, '2026-01-01', 'active', 1)`);
+
+  await safeExecute(`INSERT OR IGNORE INTO user_diet_assignments (id, user_id, diet_plan_version_id, effective_from, status, assigned_by) VALUES
+    (2, 3, 1, '2026-01-01', 'active', 1)`);
+
+  await safeExecute(`INSERT OR IGNORE INTO user_weight_goals (id, user_id, starting_weight_kg, target_weight_kg, start_date, target_date, status) VALUES
+    (2, 3, 105.2, 86.3, '2026-01-01', '2026-12-31', 'active')`);
+
+  await safeExecute(`INSERT OR IGNORE INTO user_water_targets (id, user_id, target_ml, effective_from, status) VALUES
+    (2, 3, 3500, '2026-01-01', 'active')`);
+
+  await safeExecute(`INSERT OR IGNORE INTO user_water_quick_add_options (id, user_id, amount_ml, display_order, is_active) VALUES
+    (5, 3, 250, 1, 1),
+    (6, 3, 500, 2, 1),
+    (7, 3, 750, 3, 1),
+    (8, 3, 1000, 4, 1)`);
+
+  await safeExecute(`INSERT OR IGNORE INTO user_cardio_targets (id, user_id, cardio_activity_id, target_minutes_min, target_minutes_max, effective_from, status) VALUES
+    (2, 3, 2, 30, 40, '2026-01-01', 'active')`);
+
+  await safeExecute(`INSERT OR IGNORE INTO user_cardio_target_days (user_cardio_target_id, weekday) VALUES
+    (2, 1), (2, 2), (2, 4), (2, 5)`);
+
+  await safeExecute(`INSERT OR IGNORE INTO user_adherence_configs (id, user_id, diet_weight_pct, workout_weight_pct, cardio_weight_pct, water_weight_pct, weight_logging_weight_pct, effective_from, is_active) VALUES
+    (2, 3, 35.0, 25.0, 15.0, 15.0, 10.0, '2026-01-01', 1)`);
+
+  await safeExecute(`INSERT OR IGNORE INTO user_notification_settings (user_id, in_app_enabled, push_enabled, local_notifications_enabled) VALUES
+    (3, 1, 1, 1)`);
+
+  // 15. Reminder Rules
   await safeExecute(`INSERT OR IGNORE INTO reminder_rules (id, name, category, rule_scope, trigger_mode, fixed_time, is_active) VALUES
     (1, 'Morning Weight Log', 'weight', 'user', 'fixed_time', '08:00:00', 1),
     (2, 'Hydration Reminder', 'water', 'user', 'interval', NULL, 1),
