@@ -44,13 +44,15 @@ const AppContent: React.FC = () => {
               width: '40px',
               height: '40px',
               borderRadius: 'var(--radius-md)',
-              background: 'linear-gradient(135deg, var(--accent-primary), #059669)',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-color)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              boxShadow: 'var(--shadow-sm)',
             }}
           >
-            <Activity size={22} color="#ffffff" />
+            <Activity size={22} color="var(--text-primary)" />
           </div>
           <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', fontWeight: 600 }}>
             Initializing Fitness OS Console...
@@ -195,7 +197,9 @@ const AppContent: React.FC = () => {
 
         <main className="content-main" style={{ flex: 1, padding: '2rem 2.5rem', overflowY: 'auto', maxHeight: '100vh' }}>
           <ErrorBoundary>
-            {renderContent()}
+            <div key={`${activeTab}-${activeWorkoutPlanId ?? ''}-${activeDietPlanId ?? ''}-${selectedUserId ?? ''}`} className="page-enter">
+              {renderContent()}
+            </div>
           </ErrorBoundary>
         </main>
       </div>

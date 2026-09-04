@@ -32,7 +32,7 @@ void main() {
 
       expect(
         () => ApiConfig.validateAndResolveBaseUrl(
-          definedUrl: 'http://localhost:3000/api/v1',
+          definedUrl: 'http://localhost:4000/api/v1',
           isReleaseMode: true,
         ),
         throwsA(isA<ReleaseConfigurationError>()),
@@ -55,7 +55,7 @@ void main() {
         isReleaseMode: false,
         isAndroid: true,
       );
-      expect(url, 'http://10.0.2.2:3000/api/v1');
+      expect(url, 'http://10.0.2.2:4000/api/v1');
     });
 
     test('Debug mode returns localhost when not on Android with no define', () {
@@ -64,16 +64,16 @@ void main() {
         isReleaseMode: false,
         isAndroid: false,
       );
-      expect(url, 'http://localhost:3000/api/v1');
+      expect(url, 'http://localhost:4000/api/v1');
     });
 
     test('Debug mode respects explicit --dart-define even if http://', () {
       final url = ApiConfig.validateAndResolveBaseUrl(
-        definedUrl: 'http://192.168.1.50:3000/api/v1',
+        definedUrl: 'http://192.168.1.50:4000/api/v1',
         isReleaseMode: false,
         isAndroid: true,
       );
-      expect(url, 'http://192.168.1.50:3000/api/v1');
+      expect(url, 'http://192.168.1.50:4000/api/v1');
     });
 
     test('Normalizes and strips trailing slashes from API_BASE_URL', () {
@@ -84,10 +84,10 @@ void main() {
       expect(releaseUrl, 'https://api.fitnessplatform.com/api/v1');
 
       final debugUrl = ApiConfig.validateAndResolveBaseUrl(
-        definedUrl: 'http://192.168.1.50:3000/api/v1/',
+        definedUrl: 'http://192.168.1.50:4000/api/v1/',
         isReleaseMode: false,
       );
-      expect(debugUrl, 'http://192.168.1.50:3000/api/v1');
+      expect(debugUrl, 'http://192.168.1.50:4000/api/v1');
     });
 
     test('Release mode rejects URLs without a valid host', () {

@@ -108,13 +108,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
               width: '36px',
               height: '36px',
               borderRadius: 'var(--radius-md)',
-              background: 'linear-gradient(135deg, var(--accent-primary), #059669)',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-color)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
+              boxShadow: 'var(--shadow-sm)',
             }}>
-              <Activity size={19} color="#ffffff" strokeWidth={2.5} />
+              <Activity size={19} color="var(--text-primary)" strokeWidth={2} />
             </div>
             <div>
               <div style={{ fontSize: '1.05rem', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>

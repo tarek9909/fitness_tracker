@@ -3,6 +3,7 @@ import java.io.FileInputStream
 
 plugins {
     id("com.android.application")
+    id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
 }
 
@@ -32,12 +33,16 @@ val hasValidEnv = !envKeystorePath.isNullOrBlank() &&
 
 android {
     namespace = "com.fitnessplatform.app"
-    compileSdk = 36
+    compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
@@ -92,6 +97,12 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    packaging {
+        jniLibs {
+            keepDebugSymbols.add("**/*.so")
+        }
+    }
 }
 
 // Fail closed during release tasks when keystore configuration is absent or invalid
@@ -108,12 +119,12 @@ gradle.taskGraph.whenReady {
     }
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
-    }
-}
-
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Android 9/API 28+ platform passkeys through Credential Manager.
+    implementation("androidx.credentials:credentials:1.7.0-alpha02")
+    implementation("androidx.credentials:credentials-play-services-auth:1.7.0-alpha02")
 }

@@ -192,6 +192,9 @@ class ApiClient {
         return response;
       } catch (e) {
         lastException = e;
+        if (baseUrl == ApiConfig.getActiveWorkingBaseUrl()) {
+          ApiConfig.resetActiveWorkingBaseUrl();
+        }
         if (i == candidateUrls.length - 1) {
           rethrow;
         }
@@ -215,9 +218,16 @@ class ApiClient {
       return decoded;
     }
 
-    final errorMsg = decoded is Map && decoded['error'] != null
-        ? decoded['error']['message']
-        : 'Request failed (${response.statusCode})';
+    String errorMsg = 'Request failed (${response.statusCode})';
+    if (decoded is Map) {
+      if (decoded['error'] is Map && decoded['error']['message'] != null) {
+        errorMsg = decoded['error']['message'].toString();
+      } else if (decoded['message'] != null) {
+        errorMsg = decoded['message'].toString();
+      } else if (decoded['error'] != null) {
+        errorMsg = decoded['error'].toString();
+      }
+    }
     throw Exception(errorMsg);
   }
 

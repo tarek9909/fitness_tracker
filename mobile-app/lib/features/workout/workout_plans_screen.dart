@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/premium_widgets.dart';
+import 'workout_plan_builder_screen.dart';
 
 class WorkoutPlansScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -60,6 +61,7 @@ class _WorkoutPlansScreenState extends State<WorkoutPlansScreen> {
   Future<void> _showCreatePlanDialog() async {
     final nameCtrl = TextEditingController();
     final descCtrl = TextEditingController();
+    final goalCtrl = TextEditingController();
     String? error;
 
     await showPremiumDialog(
@@ -102,6 +104,12 @@ class _WorkoutPlansScreenState extends State<WorkoutPlansScreen> {
                       controller: descCtrl,
                       maxLines: 2,
                     ),
+                    const SizedBox(height: 12),
+                    PremiumTextField(
+                      label: 'Goal / focus (optional)',
+                      hint: 'e.g. Strength, hypertrophy, or conditioning',
+                      controller: goalCtrl,
+                    ),
                   ],
                 ),
               ),
@@ -121,12 +129,14 @@ class _WorkoutPlansScreenState extends State<WorkoutPlansScreen> {
                     }
                     Navigator.pop(ctx);
                     try {
-                      await widget.apiClient.post('/me/workout-plans', body: {
+                      final payload = <String, dynamic>{
                         'name': name,
-                        'description': descCtrl.text.trim().isNotEmpty
-                            ? descCtrl.text.trim()
-                            : null,
-                      });
+                        if (descCtrl.text.trim().isNotEmpty)
+                          'description': descCtrl.text.trim(),
+                        if (goalCtrl.text.trim().isNotEmpty)
+                          'goalCategory': goalCtrl.text.trim(),
+                      };
+                      await widget.apiClient.post('/me/workout-plans', body: payload);
                       if (mounted) {
                         showPremiumSnackBar(
                           context,
@@ -254,7 +264,7 @@ class _WorkoutPlansScreenState extends State<WorkoutPlansScreen> {
                               await Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => WorkoutPlanDetailScreen(
+                                  builder: (_) => WorkoutPlanBuilderScreen(
                                     apiClient: widget.apiClient,
                                     planId: planId,
                                   ),
@@ -850,18 +860,18 @@ class _WorkoutPlanDetailScreenState extends State<WorkoutPlanDetailScreen> {
 
                     Navigator.pop(ctx);
                     try {
+                      final payload = <String, dynamic>{
+                        'exerciseId': selectedExId,
+                        'targetSets': sets,
+                        'repsMin': repsMin,
+                        if (repsMax != null) 'repsMax': repsMax,
+                        'restSeconds': rest,
+                        if (notesCtrl.text.trim().isNotEmpty)
+                          'notes': notesCtrl.text.trim(),
+                      };
                       await widget.apiClient.post(
                         '/me/workout-plans/${widget.planId}/days/$dayId/exercises',
-                        body: {
-                          'exerciseId': selectedExId,
-                          'targetSets': sets,
-                          'repsMin': repsMin,
-                          'repsMax': repsMax,
-                          'restSeconds': rest,
-                          'notes': notesCtrl.text.trim().isNotEmpty
-                              ? notesCtrl.text.trim()
-                              : null,
-                        },
+                        body: payload,
                       );
                       if (mounted) {
                         showPremiumSnackBar(context, 'Exercise added');

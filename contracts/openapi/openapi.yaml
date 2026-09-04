@@ -4,7 +4,7 @@ info:
   version: 1.0.0
   description: Authoritative REST API for multi-user fitness management, daily tracking, workout/diet plan builders, progress analysis, reminders, and administration.
 servers:
-  - url: http://localhost:3000/api/v1
+  - url: http://localhost:4000/api/v1
     description: Local Development Server
 
 paths:

@@ -22,6 +22,9 @@ describe('Production Environment Configuration & Validation Suite', () => {
     COOKIE_SECRET: 'production-cookie-signing-secret-64-characters-long-key-qwe123456',
     PASSWORD_RESET_BASE_URL: 'https://app.fitnessplatform.com/reset-password',
     ADMIN_ALLOWED_ORIGINS: 'https://admin.fitnessplatform.com,https://ops.fitnessplatform.com',
+    WEBAUTHN_RP_ID: 'auth.fitnessplatform.com',
+    WEBAUTHN_RP_NAME: 'Fitness Platform',
+    WEBAUTHN_EXPECTED_ORIGINS: 'https://admin.fitnessplatform.com,https://ops.fitnessplatform.com',
   };
 
   it('Valid production configuration loads successfully with strict defaults', () => {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
+import '../../core/auth/passkey_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/premium_widgets.dart';
 
@@ -16,8 +17,15 @@ class FitnessConfigurationScreen extends StatefulWidget {
 class _FitnessConfigurationScreenState
     extends State<FitnessConfigurationScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late final PasskeyService _passkeyService;
   bool _isLoading = true;
   String? _errorMessage;
+
+  // Passkey state
+  List<Map<String, dynamic>> _serverPasskeys = [];
+  bool _hasLocalPasskey = false;
+  String? _localPasskeyDevice;
+  bool _isPasskeyBusy = false;
 
   // Controllers
   final _firstNameCtrl = TextEditingController();
@@ -46,6 +54,10 @@ class _FitnessConfigurationScreenState
   @override
   void initState() {
     super.initState();
+    _passkeyService = PasskeyService(
+      apiClient: widget.apiClient,
+      authSession: widget.apiClient.authSession,
+    );
     _tabController = TabController(length: 4, vsync: this);
     _loadConfiguration();
   }
@@ -169,6 +181,13 @@ class _FitnessConfigurationScreenState
 
       final reminders = data['reminders'] as List<dynamic>?;
       if (reminders != null) _reminders = reminders;
+
+      try {
+        _hasLocalPasskey = await _passkeyService.hasLocalPasskey();
+        final localInfo = await _passkeyService.getLocalPasskeyInfo();
+        _localPasskeyDevice = localInfo?.deviceName;
+        _serverPasskeys = await _passkeyService.fetchServerPasskeys();
+      } catch (_) {}
 
       setState(() {
         _isLoading = false;
@@ -521,13 +540,9 @@ class _FitnessConfigurationScreenState
 
     return PremiumScaffold(
       appBar: PremiumAppBar(
-        title: const Text('Goals & Configuration'),
-        bottom: TabBar(
+        titleText: 'Goals & Configuration',
+        bottom: PremiumTabBar(
           controller: _tabController,
-          indicatorColor: colors.primary,
-          labelColor: colors.primary,
-          unselectedLabelColor: colors.textSecondary,
-          labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           tabs: const [
             Tab(text: 'Profile'),
             Tab(text: 'Water'),
@@ -560,13 +575,35 @@ class _FitnessConfigurationScreenState
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('PROFILE & PHYSICAL METRICS',
-                                  style: TextStyle(
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: colors.primaryMuted,
+                                      borderRadius:
+                                          BorderRadius.circular(AppRadii.sm),
+                                      border: Border.all(
+                                        color: colors.border,
+                                        width: 1.0,
+                                      ),
+                                    ),
+                                    child: Icon(Icons.person_outline_rounded,
+                                        size: 15, color: colors.primary),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'PROFILE & PHYSICAL METRICS',
+                                    style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w800,
                                       letterSpacing: 0.8,
-                                      color: colors.textSecondary)),
-                              const SizedBox(height: 12),
+                                      color: colors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
                               PremiumTextField(
                                 label: 'First Name',
                                 controller: _firstNameCtrl,
@@ -589,7 +626,9 @@ class _FitnessConfigurationScreenState
                               ),
                               const SizedBox(height: 12),
                               PremiumTextField(
-                                label: _unitSystem == 'imperial' ? 'Height (inches)' : 'Height (cm)',
+                                label: _unitSystem == 'imperial'
+                                    ? 'Height (inches)'
+                                    : 'Height (cm)',
                                 controller: _heightCtrl,
                                 keyboardType: TextInputType.number,
                               ),
@@ -599,17 +638,25 @@ class _FitnessConfigurationScreenState
                                 dropdownColor: colors.surfaceElevated,
                                 decoration: InputDecoration(
                                   labelText: 'Unit System',
-                                  labelStyle: TextStyle(color: colors.textSecondary),
+                                  labelStyle:
+                                      TextStyle(color: colors.textSecondary),
                                   filled: true,
                                   fillColor: colors.surfaceElevated,
                                   border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(AppRadii.lg),
-                                    borderSide: BorderSide(color: colors.border),
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadii.lg),
+                                    borderSide:
+                                        BorderSide(color: colors.border),
                                   ),
                                 ),
                                 items: const [
-                                  DropdownMenuItem(value: 'metric', child: Text('Metric (kg / cm)')),
-                                  DropdownMenuItem(value: 'imperial', child: Text('Imperial (lb / inches)')),
+                                  DropdownMenuItem(
+                                      value: 'metric',
+                                      child: Text('Metric (kg / cm)')),
+                                  DropdownMenuItem(
+                                      value: 'imperial',
+                                      child:
+                                          Text('Imperial (lb / inches)')),
                                 ],
                                 onChanged: (val) {
                                   if (val != null) _changeUnitSystem(val);
@@ -621,19 +668,27 @@ class _FitnessConfigurationScreenState
                                 dropdownColor: colors.surfaceElevated,
                                 decoration: InputDecoration(
                                   labelText: 'Gender (optional)',
-                                  labelStyle: TextStyle(color: colors.textSecondary),
+                                  labelStyle:
+                                      TextStyle(color: colors.textSecondary),
                                   filled: true,
                                   fillColor: colors.surfaceElevated,
                                   border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(AppRadii.lg),
-                                    borderSide: BorderSide(color: colors.border),
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadii.lg),
+                                    borderSide:
+                                        BorderSide(color: colors.border),
                                   ),
                                 ),
                                 items: const [
-                                  DropdownMenuItem(value: 'male', child: Text('Male')),
-                                  DropdownMenuItem(value: 'female', child: Text('Female')),
-                                  DropdownMenuItem(value: 'other', child: Text('Other')),
-                                  DropdownMenuItem(value: 'prefer_not_to_say', child: Text('Prefer not to say')),
+                                  DropdownMenuItem(
+                                      value: 'male', child: Text('Male')),
+                                  DropdownMenuItem(
+                                      value: 'female', child: Text('Female')),
+                                  DropdownMenuItem(
+                                      value: 'other', child: Text('Other')),
+                                  DropdownMenuItem(
+                                      value: 'prefer_not_to_say',
+                                      child: Text('Prefer not to say')),
                                 ],
                                 onChanged: (val) {
                                   setState(() => _gender = val ?? '');
@@ -659,18 +714,42 @@ class _FitnessConfigurationScreenState
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('WEIGHT GOAL TARGETS',
-                                  style: TextStyle(
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: colors.violetMuted,
+                                      borderRadius:
+                                          BorderRadius.circular(AppRadii.sm),
+                                      border: Border.all(
+                                        color: colors.border,
+                                        width: 1.0,
+                                      ),
+                                    ),
+                                    child: Icon(Icons.monitor_weight_outlined,
+                                        size: 15, color: colors.violet),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'WEIGHT GOAL TARGETS',
+                                    style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w800,
                                       letterSpacing: 0.8,
-                                      color: colors.textSecondary)),
-                              const SizedBox(height: 12),
+                                      color: colors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
                               Row(
                                 children: [
                                   Expanded(
                                     child: PremiumTextField(
-                                      label: _unitSystem == 'imperial' ? 'Starting (lb)' : 'Starting (kg)',
+                                      label: _unitSystem == 'imperial'
+                                          ? 'Starting (lb)'
+                                          : 'Starting (kg)',
                                       controller: _startWeightCtrl,
                                       keyboardType: TextInputType.number,
                                     ),
@@ -678,7 +757,9 @@ class _FitnessConfigurationScreenState
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: PremiumTextField(
-                                      label: _unitSystem == 'imperial' ? 'Target (lb)' : 'Target (kg)',
+                                      label: _unitSystem == 'imperial'
+                                          ? 'Target (lb)'
+                                          : 'Target (kg)',
                                       controller: _targetWeightCtrl,
                                       keyboardType: TextInputType.number,
                                     ),
@@ -691,22 +772,35 @@ class _FitnessConfigurationScreenState
                                 dropdownColor: colors.surfaceElevated,
                                 decoration: InputDecoration(
                                   labelText: 'Main Goal Type',
-                                  labelStyle: TextStyle(color: colors.textSecondary),
+                                  labelStyle:
+                                      TextStyle(color: colors.textSecondary),
                                   filled: true,
                                   fillColor: colors.surfaceElevated,
                                   border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(AppRadii.lg),
-                                    borderSide: BorderSide(color: colors.border),
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadii.lg),
+                                    borderSide:
+                                        BorderSide(color: colors.border),
                                   ),
                                 ),
                                 items: const [
-                                  DropdownMenuItem(value: 'lose_weight', child: Text('Lose Weight')),
-                                  DropdownMenuItem(value: 'gain_weight', child: Text('Gain Weight')),
-                                  DropdownMenuItem(value: 'build_muscle', child: Text('Build Muscle')),
-                                  DropdownMenuItem(value: 'maintain_weight', child: Text('Maintain Weight')),
+                                  DropdownMenuItem(
+                                      value: 'lose_weight',
+                                      child: Text('Lose Weight')),
+                                  DropdownMenuItem(
+                                      value: 'gain_weight',
+                                      child: Text('Gain Weight')),
+                                  DropdownMenuItem(
+                                      value: 'build_muscle',
+                                      child: Text('Build Muscle')),
+                                  DropdownMenuItem(
+                                      value: 'maintain_weight',
+                                      child: Text('Maintain Weight')),
                                 ],
                                 onChanged: (val) {
-                                  if (val != null) setState(() => _goalType = val);
+                                  if (val != null) {
+                                    setState(() => _goalType = val);
+                                  }
                                 },
                               ),
                               const SizedBox(height: 12),
@@ -733,8 +827,11 @@ class _FitnessConfigurationScreenState
                         const SizedBox(height: 20),
                         PremiumButton(
                           text: 'Save Profile & Goals',
+                          icon: const Icon(Icons.check_circle_outline, size: 18),
                           onPressed: _saveProfileAndWeight,
                         ),
+                        const SizedBox(height: 16),
+                        _buildPasskeySecurityCard(colors),
                       ],
                     ),
 
@@ -746,13 +843,35 @@ class _FitnessConfigurationScreenState
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('HYDRATION GOALS & QUICK-ADDS',
-                                  style: TextStyle(
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: colors.cyanMuted,
+                                      borderRadius:
+                                          BorderRadius.circular(AppRadii.sm),
+                                      border: Border.all(
+                                        color: colors.border,
+                                        width: 1.0,
+                                      ),
+                                    ),
+                                    child: Icon(Icons.water_drop_outlined,
+                                        size: 15, color: colors.cyan),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'HYDRATION GOALS & QUICK-ADDS',
+                                    style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w800,
                                       letterSpacing: 0.8,
-                                      color: colors.textSecondary)),
-                              const SizedBox(height: 12),
+                                      color: colors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
                               PremiumTextField(
                                 label: 'Daily Water Target (ml)',
                                 hint: 'e.g. 3000',
@@ -765,11 +884,12 @@ class _FitnessConfigurationScreenState
                                 hint: '250, 500, 750, 1000',
                                 controller: _quickAddsCtrl,
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 10),
                               Text(
                                 'These presets appear on your daily log for quick one-tap hydration logging.',
                                 style: TextStyle(
-                                    fontSize: 12, color: colors.textSecondary),
+                                    fontSize: 12,
+                                    color: colors.textSecondary),
                               ),
                             ],
                           ),
@@ -777,6 +897,7 @@ class _FitnessConfigurationScreenState
                         const SizedBox(height: 20),
                         PremiumButton(
                           text: 'Save Water Configuration',
+                          icon: const Icon(Icons.save_outlined, size: 18),
                           onPressed: _saveWaterSettings,
                         ),
                       ],
@@ -789,27 +910,55 @@ class _FitnessConfigurationScreenState
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('ACTIVE CARDIO TARGETS',
-                                style: TextStyle(
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: colors.cyanMuted,
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadii.sm),
+                                    border: Border.all(
+                                      color: colors.border,
+                                      width: 1.0,
+                                    ),
+                                  ),
+                                  child: Icon(Icons.directions_run_rounded,
+                                      size: 15, color: colors.cyan),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'ACTIVE CARDIO TARGETS',
+                                  style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: 0.8,
-                                    color: colors.textSecondary)),
-                            TextButton.icon(
+                                    color: colors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            PremiumButton(
+                              text: 'Add Goal',
                               icon: const Icon(Icons.add, size: 16),
-                              label: const Text('Add Goal'),
+                              height: 34,
+                              isSecondary: true,
                               onPressed: _showAddCardioDialog,
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 12),
                         if (_cardioTargets.isEmpty)
                           PremiumCard(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 24),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 24),
                               child: Center(
-                                child: Text('No weekly cardio goals configured.',
-                                    style: TextStyle(color: colors.textSecondary)),
+                                child: Text(
+                                  'No weekly cardio goals configured.',
+                                  style: TextStyle(
+                                      color: colors.textSecondary),
+                                ),
                               ),
                             ),
                           )
@@ -826,35 +975,59 @@ class _FitnessConfigurationScreenState
                             final freq = map['frequency_per_week'] ?? 3;
 
                             return Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.only(bottom: 10),
                               child: PremiumCard(
+                                padding: const EdgeInsets.all(14),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.directions_run, color: colors.cyan),
+                                    Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color: colors.cyanMuted,
+                                        borderRadius: BorderRadius.circular(
+                                            AppRadii.md),
+                                        border: Border.all(
+                                          color: colors.border,
+                                          width: 1.0,
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        Icons.directions_run_rounded,
+                                        color: colors.cyan,
+                                        size: 20,
+                                      ),
+                                    ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             name.toString().toUpperCase(),
                                             style: TextStyle(
-                                                fontWeight: FontWeight.w700,
+                                                fontWeight: FontWeight.w800,
                                                 fontSize: 14,
+                                                letterSpacing: 0.2,
                                                 color: colors.textPrimary),
                                           ),
+                                          const SizedBox(height: 4),
                                           Text(
                                             '$mins mins • $freq sessions/week',
                                             style: TextStyle(
                                                 fontSize: 12,
+                                                fontWeight: FontWeight.w500,
                                                 color: colors.textSecondary),
                                           ),
                                         ],
                                       ),
                                     ),
-                                    IconButton(
-                                      icon: Icon(Icons.delete_outline,
-                                          size: 18, color: colors.rose),
+                                    PremiumIconButton(
+                                      icon: Icons.delete_outline,
+                                      size: 18,
+                                      color: colors.rose,
+                                      tooltip: 'Delete Goal',
                                       onPressed: () async {
                                         try {
                                           await widget.apiClient
@@ -878,27 +1051,55 @@ class _FitnessConfigurationScreenState
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('MY REMINDERS',
-                                style: TextStyle(
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: colors.primaryMuted,
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadii.sm),
+                                    border: Border.all(
+                                      color: colors.border,
+                                      width: 1.0,
+                                    ),
+                                  ),
+                                  child: Icon(Icons.alarm_rounded,
+                                      size: 15, color: colors.primary),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'MY REMINDERS',
+                                  style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: 0.8,
-                                    color: colors.textSecondary)),
-                            TextButton.icon(
+                                    color: colors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            PremiumButton(
+                              text: 'Add Reminder',
                               icon: const Icon(Icons.add, size: 16),
-                              label: const Text('Add Reminder'),
+                              height: 34,
+                              isSecondary: true,
                               onPressed: _showAddReminderDialog,
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 12),
                         if (_reminders.isEmpty)
                           PremiumCard(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 24),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 24),
                               child: Center(
-                                child: Text('No custom reminders active.',
-                                    style: TextStyle(color: colors.textSecondary)),
+                                child: Text(
+                                  'No custom reminders active.',
+                                  style: TextStyle(
+                                      color: colors.textSecondary),
+                                ),
                               ),
                             ),
                           )
@@ -906,40 +1107,67 @@ class _FitnessConfigurationScreenState
                           ..._reminders.map((r) {
                             final map = r as Map<String, dynamic>;
                             final id = map['id'] as int;
-                            final title = map['title'] ?? map['name'] ?? 'Reminder';
+                            final title = map['title'] ??
+                                map['name'] ??
+                                'Reminder';
                             final cat = map['category'] ?? 'general';
-                            final time = map['fixed_time'] ?? map['fixedTime'] ?? 'Scheduled';
+                            final time = map['fixed_time'] ??
+                                map['fixedTime'] ??
+                                'Scheduled';
 
                             return Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.only(bottom: 10),
                               child: PremiumCard(
+                                padding: const EdgeInsets.all(14),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.alarm, color: colors.primary),
+                                    Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color: colors.primaryMuted,
+                                        borderRadius: BorderRadius.circular(
+                                            AppRadii.md),
+                                        border: Border.all(
+                                          color: colors.border,
+                                          width: 1.0,
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        Icons.alarm_rounded,
+                                        color: colors.primary,
+                                        size: 20,
+                                      ),
+                                    ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             title.toString(),
                                             style: TextStyle(
-                                                fontWeight: FontWeight.w700,
+                                                fontWeight: FontWeight.w800,
                                                 fontSize: 14,
                                                 color: colors.textPrimary),
                                           ),
+                                          const SizedBox(height: 4),
                                           Text(
                                             '$cat • $time',
                                             style: TextStyle(
                                                 fontSize: 12,
+                                                fontWeight: FontWeight.w500,
                                                 color: colors.textSecondary),
                                           ),
                                         ],
                                       ),
                                     ),
-                                    IconButton(
-                                      icon: Icon(Icons.delete_outline,
-                                          size: 18, color: colors.rose),
+                                    PremiumIconButton(
+                                      icon: Icons.delete_outline,
+                                      size: 18,
+                                      color: colors.rose,
+                                      tooltip: 'Delete Reminder',
                                       onPressed: () async {
                                         try {
                                           await widget.apiClient
@@ -958,5 +1186,246 @@ class _FitnessConfigurationScreenState
                   ],
                 ),
     );
+  }
+
+  Widget _buildPasskeySecurityCard(AppThemeColors colors) {
+    const emerald = Color(0xFF10B981);
+    return PremiumCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: colors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.fingerprint, color: colors.primary, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'PASSKEY & BIOMETRIC LOGIN',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                        color: colors.textSecondary,
+                      ),
+                    ),
+                    Text(
+                      'Passwordless, cryptographic sign-in',
+                      style: TextStyle(fontSize: 12, color: colors.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (_hasLocalPasskey) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: emerald.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: emerald.withValues(alpha: 0.25)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: emerald, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Passkey Active on This Device',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: colors.textPrimary,
+                          ),
+                        ),
+                        if (_localPasskeyDevice != null)
+                          Text(
+                            _localPasskeyDevice!,
+                            style: TextStyle(fontSize: 11, color: colors.textSecondary),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _isPasskeyBusy ? null : _handleRegisterPasskey,
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: const Text('Re-register'),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: colors.border),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _isPasskeyBusy ? null : _handleRemoveLocalPasskey,
+                    icon: Icon(Icons.delete_outline, size: 16, color: colors.rose),
+                    label: Text('Remove', style: TextStyle(color: colors.rose)),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: colors.rose.withValues(alpha: 0.3)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            Text(
+              'Enroll this device as a Passkey to log in securely with 1-tap biometrics (Fingerprint / Face ID) without entering passwords.',
+              style: TextStyle(fontSize: 13, color: colors.textSecondary, height: 1.4),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: PremiumButton(
+                text: 'Register This Device as a Passkey',
+                icon: const Icon(Icons.fingerprint, size: 18),
+                loading: _isPasskeyBusy,
+                onPressed: _handleRegisterPasskey,
+              ),
+            ),
+          ],
+          if (_serverPasskeys.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            const Divider(),
+            const SizedBox(height: 12),
+            Text(
+              'REGISTERED PASSKEY DEVICES (${_serverPasskeys.length})',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.8,
+                color: colors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ..._serverPasskeys.map((p) {
+              final id = (p['id'] as num?)?.toInt();
+              final name = p['deviceName'] ?? p['device_name'] ?? 'Passkey';
+              final created = p['createdAt'] ?? p['created_at'] ?? '';
+              final credId = p['credentialId'] ?? p['credential_id'] ?? '';
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Icon(Icons.devices, size: 16, color: colors.textSecondary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$name',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: colors.textPrimary,
+                            ),
+                          ),
+                          if (created.toString().isNotEmpty)
+                            Text(
+                              'Added ${created.toString().split("T").first}',
+                              style: TextStyle(fontSize: 11, color: colors.textMuted),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (id != null)
+                      IconButton(
+                        icon: Icon(Icons.delete_outline, size: 18, color: colors.rose),
+                        tooltip: 'Revoke Passkey',
+                        onPressed: _isPasskeyBusy
+                            ? null
+                            : () => _handleRevokePasskey(id, credId.toString()),
+                      ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleRegisterPasskey() async {
+    setState(() => _isPasskeyBusy = true);
+    try {
+      await _passkeyService.registerDevicePasskey(customDeviceName: 'Mobile Device');
+      _hasLocalPasskey = await _passkeyService.hasLocalPasskey();
+      final localInfo = await _passkeyService.getLocalPasskeyInfo();
+      _localPasskeyDevice = localInfo?.deviceName;
+      _serverPasskeys = await _passkeyService.fetchServerPasskeys();
+      if (mounted) {
+        showPremiumSnackBar(context, 'This device has been registered as a Passkey!');
+      }
+    } catch (e) {
+      if (mounted) {
+        showPremiumSnackBar(
+          context,
+          'Failed to register passkey: ${e.toString().replaceAll("Exception: ", "")}',
+          isError: true,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isPasskeyBusy = false);
+    }
+  }
+
+  Future<void> _handleRemoveLocalPasskey() async {
+    await _passkeyService.clearLocalPasskey();
+    setState(() {
+      _hasLocalPasskey = false;
+      _localPasskeyDevice = null;
+    });
+    if (mounted) {
+      showPremiumSnackBar(context, 'Passkey removed from this device');
+    }
+  }
+
+  Future<void> _handleRevokePasskey(int passkeyId, String credentialId) async {
+    setState(() => _isPasskeyBusy = true);
+    try {
+      await _passkeyService.revokePasskey(passkeyId, credentialId: credentialId);
+      _hasLocalPasskey = await _passkeyService.hasLocalPasskey();
+      final localInfo = await _passkeyService.getLocalPasskeyInfo();
+      _localPasskeyDevice = localInfo?.deviceName;
+      _serverPasskeys = await _passkeyService.fetchServerPasskeys();
+      if (mounted) {
+        showPremiumSnackBar(context, 'Passkey revoked successfully');
+      }
+    } catch (e) {
+      if (mounted) {
+        showPremiumSnackBar(
+          context,
+          'Failed to revoke passkey: ${e.toString().replaceAll("Exception: ", "")}',
+          isError: true,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isPasskeyBusy = false);
+    }
   }
 }

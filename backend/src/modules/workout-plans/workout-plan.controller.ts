@@ -11,8 +11,8 @@ import { getUserLocalDate } from '../../shared/utils/date-utils.js';
 
 const createPlanSchema = z.object({
   name: z.string().min(1).max(150),
-  description: z.string().max(2000).optional(),
-  goalCategory: z.string().max(50).optional(),
+  description: z.string().max(2000).nullish(),
+  goalCategory: z.string().max(50).nullish(),
 });
 
 const updatePlanSchema = createPlanSchema.partial().extend({
@@ -30,36 +30,69 @@ const cloneVersionSchema = z.object({
 const addDaySchema = z.object({
   weekdayNumber: z.number().int().min(1).max(7),
   name: z.string().min(1).max(100),
-  isRestDay: z.boolean().optional(),
-  notes: z.string().max(2000).optional(),
+  isRestDay: z.boolean().nullish(),
+  notes: z.string().max(2000).nullish(),
+  orderIndex: z.number().int().min(1).max(7).nullish(),
 });
 
 const updateDaySchema = z.object({
   name: z.string().min(1).max(100).optional(),
-  isRestDay: z.boolean().optional(),
-  notes: z.string().max(2000).optional(),
+  isRestDay: z.boolean().nullish(),
+  notes: z.string().max(2000).nullish(),
+  orderIndex: z.number().int().min(1).max(7).optional(),
 });
 
-const exerciseFields = {
-  exerciseId: z.number().int().positive(),
-  orderIndex: z.number().int().min(1).optional(),
-  targetSets: z.number().int().min(1).max(50),
-  repsMin: z.number().int().min(1).max(500).optional(),
-  repsMax: z.number().int().min(1).max(500).optional(),
-  restSeconds: z.number().int().min(0).max(3600).optional(),
-  notes: z.string().max(2000).optional(),
-  isOptional: z.boolean().optional(),
-};
-
-const validateRepRange = (data: { repsMin?: number; repsMax?: number }, ctx: z.RefinementCtx) => {
-  if (data.repsMin !== undefined && data.repsMax !== undefined && data.repsMax < data.repsMin) {
+const validateRepRange = (data: { repsMin?: number | null; repsMax?: number | null; targetRepsMin?: number | null; targetRepsMax?: number | null }, ctx: z.RefinementCtx) => {
+  const min = data.repsMin ?? data.targetRepsMin;
+  const max = data.repsMax ?? data.targetRepsMax;
+  if (min != null && max != null && max < min) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['repsMax'], message: 'repsMax cannot be less than repsMin' });
   }
 };
 
-const addExerciseSchema = z.object(exerciseFields).superRefine(validateRepRange);
+const workoutSetSchema = z.object({
+  setNumber: z.number().int().min(1).max(50),
+  targetRepsMin: z.number().int().min(1).max(500).nullish(),
+  targetRepsMax: z.number().int().min(1).max(500).nullish(),
+  targetWeightKg: z.number().min(0).max(1000).nullish(),
+  targetDurationSeconds: z.number().int().min(1).max(86400).nullish(),
+  targetDistanceMeters: z.number().min(0).max(1000000).nullish(),
+  restSeconds: z.number().int().min(0).max(3600).nullish(),
+  notes: z.string().max(1000).nullish(),
+}).superRefine(validateRepRange);
 
-const updateExerciseSchema = z.object(exerciseFields).partial().superRefine(validateRepRange);
+const exerciseFields = {
+  exerciseId: z.number().int().positive(),
+  orderIndex: z.number().int().min(1).nullish(),
+  targetSets: z.number().int().min(1).max(50),
+  repsMin: z.number().int().min(1).max(500).nullish(),
+  repsMax: z.number().int().min(1).max(500).nullish(),
+  targetDurationSeconds: z.number().int().min(1).max(86400).nullish(),
+  targetDistanceMeters: z.number().min(0).max(1000000).nullish(),
+  restSeconds: z.number().int().min(0).max(3600).nullish(),
+  notes: z.string().max(2000).nullish(),
+  isOptional: z.boolean().nullish(),
+  sets: z.array(workoutSetSchema).max(50).optional(),
+};
+
+const validateSetCollection = (data: { targetSets?: number; sets?: Array<{ setNumber: number }> }, ctx: z.RefinementCtx) => {
+  if (!data.sets) return;
+  if (data.targetSets !== undefined && data.sets.length !== data.targetSets) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['sets'], message: 'sets must contain exactly targetSets entries' });
+  }
+  const numbers = data.sets.map((set) => set.setNumber);
+  if (new Set(numbers).size !== numbers.length || numbers.some((number, index) => number !== index + 1)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['sets'], message: 'sets must be numbered consecutively starting at 1' });
+  }
+};
+
+const addExerciseSchema = z.object(exerciseFields)
+  .superRefine(validateRepRange)
+  .superRefine(validateSetCollection);
+
+const updateExerciseSchema = z.object(exerciseFields).partial()
+  .superRefine(validateRepRange)
+  .superRefine(validateSetCollection);
 
 export class WorkoutPlanController {
   private service = new WorkoutPlanService();
@@ -114,7 +147,13 @@ export class WorkoutPlanController {
   async createPlan(request: FastifyRequest, reply: FastifyReply) {
     const auth = (request as AuthenticatedRequest).user;
     const body = createPlanSchema.parse(request.body);
-    const plan = await this.service.createPlan({ ...body, createdBy: auth.userId, visibility: 'admin' });
+    const plan = await this.service.createPlan({
+      ...body,
+      description: body.description ?? undefined,
+      goalCategory: body.goalCategory ?? undefined,
+      createdBy: auth.userId,
+      visibility: 'admin',
+    });
     await recordAuditEvent(request, 'workout_plan.created', 'workout_plan', plan.id, { name: plan.name });
     return reply.status(201).send({ success: true, data: plan });
   }
@@ -182,6 +221,7 @@ export class WorkoutPlanController {
     assertCanModifyWorkoutPlan(plan, auth);
     const body = addDaySchema.parse(request.body);
     const result = await this.service.addDay(versionId, body);
+    await recordAuditEvent(request, 'workout_plan_day.created', 'workout_plan_day', result.id, { versionId, weekdayNumber: body.weekdayNumber });
     return reply.status(201).send({ success: true, data: result });
   }
 
@@ -193,6 +233,7 @@ export class WorkoutPlanController {
     assertCanModifyWorkoutPlan(plan, auth);
     const body = updateDaySchema.parse(request.body);
     await this.service.updateDay(dayId, body);
+    await recordAuditEvent(request, 'workout_plan_day.updated', 'workout_plan_day', dayId, body);
     return reply.status(200).send({ success: true, data: { message: 'Day updated' } });
   }
 
@@ -203,6 +244,7 @@ export class WorkoutPlanController {
     const plan = await this.getPlanForDay(dayId);
     assertCanModifyWorkoutPlan(plan, auth);
     await this.service.deleteDay(dayId);
+    await recordAuditEvent(request, 'workout_plan_day.deleted', 'workout_plan_day', dayId, {});
     return reply.status(200).send({ success: true, data: { message: 'Day deleted' } });
   }
 
@@ -214,6 +256,7 @@ export class WorkoutPlanController {
     assertCanModifyWorkoutPlan(plan, auth);
     const body = addExerciseSchema.parse(request.body);
     const result = await this.service.addExerciseToDay(dayId, body);
+    await recordAuditEvent(request, 'workout_plan_exercise.created', 'workout_plan_exercise', result.id, { dayId, exerciseId: body.exerciseId });
     return reply.status(201).send({ success: true, data: result });
   }
 
@@ -225,6 +268,7 @@ export class WorkoutPlanController {
     assertCanModifyWorkoutPlan(plan, auth);
     const body = updateExerciseSchema.parse(request.body);
     await this.service.updateExercise(exerciseId, body);
+    await recordAuditEvent(request, 'workout_plan_exercise.updated', 'workout_plan_exercise', exerciseId, body);
     return reply.status(200).send({ success: true, data: { message: 'Exercise updated' } });
   }
 
@@ -235,6 +279,7 @@ export class WorkoutPlanController {
     const plan = await this.getPlanForExercise(exerciseId);
     assertCanModifyWorkoutPlan(plan, auth);
     await this.service.deleteExercise(exerciseId);
+    await recordAuditEvent(request, 'workout_plan_exercise.deleted', 'workout_plan_exercise', exerciseId, {});
     return reply.status(200).send({ success: true, data: { message: 'Exercise removed from day' } });
   }
 
@@ -251,6 +296,8 @@ export class WorkoutPlanController {
     const body = createPlanSchema.parse(request.body);
     const plan = await this.service.createPlan({
       ...body,
+      description: body.description ?? undefined,
+      goalCategory: body.goalCategory ?? undefined,
       createdBy: auth.userId,
       ownerUserId: auth.userId,
       visibility: 'private',

@@ -57,7 +57,7 @@ export class AuthRepository {
       deviceName || null,
       ipAddress || null,
       userAgent || null,
-      expiresAt.toISOString(),
+      expiresAt.toISOString().slice(0, 19).replace('T', ' '),
       rotatedFromId || null,
     ]);
     return res.insertId;

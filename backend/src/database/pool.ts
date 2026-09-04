@@ -211,7 +211,9 @@ class SQLiteDatabasePool implements DatabasePool {
 
 export function getDatabasePool(customPath?: string): DatabasePool {
   if (!poolInstance || customPath) {
-    if (env.dbClient === 'mysql') {
+    // An explicit database path is used by isolated SQLite migration tests
+    // and must take precedence over the process-wide production client.
+    if (!customPath && env.dbClient === 'mysql') {
       poolInstance = new MySQLDatabasePool();
     } else {
       const pool = new SQLiteDatabasePool(customPath);

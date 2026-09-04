@@ -1,6 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
-import { Settings as SettingsIcon, Save, RefreshCw, CheckCircle2, AlertCircle, X, ShieldAlert } from 'lucide-react';
+import {
+  Settings as SettingsIcon,
+  Save,
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  ShieldAlert,
+  Fingerprint,
+  Trash2,
+  ShieldCheck,
+  KeyRound,
+} from 'lucide-react';
 import {
   Card,
   Button,
@@ -11,6 +23,11 @@ import {
   Skeleton,
   AlertBanner,
 } from '../components/ui';
+import {
+  isPasskeySupported,
+  executePasskeyRegistration,
+  WebAuthnRegistrationOptions,
+} from '../lib/webauthn';
 
 interface SystemSetting {
   id: number;
@@ -21,12 +38,27 @@ interface SystemSetting {
   updated_at: string;
 }
 
+interface PasskeyItem {
+  id: number;
+  credentialId: string;
+  deviceName: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
 export const SettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<SystemSetting[]>([]);
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Passkey state
+  const [passkeys, setPasskeys] = useState<PasskeyItem[]>([]);
+  const [passkeysLoading, setPasskeysLoading] = useState<boolean>(true);
+  const [registeringPasskey, setRegisteringPasskey] = useState<boolean>(false);
+  const [revokingId, setRevokingId] = useState<number | null>(null);
+  const [passkeySupported, setPasskeySupported] = useState<boolean>(true);
 
   const fetchSettings = async () => {
     try {
@@ -61,9 +93,70 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
+  const fetchPasskeys = async () => {
+    try {
+      setPasskeysLoading(true);
+      const res = await api.get<{ passkeys: PasskeyItem[] }>('/me/passkeys');
+      setPasskeys(res.passkeys || []);
+    } catch {
+      // Non-critical if checking settings
+    } finally {
+      setPasskeysLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchSettings();
+    fetchPasskeys();
+    isPasskeySupported().then((supported) => setPasskeySupported(supported));
   }, []);
+
+  const handleRegisterPasskey = async () => {
+    try {
+      setRegisteringPasskey(true);
+      setFeedback(null);
+      // 1. Fetch registration challenge options
+      const options = await api.post<WebAuthnRegistrationOptions>('/auth/passkey/register-options', {});
+
+      // Determine friendly device name
+      const deviceName = navigator.userAgent.includes('Mac')
+        ? 'Mac Platform Authenticator (Touch ID)'
+        : navigator.userAgent.includes('Windows')
+        ? 'Windows Hello / Workstation'
+        : 'Web Authenticator';
+
+      // 2. Perform authenticator ceremony
+      const registrationPayload = await executePasskeyRegistration(options, deviceName);
+
+      // 3. Complete verification on server
+      await api.post('/auth/passkey/register-verify', registrationPayload);
+
+      setFeedback({ type: 'success', message: 'Passkey registered successfully! You can now use it to sign in.' });
+      await fetchPasskeys();
+    } catch (err: any) {
+      if (err.name === 'NotAllowedError') {
+        setFeedback({ type: 'error', message: 'Passkey registration was cancelled or timed out.' });
+      } else {
+        setFeedback({ type: 'error', message: err.message || 'Failed to register passkey' });
+      }
+    } finally {
+      setRegisteringPasskey(false);
+    }
+  };
+
+  const handleRevokePasskey = async (passkeyId: number) => {
+    if (!window.confirm('Are you sure you want to revoke this passkey?')) return;
+    try {
+      setRevokingId(passkeyId);
+      await api.delete(`/me/passkeys/${passkeyId}`);
+      setFeedback({ type: 'success', message: 'Passkey revoked successfully.' });
+      await fetchPasskeys();
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: err.message || 'Failed to revoke passkey' });
+    } finally {
+      setRevokingId(null);
+    }
+  };
 
   const handleChange = (key: string, value: string) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -208,6 +301,133 @@ export const SettingsPage: React.FC = () => {
           </div>
         </form>
       )}
+
+      {/* Section: Passkey & Hardware Security Keys */}
+      <Card style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          flexWrap: 'wrap',
+          gap: '1rem',
+          borderBottom: '1px solid var(--border-subtle)',
+          paddingBottom: '0.75rem',
+        }}>
+          <div>
+            <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Fingerprint size={18} color="var(--accent-primary)" />
+              <span>Passkey & Biometric Credentials</span>
+            </h2>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+              FIDO2 / WebAuthn cryptographic keys (Touch ID, Windows Hello, YubiKey). Sign in instantly without passwords.
+            </p>
+          </div>
+
+          <Button
+            type="button"
+            variant="secondary"
+            loading={registeringPasskey}
+            disabled={!passkeySupported}
+            onClick={handleRegisterPasskey}
+            icon={<ShieldCheck size={16} color="var(--accent-primary)" />}
+          >
+            {registeringPasskey ? 'Prompting Authenticator...' : 'Register Passkey for this Device'}
+          </Button>
+        </div>
+
+        {!passkeySupported && (
+          <div style={{
+            padding: '0.75rem 1rem',
+            borderRadius: 'var(--radius-md)',
+            backgroundColor: 'var(--accent-amber-muted)',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+            color: 'var(--accent-amber)',
+            fontSize: '0.8125rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+          }}>
+            <AlertCircle size={16} />
+            <span>WebAuthn / Passkeys are not supported in this browser environment. Ensure you are accessing via HTTPS or localhost.</span>
+          </div>
+        )}
+
+        {passkeysLoading ? (
+          <Skeleton width="100%" height="56px" />
+        ) : passkeys.length === 0 ? (
+          <div style={{
+            padding: '1.5rem',
+            textAlign: 'center',
+            backgroundColor: 'var(--surface-subtle)',
+            borderRadius: 'var(--radius-md)',
+            color: 'var(--text-secondary)',
+            fontSize: '0.875rem',
+          }}>
+            No Passkey registered yet on this account. Click "Register Passkey for this Device" above to enable biometric 1-tap sign in.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+            <div style={{
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              color: 'var(--text-secondary)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}>
+              Registered Passkeys ({passkeys.length})
+            </div>
+            {passkeys.map((p) => (
+              <div
+                key={p.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '0.875rem 1rem',
+                  backgroundColor: 'var(--surface-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-subtle)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: 'var(--radius-sm)',
+                    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <KeyRound size={16} color="var(--accent-primary)" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {p.deviceName || 'Passkey Device'}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      Enrolled: {new Date(p.createdAt).toLocaleDateString()}
+                      {p.lastUsedAt ? ` • Last used: ${new Date(p.lastUsedAt).toLocaleDateString()}` : ' • Never used'}
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  loading={revokingId === p.id}
+                  onClick={() => handleRevokePasskey(p.id)}
+                  icon={<Trash2 size={15} color="var(--accent-rose)" />}
+                  style={{ padding: '0.4rem 0.6rem', color: 'var(--accent-rose)' }}
+                  title="Revoke passkey"
+                >
+                  <span>Revoke</span>
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
   );
 };

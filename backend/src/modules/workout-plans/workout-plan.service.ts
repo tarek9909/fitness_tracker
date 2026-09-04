@@ -111,9 +111,21 @@ export class WorkoutPlanService {
             targetSets: ex.target_sets,
             repsMin: ex.reps_min,
             repsMax: ex.reps_max,
+            targetDurationSeconds: ex.target_duration_seconds,
+            targetDistanceMeters: ex.target_distance_meters,
             restSeconds: ex.rest_seconds,
             notes: ex.notes,
             isOptional: ex.is_optional,
+            sets: (ex.sets || []).map((set: any) => ({
+              setNumber: set.set_number,
+              targetRepsMin: set.target_reps_min,
+              targetRepsMax: set.target_reps_max,
+              targetWeightKg: set.target_weight_kg,
+              targetDurationSeconds: set.target_duration_seconds,
+              targetDistanceMeters: set.target_distance_meters,
+              restSeconds: set.rest_seconds,
+              notes: set.notes,
+            })),
           }, conn);
         }
       }
@@ -122,7 +134,7 @@ export class WorkoutPlanService {
     });
   }
 
-  async updatePlan(planId: number, data: Partial<{ name: string; description: string; goalCategory: string; isArchived: boolean }>) {
+  async updatePlan(planId: number, data: Partial<{ name: string; description: string | null; goalCategory: string | null; isArchived: boolean }>) {
     await this.getPlanById(planId);
     await this.repo.updatePlan(planId, {
       name: data.name,
@@ -182,9 +194,21 @@ export class WorkoutPlanService {
               targetSets: ex.target_sets,
               repsMin: ex.reps_min,
               repsMax: ex.reps_max,
+              targetDurationSeconds: ex.target_duration_seconds,
+              targetDistanceMeters: ex.target_distance_meters,
               restSeconds: ex.rest_seconds,
               notes: ex.notes,
               isOptional: ex.is_optional,
+              sets: (ex.sets || []).map((set: any) => ({
+                setNumber: set.set_number,
+                targetRepsMin: set.target_reps_min,
+                targetRepsMax: set.target_reps_max,
+                targetWeightKg: set.target_weight_kg,
+                targetDurationSeconds: set.target_duration_seconds,
+                targetDistanceMeters: set.target_distance_meters,
+                restSeconds: set.rest_seconds,
+                notes: set.notes,
+              })),
             }, conn);
           }
         }
@@ -254,23 +278,50 @@ export class WorkoutPlanService {
     return this.getVersionDetails(versionId);
   }
 
-  private async assertDraftVersion(versionId: number) {
-    const version = await this.repo.findVersionById(versionId);
-    if (!version) throw new NotFoundError('Workout plan version not found');
-    if (version.status === 'published') {
-      throw new ConflictError('Published plan versions are immutable. Create a new version draft to make changes.', 'PLAN_VERSION_IMMUTABLE');
+  private async validatePublishedStructure(versionId: number, conn: any): Promise<void> {
+    const days = await conn.query(
+      'SELECT id, is_rest_day FROM workout_plan_days WHERE workout_plan_version_id = ?',
+      [versionId],
+    );
+    if (days.length === 0) throw new ValidationError('Published workout plans must contain at least one day');
+    const trainingDays = days.filter((day: any) => !day.is_rest_day);
+    if (trainingDays.length === 0) {
+      throw new ValidationError('Published workout plans must contain at least one active workout day');
     }
-    return version;
+    const dayIds = trainingDays.map((day: any) => day.id);
+    const exercises = await conn.query(
+      `SELECT id, exercise_id, target_sets, target_reps_min, target_reps_max
+       FROM workout_plan_exercises WHERE workout_plan_day_id IN (${dayIds.map(() => '?').join(',')})`,
+      dayIds,
+    );
+    if (exercises.length === 0) throw new ValidationError('Published workout plans must contain at least one exercise');
+    for (const exercise of exercises) {
+      if (!exercise.exercise_id || Number(exercise.target_sets) < 1) {
+        throw new ValidationError('Published workout exercises must have a valid exercise and at least one set');
+      }
+      if (exercise.target_reps_min != null && exercise.target_reps_max != null && exercise.target_reps_max < exercise.target_reps_min) {
+        throw new ValidationError('Published workout exercise rep ranges are invalid');
+      }
+    }
   }
 
-  async addDay(versionId: number, data: { weekdayNumber: number; name: string; isRestDay?: boolean; notes?: string }) {
+  private defaultSets(data: any, targetSets: number) {
+    return Array.from({ length: targetSets }, (_, index) => ({
+      setNumber: index + 1,
+      targetRepsMin: data.repsMin ?? null,
+      targetRepsMax: data.repsMax ?? null,
+      targetWeightKg: null,
+      targetDurationSeconds: data.targetDurationSeconds ?? null,
+      targetDistanceMeters: data.targetDistanceMeters ?? null,
+      restSeconds: data.restSeconds ?? null,
+      notes: data.notes ?? null,
+    }));
+  }
+
+  async addDay(versionId: number, data: { weekdayNumber: number; name: string; isRestDay?: boolean | null; notes?: string | null; orderIndex?: number | null }) {
     const dayId = await this.db.withTransaction(async (conn) => {
       const version = await conn.queryOne<any>('SELECT status FROM workout_plan_versions WHERE id = ?', [versionId]);
       if (!version) throw new NotFoundError('Workout plan version not found');
-      if (version.status === 'published') {
-        throw new ConflictError('Published plan versions are immutable. Create a new version draft to make changes.', 'PLAN_VERSION_IMMUTABLE');
-      }
-
       const result = await conn.execute(
         `INSERT INTO workout_plan_days (workout_plan_version_id, weekday, name, is_rest_day, notes, day_order)
          VALUES (?, ?, ?, ?, ?, ?)`,
@@ -280,9 +331,10 @@ export class WorkoutPlanService {
           data.name,
           data.isRestDay ? 1 : 0,
           data.notes || null,
-          data.weekdayNumber,
+          data.orderIndex ?? data.weekdayNumber,
         ]
       );
+      if (version.status === 'published') await this.validatePublishedStructure(versionId, conn);
       return result.insertId;
     });
     return {
@@ -292,12 +344,12 @@ export class WorkoutPlanService {
       name: data.name,
       is_rest_day: data.isRestDay ? 1 : 0,
       notes: data.notes || null,
-      day_order: data.weekdayNumber,
+      day_order: data.orderIndex ?? data.weekdayNumber,
       exercises: [],
     };
   }
 
-  async updateDay(dayId: number, data: { name?: string; isRestDay?: boolean; notes?: string }) {
+  async updateDay(dayId: number, data: { name?: string; isRestDay?: boolean | null; notes?: string | null; orderIndex?: number }) {
     await this.db.withTransaction(async (conn) => {
       const day = await conn.queryOne<any>(
         `SELECT wpd.workout_plan_version_id, wpv.status 
@@ -307,19 +359,29 @@ export class WorkoutPlanService {
         [dayId]
       );
       if (!day) throw new NotFoundError('Workout day not found');
-      if (day.status === 'published') {
-        throw new ConflictError('Published plan versions are immutable. Create a new version draft to make changes.', 'PLAN_VERSION_IMMUTABLE');
-      }
-
       const set: string[] = [];
       const values: any[] = [];
       if (data.name !== undefined) { set.push('name = ?'); values.push(data.name); }
       if (data.isRestDay !== undefined) { set.push('is_rest_day = ?'); values.push(data.isRestDay ? 1 : 0); }
       if (data.notes !== undefined) { set.push('notes = ?'); values.push(data.notes); }
 
+      if (data.orderIndex !== undefined) {
+        const current = await conn.queryOne<any>('SELECT day_order FROM workout_plan_days WHERE id = ?', [dayId]);
+        if (current && current.day_order !== data.orderIndex) {
+          await conn.execute('UPDATE workout_plan_days SET day_order = ? WHERE id = ?', [-9999, dayId]);
+          const target = await conn.queryOne<any>(
+            'SELECT id FROM workout_plan_days WHERE workout_plan_version_id = ? AND day_order = ? AND id != ?',
+            [day.workout_plan_version_id, data.orderIndex, dayId],
+          );
+          if (target) await conn.execute('UPDATE workout_plan_days SET day_order = ? WHERE id = ?', [current.day_order, target.id]);
+          await conn.execute('UPDATE workout_plan_days SET day_order = ? WHERE id = ?', [data.orderIndex, dayId]);
+        }
+      }
+
       if (set.length > 0) {
         await conn.execute(`UPDATE workout_plan_days SET ${set.join(', ')} WHERE id = ?`, [...values, dayId]);
       }
+      if (day.status === 'published') await this.validatePublishedStructure(day.workout_plan_version_id, conn);
     });
   }
 
@@ -333,11 +395,8 @@ export class WorkoutPlanService {
         [dayId]
       );
       if (!day) throw new NotFoundError('Workout day not found');
-      if (day.status === 'published') {
-        throw new ConflictError('Published plan versions are immutable. Create a new version draft to make changes.', 'PLAN_VERSION_IMMUTABLE');
-      }
-
       await conn.execute('DELETE FROM workout_plan_days WHERE id = ?', [dayId]);
+      if (day.status === 'published') await this.validatePublishedStructure(day.workout_plan_version_id, conn);
     });
   }
 
@@ -347,9 +406,12 @@ export class WorkoutPlanService {
     targetSets: number;
     repsMin?: number;
     repsMax?: number;
+    targetDurationSeconds?: number;
+    targetDistanceMeters?: number;
     restSeconds?: number;
     notes?: string;
     isOptional?: boolean;
+    sets?: any[];
   }) {
     return this.db.withTransaction(async (conn) => {
       const day = await conn.queryOne<any>(
@@ -359,10 +421,6 @@ export class WorkoutPlanService {
         [dayId]
       );
       if (!day) throw new NotFoundError('Workout day not found');
-      if (day.status === 'published') {
-        throw new ConflictError('Published plan versions are immutable. Create a new version draft to make changes.', 'PLAN_VERSION_IMMUTABLE');
-      }
-
       const exercise = await conn.queryOne<{ name: string; tracking_type: string }>(
         'SELECT name, tracking_type FROM exercises WHERE id = ?',
         [data.exerciseId]
@@ -373,8 +431,9 @@ export class WorkoutPlanService {
       const res = await conn.execute(
         `INSERT INTO workout_plan_exercises (
           workout_plan_day_id, exercise_id, exercise_order, exercise_name_snapshot, tracking_type_snapshot,
-          target_sets, target_reps_min, target_reps_max, rest_seconds, notes, is_optional
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          target_sets, target_reps_min, target_reps_max, target_duration_seconds,
+          target_distance_meters, rest_seconds, notes, is_optional
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           dayId,
           data.exerciseId,
@@ -384,11 +443,15 @@ export class WorkoutPlanService {
           data.targetSets,
           data.repsMin ?? null,
           data.repsMax ?? null,
+          data.targetDurationSeconds ?? null,
+          data.targetDistanceMeters ?? null,
           data.restSeconds ?? null,
           data.notes || null,
           data.isOptional ? 1 : 0,
         ]
       );
+      await this.repo.replaceExerciseSets(res.insertId, data.sets || this.defaultSets(data, data.targetSets), conn);
+      if (day.status === 'published') await this.validatePublishedStructure(day.workout_plan_version_id, conn);
       return { id: res.insertId };
     });
   }
@@ -401,7 +464,9 @@ export class WorkoutPlanService {
     await this.db.withTransaction(async (conn) => {
       const ex = await conn.queryOne<any>(
         `SELECT wpd.workout_plan_version_id, wpe.workout_plan_day_id, wpe.exercise_order,
-                wpe.target_reps_min, wpe.target_reps_max, wpv.status
+                wpe.target_sets, wpe.target_reps_min, wpe.target_reps_max,
+                wpe.target_duration_seconds, wpe.target_distance_meters,
+                wpe.rest_seconds, wpe.notes, wpv.status
          FROM workout_plan_exercises wpe
          JOIN workout_plan_days wpd ON wpd.id = wpe.workout_plan_day_id
          JOIN workout_plan_versions wpv ON wpv.id = wpd.workout_plan_version_id
@@ -409,10 +474,6 @@ export class WorkoutPlanService {
         [exerciseId]
       );
       if (!ex) throw new NotFoundError('Workout exercise not found');
-      if (ex.status === 'published') {
-        throw new ConflictError('Published plan versions are immutable. Create a new version draft to make changes.', 'PLAN_VERSION_IMMUTABLE');
-      }
-
       const effectiveRepsMin = data.repsMin !== undefined ? data.repsMin : ex.target_reps_min;
       const effectiveRepsMax = data.repsMax !== undefined ? data.repsMax : ex.target_reps_max;
       if (effectiveRepsMin !== null && effectiveRepsMin !== undefined && effectiveRepsMax !== null && effectiveRepsMax !== undefined && effectiveRepsMax < effectiveRepsMin) {
@@ -441,6 +502,8 @@ export class WorkoutPlanService {
       if (updatePayload.targetSets !== undefined) { set.push('target_sets = ?'); values.push(updatePayload.targetSets); }
       if (updatePayload.repsMin !== undefined) { set.push('target_reps_min = ?'); values.push(updatePayload.repsMin); }
       if (updatePayload.repsMax !== undefined) { set.push('target_reps_max = ?'); values.push(updatePayload.repsMax); }
+      if (updatePayload.targetDurationSeconds !== undefined) { set.push('target_duration_seconds = ?'); values.push(updatePayload.targetDurationSeconds); }
+      if (updatePayload.targetDistanceMeters !== undefined) { set.push('target_distance_meters = ?'); values.push(updatePayload.targetDistanceMeters); }
       if (updatePayload.restSeconds !== undefined) { set.push('rest_seconds = ?'); values.push(updatePayload.restSeconds); }
       if (updatePayload.notes !== undefined) { set.push('notes = ?'); values.push(updatePayload.notes); }
       if (updatePayload.isOptional !== undefined) { set.push('is_optional = ?'); values.push(updatePayload.isOptional ? 1 : 0); }
@@ -448,6 +511,19 @@ export class WorkoutPlanService {
       if (set.length > 0) {
         await conn.execute(`UPDATE workout_plan_exercises SET ${set.join(', ')} WHERE id = ?`, [...values, exerciseId]);
       }
+      if (data.sets !== undefined) {
+        await this.repo.replaceExerciseSets(exerciseId, data.sets, conn);
+      } else if (data.targetSets !== undefined && data.targetSets !== ex.target_sets) {
+        await this.repo.replaceExerciseSets(exerciseId, this.defaultSets({
+          repsMin: effectiveRepsMin,
+          repsMax: effectiveRepsMax,
+          targetDurationSeconds: data.targetDurationSeconds ?? ex.target_duration_seconds,
+          targetDistanceMeters: data.targetDistanceMeters ?? ex.target_distance_meters,
+          restSeconds: data.restSeconds ?? ex.rest_seconds,
+          notes: data.notes ?? ex.notes,
+        }, data.targetSets), conn);
+      }
+      if (ex.status === 'published') await this.validatePublishedStructure(ex.workout_plan_version_id, conn);
     });
   }
 
@@ -462,11 +538,8 @@ export class WorkoutPlanService {
         [exerciseId]
       );
       if (!ex) throw new NotFoundError('Workout exercise not found');
-      if (ex.status === 'published') {
-        throw new ConflictError('Published plan versions are immutable. Create a new version draft to make changes.', 'PLAN_VERSION_IMMUTABLE');
-      }
-
       await conn.execute('DELETE FROM workout_plan_exercises WHERE id = ?', [exerciseId]);
+      if (ex.status === 'published') await this.validatePublishedStructure(ex.workout_plan_version_id, conn);
     });
   }
 

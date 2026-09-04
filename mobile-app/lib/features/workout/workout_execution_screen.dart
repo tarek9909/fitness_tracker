@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/storage/local_cache.dart';
@@ -9,12 +10,14 @@ class WorkoutExecutionScreen extends StatefulWidget {
   final ApiClient apiClient;
   final int? workoutDayId;
   final int? existingSessionId;
+  final bool isReadOnly;
 
   const WorkoutExecutionScreen({
     super.key,
     required this.apiClient,
     this.workoutDayId,
     this.existingSessionId,
+    this.isReadOnly = false,
   });
 
   @override
@@ -24,39 +27,107 @@ class WorkoutExecutionScreen extends StatefulWidget {
 class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
   Map<String, dynamic>? _session;
   bool _isLoading = true;
+
+  bool get _isSessionCompleted =>
+      widget.isReadOnly ||
+      _session?['status'] == 'completed' ||
+      _session?['status'] == 'finished';
   late final LocalCache _localCache;
-  Timer? _workoutTimer;
-  int _elapsedSeconds = 0;
+  Timer? _sessionTimer;
+  int _sessionSeconds = 0;
+  Timer? _restTimer;
+  int _restSecondsRemaining = 0;
+
+  final Map<String, TextEditingController> _inlineWeightControllers = {};
+  final Map<String, TextEditingController> _inlineRepsControllers = {};
+  final Map<String, TextEditingController> _inlineDurationControllers = {};
+  final Map<String, TextEditingController> _inlineDistanceControllers = {};
+  final Map<int, int> _extraSetsCount = {};
 
   String get _activeSessionCacheKey {
     final userId = widget.apiClient.authSession.currentUser?.id;
     return 'active_workout_session.${userId ?? 'anonymous'}';
   }
 
-  String get _formattedTimer {
-    final m = (_elapsedSeconds ~/ 60).toString().padLeft(2, '0');
-    final s = (_elapsedSeconds % 60).toString().padLeft(2, '0');
-    return '$m:$s';
-  }
-
   @override
   void initState() {
     super.initState();
     _localCache = LocalCache(widget.apiClient.authSession.storage);
-    _workoutTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() {
-          _elapsedSeconds++;
-        });
-      }
-    });
+    if (!widget.isReadOnly) {
+      _startSessionTimer();
+    }
     _startOrResumeSession();
   }
 
   @override
   void dispose() {
-    _workoutTimer?.cancel();
+    _sessionTimer?.cancel();
+    _restTimer?.cancel();
+    for (final c in _inlineWeightControllers.values) {
+      c.dispose();
+    }
+    for (final c in _inlineRepsControllers.values) {
+      c.dispose();
+    }
+    for (final c in _inlineDurationControllers.values) {
+      c.dispose();
+    }
+    for (final c in _inlineDistanceControllers.values) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  void _startSessionTimer() {
+    _sessionTimer?.cancel();
+    _sessionTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (mounted) {
+        setState(() {
+          _sessionSeconds++;
+        });
+      }
+    });
+  }
+
+  void _startRestTimer([int durationSeconds = 90]) {
+    _restTimer?.cancel();
+    setState(() => _restSecondsRemaining = durationSeconds);
+    _restTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      if (_restSecondsRemaining <= 1) {
+        t.cancel();
+        setState(() => _restSecondsRemaining = 0);
+        showPremiumSnackBar(context, 'Rest complete! Ready for next set 💪', isSuccess: true);
+      } else {
+        setState(() => _restSecondsRemaining--);
+      }
+    });
+  }
+
+  String _formatDuration(int totalSeconds) {
+    final m = (totalSeconds ~/ 60).toString().padLeft(2, '0');
+    final s = (totalSeconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  String _formatPerfWeight(dynamic val) {
+    if (val == null) return '';
+    if (val is double) return val.toString();
+    final d = double.tryParse(val.toString());
+    if (d != null && d % 1 == 0 && !val.toString().endsWith('.0')) {
+      return d.toInt().toString();
+    }
+    return val.toString();
+  }
+
+  String _formatNum(dynamic val) {
+    if (val == null) return '';
+    final n = num.tryParse(val.toString());
+    if (n == null) return val.toString();
+    return (n % 1 == 0) ? n.toInt().toString() : n.toString();
   }
 
   Future<void> _persistSessionLocally(Map<String, dynamic>? session) async {
@@ -137,6 +208,22 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
       await _persistSessionLocally(res);
 
       if (mounted) {
+        if (res['duration_seconds'] != null) {
+          final d = res['duration_seconds'];
+          _sessionSeconds = d is int ? d : (int.tryParse(d.toString()) ?? _sessionSeconds);
+        } else if (res['started_at'] != null && res['completed_at'] != null) {
+          try {
+            final start = DateTime.parse(res['started_at'].toString());
+            final end = DateTime.parse(res['completed_at'].toString());
+            _sessionSeconds = end.difference(start).inSeconds;
+          } catch (_) {}
+        }
+        final isCompleted = widget.isReadOnly ||
+            res['status'] == 'completed' ||
+            res['status'] == 'finished';
+        if (isCompleted) {
+          _sessionTimer?.cancel();
+        }
         setState(() {
           _session = res;
           _isLoading = false;
@@ -160,11 +247,12 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
     String setType = 'working',
     double? weight,
     int? reps,
+    int? rir,
     int? durationSeconds,
     double? distanceMeters,
     String? notes,
   }) async {
-    if (_session == null) return;
+    if (_session == null || _isSessionCompleted) return;
 
     final body = <String, dynamic>{
       'sessionExerciseId': sessionExerciseId,
@@ -192,11 +280,13 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
       case 'reps_only':
       case 'bodyweight_reps':
         if (reps != null) body['reps'] = reps;
+        if (rir != null) body['rir'] = rir;
         break;
       case 'weight_reps':
       default:
         if (weight != null) body['weightKg'] = weight;
         if (reps != null) body['reps'] = reps;
+        if (rir != null) body['rir'] = rir;
         break;
     }
 
@@ -237,6 +327,7 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
             'set_type': setType,
             if (weight != null) 'weight_kg': weight,
             if (reps != null) 'reps': reps,
+            if (rir != null) 'rir': rir,
             if (durationSeconds != null) 'duration_seconds': durationSeconds,
             if (distanceMeters != null) 'distance_meters': distanceMeters,
             if (notes != null) 'notes': notes,
@@ -270,7 +361,7 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
   }
 
   Future<void> _showFinishWorkoutDialog() async {
-    if (_session == null) return;
+    if (_session == null || _isSessionCompleted) return;
     final exercises = (_session?['exercises'] as List<dynamic>? ?? []);
 
     final totalCompletedSets = exercises.fold<int>(0, (sum, ex) {
@@ -372,6 +463,7 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         PremiumButton(
+          key: const Key('confirm_finish_workout_button'),
           text: 'Finish Workout',
           onPressed: canFinish
               ? () {
@@ -439,781 +531,1212 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
     final colors = AppThemeColors.of(context);
     if (_isLoading) {
       return PremiumScaffold(
-        body:
-            Center(child: CircularProgressIndicator(color: colors.primary)),
+        body: Center(child: CircularProgressIndicator(color: colors.primary)),
       );
     }
 
     final exercises = (_session?['exercises'] as List<dynamic>? ?? []);
-    final totalExercises = exercises.length;
-    final completedExercises = exercises.where((e) {
-      final sList = (e['sets'] as List<dynamic>? ?? []);
-      final targetS = e['planned_sets'] ?? e['plannedSets'] ?? e['target_sets'] ?? e['targetSets'];
-      final targetCount = targetS is int
-          ? targetS
-          : (int.tryParse(targetS?.toString() ?? '') ?? sList.length);
-      final doneSets =
-          sList.where((s) => s['completed'] == 1 || s['completed'] == true).length;
-      return targetCount > 0 && doneSets >= targetCount;
-    }).length;
+    final workoutName = _session?['workout_name_snapshot'] as String? ??
+        _session?['name'] as String? ??
+        'Active Workout';
+
+    int completedExercises = 0;
+    for (final ex in exercises) {
+      final sets = (ex['sets'] as List<dynamic>? ?? []);
+      final hasCompletedSet = sets.any((s) => s['completed'] == 1 || s['completed'] == true);
+      if (hasCompletedSet) completedExercises++;
+    }
 
     return PremiumScaffold(
       appBar: PremiumAppBar(
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: Icon(Icons.close_rounded, color: colors.textPrimary),
           onPressed: () => Navigator.pop(context),
-          tooltip: 'Exit Workout',
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Live Workout Tracker',
+              _isSessionCompleted ? 'Workout Completed' : 'Live Workout Tracker',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
-                letterSpacing: 1,
-                color: colors.textSecondary,
+                letterSpacing: 1.0,
+                color: _isSessionCompleted ? colors.emerald : colors.primary,
               ),
             ),
+            const SizedBox(height: 2),
             Text(
-              _session?['workout_name_snapshot'] as String? ?? 'Workout Session',
+              workoutName,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+                color: colors.textPrimary,
+                letterSpacing: -0.3,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: colors.textPrimary,
-              ),
             ),
           ],
         ),
         actions: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
               color: colors.surfaceElevated,
               borderRadius: BorderRadius.circular(AppRadii.full),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              border: Border.all(
+                color: _isSessionCompleted
+                    ? colors.emerald.withValues(alpha: 0.35)
+                    : (colors.isDark ? Colors.white.withValues(alpha: 0.08) : colors.border),
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.timer, size: 14, color: colors.primary),
+                Icon(
+                  _isSessionCompleted ? Icons.check_circle_rounded : Icons.timer_outlined,
+                  size: 14,
+                  color: _isSessionCompleted ? colors.emerald : colors.cyan,
+                ),
                 const SizedBox(width: 4),
                 Text(
-                  _formattedTimer,
+                  _formatDuration(_sessionSeconds),
                   style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                    color: colors.textPrimary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: _isSessionCompleted ? colors.emerald : colors.textPrimary,
                   ),
                 ),
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: PremiumButton(
-              text: 'Finish',
-              onPressed: _showFinishWorkoutDialog,
-              icon: const Icon(Icons.check, size: 16),
-              height: 34,
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: PremiumButton(
-            text: 'Complete Workout',
-            icon: const Icon(Icons.done_all, size: 18),
-            onPressed: _showFinishWorkoutDialog,
-            height: 50,
-          ),
-        ),
-      ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: exercises.length + 1,
-        itemBuilder: (ctx, idx) {
-          if (idx == 0) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          if (_isSessionCompleted)
+            Container(
+              margin: const EdgeInsets.only(right: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: colors.emeraldMuted,
+                borderRadius: BorderRadius.circular(AppRadii.full),
+                border: Border.all(color: colors.emerald.withValues(alpha: 0.35)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Progress',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: colors.textSecondary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        '$completedExercises / $totalExercises Exercises',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: colors.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: List.generate(
-                        totalExercises > 0 ? totalExercises : 1, (i) {
-                      final isFinished = i < completedExercises;
-                      final isCurrent = i == completedExercises;
-                      return Expanded(
-                        child: Container(
-                          height: 6,
-                          margin: EdgeInsets.only(
-                              right: i < totalExercises - 1 ? 4 : 0),
-                          decoration: BoxDecoration(
-                            color: isFinished
-                                ? colors.primary
-                                : (isCurrent
-                                    ? colors.primary.withValues(alpha: 0.4)
-                                    : colors.surfaceElevated),
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                        ),
-                      );
-                    }),
+                  Icon(Icons.lock_rounded, size: 13, color: colors.emerald),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Finalized',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: colors.emerald,
+                    ),
                   ),
                 ],
               ),
-            );
-          }
-
-          final ex = exercises[idx - 1] as Map<String, dynamic>;
-          final sets = (ex['sets'] as List<dynamic>? ?? []);
-          final trackingType =
-              (ex['tracking_type'] ?? ex['trackingType'] ?? 'weight_reps')
-                  .toString();
-
-          final dynamic rawPlannedSets = ex['planned_sets'] ??
-              ex['plannedSets'] ??
-              ex['target_sets'] ??
-              ex['targetSets'];
-          final int? plannedSets = rawPlannedSets is int
-              ? rawPlannedSets
-              : (rawPlannedSets != null
-                  ? int.tryParse(rawPlannedSets.toString())
-                  : null);
-
-          // If plannedSets is absent and sets is empty -> totalSets = 0 (clear unconfigured state)
-          final totalSets = plannedSets != null
-              ? (sets.length > plannedSets ? sets.length : plannedSets)
-              : sets.length;
-
-          final repsMin = ex['reps_min_target'] ??
-              ex['planned_reps_min_snapshot'] ??
-              ex['target_reps_min'] ??
-              ex['target_reps'] ??
-              ex['targetReps'];
-          final repsMax = ex['reps_max_target'] ??
-              ex['planned_reps_max_snapshot'] ??
-              ex['target_reps_max'];
-          String targetRepsDesc = '';
-          if (repsMin != null && repsMax != null) {
-            if (repsMin == repsMax) {
-              targetRepsDesc = '$repsMin reps';
-            } else {
-              targetRepsDesc = '$repsMin-$repsMax reps';
-            }
-          } else if (repsMin != null) {
-            targetRepsDesc = '$repsMin+ reps';
-          } else if (repsMax != null) {
-            targetRepsDesc = 'Up to $repsMax reps';
-          }
-
-          final targetHeader = plannedSets != null
-              ? (targetRepsDesc.isNotEmpty
-                  ? 'Target: $plannedSets Sets × $targetRepsDesc'
-                  : 'Target: $plannedSets Sets')
-              : (targetRepsDesc.isNotEmpty ? 'Target: $targetRepsDesc' : '');
-
-          final dynamic prevPerf = ex['previous_performance'] ??
-              ex['previousPerformance'] ??
-              ex['last_session_performance'] ??
-              ex['history'];
-          final Map? prevPerfMap = prevPerf is Map ? prevPerf : null;
-          String? prevPerfDesc;
-          if (prevPerf is Map) {
-            final maxW = prevPerf['maxWeightKg'] ??
-                prevPerf['max_weight_kg'] ??
-                prevPerf['weight_kg'] ??
-                prevPerf['weightKg'];
-            final recentSets = prevPerf['recentSets'] as List<dynamic>?;
-            if (recentSets != null && recentSets.isNotEmpty) {
-              final first = recentSets.first as Map<String, dynamic>;
-              final fw = first['weight_kg'] ?? first['weightKg'];
-              final fr = first['reps'];
-              prevPerfDesc =
-                  'Last session: ${fw != null ? '$fw kg' : ''}${fw != null && fr != null ? ' × ' : ''}${fr != null ? '$fr reps' : ''}';
-            } else if (prevPerf['weight_kg'] != null ||
-                prevPerf['weightKg'] != null ||
-                prevPerf['reps'] != null) {
-              final pw = prevPerf['weight_kg'] ?? prevPerf['weightKg'];
-              final pr = prevPerf['reps'];
-              prevPerfDesc =
-                  'Last session: ${pw != null ? '$pw kg' : ''}${pw != null && pr != null ? ' × ' : ''}${pr != null ? '$pr reps' : ''}';
-            } else if (maxW != null) {
-              prevPerfDesc = 'Previous Best: $maxW kg';
-            }
-          } else if (prevPerf is String && prevPerf.isNotEmpty) {
-            prevPerfDesc = 'Last session: $prevPerf';
-          }
-
-          final isExerciseCompleted = plannedSets != null &&
-              plannedSets > 0 &&
-              sets.where((s) => s is Map && (s['completed'] == 1 || s['completed'] == true)).length >=
-                  plannedSets;
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            child: PremiumCard(
-              padding: const EdgeInsets.all(18),
-              ambientGlow: !isExerciseCompleted,
-              border: BorderSide(
-                color: isExerciseCompleted
-                    ? colors.border
-                    : colors.primary.withValues(alpha: 0.3),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: PremiumButton(
+                text: 'Finish',
+                onPressed: _showFinishWorkoutDialog,
+                icon: const Icon(Icons.check_circle_rounded, size: 16),
+                height: 34,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: isExerciseCompleted
-                              ? colors.surfaceElevated
-                              : colors.primary.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isExerciseCompleted
-                                ? colors.border
-                                : colors.primary.withValues(alpha: 0.25),
-                          ),
-                        ),
-                        child: Center(
-                          child: Icon(
-                            isExerciseCompleted
-                                ? Icons.check
-                                : Icons.fitness_center,
-                            color: colors.primary,
-                            size: 22,
-                          ),
+            ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        children: [
+          // Workout Progress Overview Card (Stitch Active Workout Segmented Progress)
+          PremiumCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'PROGRESS',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                          color: colors.textSecondary,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              ex['exercise_name'] ??
-                                  ex['exerciseName'] ??
-                                  'Exercise',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
-                                decoration: isExerciseCompleted
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                                color: isExerciseCompleted
-                                    ? colors.textMuted
-                                    : colors.textPrimary,
-                              ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        '$completedExercises of ${exercises.length} Exercises',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: colors.emerald,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: exercises.isNotEmpty ? completedExercises / exercises.length : 0.0,
+                    backgroundColor: colors.surfaceElevated,
+                    valueColor: AlwaysStoppedAnimation<Color>(colors.emerald),
+                    minHeight: 6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Exercises List
+          ...List.generate(exercises.length, (idx) {
+            final ex = exercises[idx] as Map<String, dynamic>;
+            final sets = (ex['sets'] as List<dynamic>? ?? []);
+            final trackingType =
+                (ex['tracking_type'] ?? ex['trackingType'] ?? 'weight_reps')
+                    .toString();
+
+            final dynamic rawPlannedSets = ex['planned_sets'] ??
+                ex['plannedSets'] ??
+                ex['target_sets'] ??
+                ex['targetSets'];
+            final int? plannedSets = rawPlannedSets is int
+                ? rawPlannedSets
+                : (rawPlannedSets != null
+                    ? int.tryParse(rawPlannedSets.toString())
+                    : null);
+
+            final baseSets = plannedSets != null
+                ? (sets.length > plannedSets ? sets.length : plannedSets)
+                : sets.length;
+            final extraCount = _extraSetsCount[ex['id'] as int] ?? 0;
+            final totalSets = max(baseSets, extraCount);
+
+            final repsMin = ex['reps_min_target'] ??
+                ex['planned_reps_min_snapshot'] ??
+                ex['target_reps_min'] ??
+                ex['target_reps'] ??
+                ex['targetReps'];
+            final repsMax = ex['reps_max_target'] ??
+                ex['planned_reps_max_snapshot'] ??
+                ex['target_reps_max'];
+            String targetRepsDesc = '';
+            if (repsMin != null && repsMax != null) {
+              targetRepsDesc = repsMin == repsMax ? '$repsMin reps' : '$repsMin-$repsMax reps';
+            } else if (repsMin != null) {
+              targetRepsDesc = '$repsMin+ reps';
+            } else if (repsMax != null) {
+              targetRepsDesc = 'Up to $repsMax reps';
+            }
+
+            final targetHeader = plannedSets != null
+                ? (targetRepsDesc.isNotEmpty
+                    ? 'Target: $plannedSets Sets × $targetRepsDesc'
+                    : 'Target: $plannedSets Sets')
+                : (targetRepsDesc.isNotEmpty ? 'Target: $targetRepsDesc' : '');
+
+            final prevPerf = ex['previous_performance'] ??
+                ex['previousPerformance'] ??
+                ex['last_session_performance'] ??
+                ex['history'];
+
+            final targetWeight = ex['target_weight_kg'] ??
+                ex['targetWeightKg'] ??
+                ex['planned_weight_kg'] ??
+                ex['plannedWeightKg'] ??
+                (prevPerf is Map
+                    ? (prevPerf['weight_kg'] ??
+                        prevPerf['weightKg'] ??
+                        prevPerf['maxWeightKg'])
+                    : null);
+            final targetReps =
+                repsMin ?? repsMax ?? (prevPerf is Map ? prevPerf['reps'] : null);
+            String? prevPerfDesc;
+            if (prevPerf is Map) {
+              final maxW = prevPerf['maxWeightKg'] ??
+                  prevPerf['max_weight_kg'] ??
+                  prevPerf['weight_kg'] ??
+                  prevPerf['weightKg'];
+              final recentSets = prevPerf['recentSets'] as List<dynamic>?;
+              if (recentSets != null && recentSets.isNotEmpty) {
+                final first = recentSets.first as Map<String, dynamic>;
+                final fw = first['weight_kg'] ?? first['weightKg'];
+                final fr = first['reps'];
+                prevPerfDesc =
+                    'Last session: ${fw != null ? '${_formatPerfWeight(fw)} kg' : ''}${fw != null && fr != null ? ' × ' : ''}${fr != null ? '${_formatNum(fr)} reps' : ''}';
+              } else if (prevPerf['weight_kg'] != null ||
+                  prevPerf['weightKg'] != null ||
+                  prevPerf['reps'] != null) {
+                final pw = prevPerf['weight_kg'] ?? prevPerf['weightKg'];
+                final pr = prevPerf['reps'];
+                prevPerfDesc =
+                    'Last session: ${pw != null ? '${_formatPerfWeight(pw)} kg' : ''}${pw != null && pr != null ? ' × ' : ''}${pr != null ? '${_formatNum(pr)} reps' : ''}';
+              } else if (maxW != null) {
+                prevPerfDesc = 'Previous Best: ${_formatNum(maxW)} kg';
+              }
+            } else if (prevPerf is String && prevPerf.isNotEmpty) {
+              prevPerfDesc = 'Last session: $prevPerf';
+            }
+
+            final exerciseName = ex['exercise_name'] ?? ex['exerciseName'] ?? 'Exercise';
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              child: PremiumCard(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: colors.violetMuted,
+                            borderRadius: BorderRadius.circular(AppRadii.md),
+                            border: Border.all(
+                              color: colors.violet.withValues(alpha: 0.25),
                             ),
-                            if (targetHeader.isNotEmpty) ...[
-                              const SizedBox(height: 3),
+                          ),
+                          child: Icon(Icons.fitness_center_rounded, color: colors.violet, size: 18),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Text(
-                                targetHeader,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                exerciseName,
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  color: colors.textSecondary,
-                                  fontWeight: FontWeight.w500,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: colors.textPrimary,
                                 ),
                               ),
+                              if (targetHeader.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  targetHeader,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: colors.cyan,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ],
-                            if (prevPerfDesc != null) ...[
-                              const SizedBox(height: 2),
-                              Text(
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (prevPerfDesc != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: colors.amberMuted,
+                          borderRadius: BorderRadius.circular(AppRadii.sm),
+                          border: Border.all(color: colors.amber.withValues(alpha: 0.35)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.history_rounded, size: 13, color: colors.amber),
+                            const SizedBox(width: 5),
+                            Flexible(
+                              child: Text(
                                 prevPerfDesc,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: colors.primary.withValues(alpha: 0.8),
-                                  fontWeight: FontWeight.w500,
+                                  color: colors.amber,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            ],
+                            ),
                           ],
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 12),
-                  if (totalSets == 0) ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: colors.surfaceElevated,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: colors.border),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'No planned sets configured.',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                  color: colors.textMuted, fontSize: 13),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          PremiumButton(
-                            key: Key('add_set_button_${ex['id']}'),
-                            text: 'Add Set',
-                            onPressed: () {
-                              _showLogSetDialog(
-                                exercise: ex,
-                                setNumber: 1,
-                                trackingType: trackingType,
-                                previousPerformance: prevPerfMap,
-                              );
-                            },
-                            icon: const Icon(Icons.add, size: 16),
-                            height: 32,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ] else ...[
-                    ...List.generate(totalSets, (sIdx) {
-                      final setNum = sIdx + 1;
-                      Map<String, dynamic>? loggedSet;
-                      for (final s in sets) {
-                        if (s is Map &&
-                            (s['set_number'] ?? s['setNumber']) == setNum) {
-                          loggedSet = Map<String, dynamic>.from(s);
-                          break;
-                        }
-                      }
-                      final isDone = loggedSet != null &&
-                          (loggedSet['completed'] == 1 ||
-                              loggedSet['completed'] == true);
+                    const SizedBox(height: 14),
 
-                      String completedSummary = '—';
-                      if (isDone) {
-                        if (trackingType == 'duration' ||
-                            trackingType == 'time_only') {
-                          final dur = loggedSet['duration_seconds'] ??
-                              loggedSet['durationSeconds'] ??
-                              0;
-                          completedSummary = '$dur s';
-                        } else if (trackingType == 'distance_duration') {
-                          final dur = loggedSet['duration_seconds'] ??
-                              loggedSet['durationSeconds'] ??
-                              0;
-                          final dist = loggedSet['distance_meters'] ??
-                              loggedSet['distanceMeters'] ??
-                              0;
-                          completedSummary = '$dist m in $dur s';
-                        } else if (trackingType == 'distance') {
-                          final dist = loggedSet['distance_meters'] ??
-                              loggedSet['distanceMeters'] ??
-                              0;
-                          completedSummary = '$dist m';
-                        } else if (trackingType == 'weight_duration') {
-                          final weight = loggedSet['weight_kg'] ??
-                              loggedSet['weightKg'] ??
-                              0;
-                          final dur = loggedSet['duration_seconds'] ??
-                              loggedSet['durationSeconds'] ??
-                              0;
-                          completedSummary = '$weight kg in $dur s';
-                        } else if (trackingType == 'reps_only' ||
-                            trackingType == 'bodyweight_reps') {
-                          completedSummary = '${loggedSet['reps'] ?? 0} reps';
-                        } else {
-                          completedSummary =
-                              '${loggedSet['weight_kg'] ?? loggedSet['weightKg'] ?? 0} kg × ${loggedSet['reps'] ?? 0} reps';
-                        }
-                      }
-
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
+                    if (totalSets == 0) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: isDone
-                              ? colors.primaryMuted
-                              : colors.surfaceElevated,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                              color: isDone
-                                  ? colors.primary.withValues(alpha: 0.35)
-                                  : colors.border),
+                          color: colors.surfaceElevated,
+                          borderRadius: BorderRadius.circular(AppRadii.md),
+                          border: Border.all(color: colors.border),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Set $setNum',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 13)),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                isDone ? completedSummary : '—',
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    fontWeight: isDone
-                                        ? FontWeight.w600
-                                        : FontWeight.normal,
-                                    color: isDone
-                                        ? colors.textPrimary
-                                        : colors.textMuted),
+                            Text(
+                              'No planned sets configured.',
+                              style: TextStyle(
+                                color: colors.textMuted,
+                                fontSize: 13,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            PremiumButton(
-                              key: Key('log_set_button_${ex['id']}_$setNum'),
-                              text: isDone ? 'Edit' : 'Log Set',
-                              isSecondary: isDone,
-                              onPressed: () {
-                                _showLogSetDialog(
-                                  exercise: ex,
-                                  setNumber: setNum,
-                                  trackingType: trackingType,
-                                  loggedSet: loggedSet,
-                                  previousPerformance: prevPerfMap,
-                                );
-                              },
-                              height: 30,
-                            ),
+                            if (!_isSessionCompleted)
+                              PremiumButton(
+                                key: Key('add_set_button_${ex['id']}'),
+                                text: 'Add Set',
+                                onPressed: () {
+                                  setState(() {
+                                    _extraSetsCount[ex['id'] as int] = 1;
+                                  });
+                                },
+                                icon: const Icon(Icons.add, size: 16),
+                                height: 32,
+                              ),
                           ],
                         ),
-                      );
-                    }),
-                    if (sets.length >= totalSets && totalSets > 0) ...[
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: PremiumButton(
-                          key: Key('add_extra_set_button_${ex['id']}'),
-                          text: 'Add Extra Set',
-                          isSecondary: true,
-                          icon: const Icon(Icons.add, size: 14),
-                          onPressed: () {
-                            _showLogSetDialog(
-                              exercise: ex,
-                              setNumber: sets.length + 1,
-                              trackingType: trackingType,
-                              previousPerformance: prevPerfMap,
-                            );
-                          },
-                          height: 30,
-                        ),
                       ),
+                    ] else ...[
+                      _buildTableHeader(trackingType, colors),
+                      const SizedBox(height: 4),
+
+                      ...List.generate(totalSets, (sIdx) {
+                        final setNum = sIdx + 1;
+                        Map<String, dynamic>? loggedSet;
+                        for (final s in sets) {
+                          if (s is Map && (s['set_number'] ?? s['setNumber']) == setNum) {
+                            loggedSet = Map<String, dynamic>.from(s);
+                            break;
+                          }
+                        }
+
+                        return _buildInlineSetRow(
+                          exercise: ex,
+                          setNum: setNum,
+                          trackingType: trackingType,
+                          targetWeight: targetWeight,
+                          targetReps: targetReps,
+                          loggedSet: loggedSet,
+                          prevPerf: prevPerf,
+                          colors: colors,
+                        );
+                      }),
+
+                      if (totalSets > 0 && !_isSessionCompleted) ...[
+                        const SizedBox(height: 6),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: PremiumButton(
+                            key: Key('add_extra_set_button_${ex['id']}'),
+                            text: 'Add Extra Set',
+                            isSecondary: true,
+                            icon: const Icon(Icons.add, size: 14),
+                            onPressed: () {
+                              setState(() {
+                                final current = _extraSetsCount[ex['id'] as int] ?? baseSets;
+                                _extraSetsCount[ex['id'] as int] = current + 1;
+                              });
+                            },
+                            height: 30,
+                          ),
+                        ),
+                      ],
                     ],
                   ],
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 24),
+        ],
+      ),
+      bottomNavigationBar: _isSessionCompleted
+          ? Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              decoration: BoxDecoration(
+                color: colors.isDark ? const Color(0xFF181818) : Colors.white,
+                border: Border(
+                  top: BorderSide(
+                    color: colors.isDark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : colors.border,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 48,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: colors.emeraldMuted,
+                        borderRadius: BorderRadius.circular(AppRadii.md),
+                        border: Border.all(
+                          color: colors.emerald.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.verified_rounded,
+                              color: colors.emerald, size: 22),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Workout Completed',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13,
+                                    color: colors.emerald,
+                                  ),
+                                ),
+                                Text(
+                                  'Summary is finalized and saved',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: colors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  PremiumButton(
+                    text: 'Close',
+                    onPressed: () => Navigator.pop(context),
+                    height: 48,
+                  ),
+                ],
+              ),
+            )
+          : Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              decoration: BoxDecoration(
+                color: colors.isDark ? const Color(0xFF181818) : Colors.white,
+                border: Border(
+                  top: BorderSide(
+                    color: colors.isDark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : colors.border,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  // Rest Timer Pill Button
+                  InkWell(
+                    onTap: () {
+                      if (_restSecondsRemaining > 0) {
+                        _restTimer?.cancel();
+                        setState(() => _restSecondsRemaining = 0);
+                      } else {
+                        _startRestTimer(90);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(AppRadii.full),
+                    child: Container(
+                      height: 48,
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(AppRadii.full),
+                        border: Border.all(
+                          color: _restSecondsRemaining > 0
+                              ? colors.cyan
+                              : (colors.isDark
+                                  ? Colors.white.withValues(alpha: 0.12)
+                                  : colors.border),
+                        ),
+                        color: _restSecondsRemaining > 0
+                            ? colors.cyan.withValues(alpha: 0.12)
+                            : (colors.isDark
+                                ? const Color(0xFF222222)
+                                : colors.surface),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.timer_outlined,
+                            size: 18,
+                            color: _restSecondsRemaining > 0
+                                ? colors.cyan
+                                : colors.textSecondary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _restSecondsRemaining > 0
+                                ? 'Rest ${_formatDuration(_restSecondsRemaining)}'
+                                : 'Rest 1:30',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: _restSecondsRemaining > 0
+                                  ? colors.cyan
+                                  : colors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Finish Workout Button
+                  Expanded(
+                    child: PremiumButton(
+                      key: const Key('finish_workout_button'),
+                      text: 'Finish Workout',
+                      icon: const Icon(Icons.flag_rounded, size: 18),
+                      onPressed: _showFinishWorkoutDialog,
+                      height: 48,
+                    ),
+                  ),
                 ],
               ),
             ),
-          );
-        },
-      ),
     );
   }
 
-  void _showLogSetDialog({
+  TextEditingController _getWeightCtrl(
+      int exId, int setNum, dynamic targetWeight, dynamic loggedWeight) {
+    final key = '${exId}_$setNum';
+    if (!_inlineWeightControllers.containsKey(key)) {
+      String initial = '';
+      if (loggedWeight != null) {
+        initial = _formatNum(loggedWeight);
+      } else if (targetWeight != null) {
+        initial = _formatNum(targetWeight);
+      }
+      _inlineWeightControllers[key] = TextEditingController(text: initial);
+    }
+    return _inlineWeightControllers[key]!;
+  }
+
+  TextEditingController _getRepsCtrl(
+      int exId, int setNum, dynamic targetReps, dynamic loggedReps) {
+    final key = '${exId}_$setNum';
+    if (!_inlineRepsControllers.containsKey(key)) {
+      String initial = '';
+      if (loggedReps != null) {
+        initial = _formatNum(loggedReps);
+      } else if (targetReps != null) {
+        initial = _formatNum(targetReps);
+      }
+      _inlineRepsControllers[key] = TextEditingController(text: initial);
+    }
+    return _inlineRepsControllers[key]!;
+  }
+
+  TextEditingController _getDurationCtrl(
+      int exId, int setNum, dynamic loggedDuration) {
+    final key = '${exId}_$setNum';
+    if (!_inlineDurationControllers.containsKey(key)) {
+      _inlineDurationControllers[key] =
+          TextEditingController(text: loggedDuration?.toString() ?? '');
+    }
+    return _inlineDurationControllers[key]!;
+  }
+
+  TextEditingController _getDistanceCtrl(
+      int exId, int setNum, dynamic loggedDistance) {
+    final key = '${exId}_$setNum';
+    if (!_inlineDistanceControllers.containsKey(key)) {
+      _inlineDistanceControllers[key] =
+          TextEditingController(text: loggedDistance?.toString() ?? '');
+    }
+    return _inlineDistanceControllers[key]!;
+  }
+
+  Future<void> _handleInlineLogSet({
     required Map<String, dynamic> exercise,
     required int setNumber,
     required String trackingType,
     Map<String, dynamic>? loggedSet,
-    Map? previousPerformance,
-  }) {
-    final dynamic loggedWeight =
-        loggedSet?['weight_kg'] ?? loggedSet?['weightKg'];
-    final dynamic targetWeight = exercise['target_weight_kg'] ??
-        exercise['targetWeightKg'] ??
-        exercise['planned_weight_kg'] ??
-        exercise['plannedWeightKg'] ??
-        previousPerformance?['weight_kg'] ??
-        previousPerformance?['weightKg'] ??
-        previousPerformance?['maxWeightKg'];
+  }) async {
+    if (_isSessionCompleted) return;
 
-    final dynamic loggedReps = loggedSet?['reps'];
-    final dynamic targetReps = exercise['reps_min_target'] ??
-        exercise['planned_reps_min_snapshot'] ??
-        exercise['target_reps_min'] ??
-        exercise['target_reps'] ??
-        exercise['targetReps'] ??
-        exercise['reps_max_target'] ??
-        exercise['planned_reps_max_snapshot'] ??
-        previousPerformance?['reps'];
-
-    final dynamic loggedDuration =
-        loggedSet?['duration_seconds'] ?? loggedSet?['durationSeconds'];
-    final dynamic loggedDistance =
-        loggedSet?['distance_meters'] ?? loggedSet?['distanceMeters'];
-
-    String initialWeight = '';
-    if (loggedWeight != null) {
-      initialWeight = (loggedWeight is num)
-          ? (loggedWeight % 1 == 0
-              ? loggedWeight.toInt().toString()
-              : loggedWeight.toString())
-          : loggedWeight.toString();
-    } else if (targetWeight != null) {
-      initialWeight = (targetWeight is num)
-          ? (targetWeight % 1 == 0
-              ? targetWeight.toInt().toString()
-              : targetWeight.toString())
-          : targetWeight.toString();
-    }
-
-    String initialReps = '';
-    if (loggedReps != null) {
-      initialReps = loggedReps.toString();
-    } else if (targetReps != null) {
-      initialReps = targetReps.toString();
-    }
-
-    final initialDuration = loggedDuration?.toString() ?? '';
-    final initialDistance = loggedDistance?.toString() ?? '';
-
-    final weightCtrl = TextEditingController(text: initialWeight);
-    final repsCtrl = TextEditingController(text: initialReps);
-    final durationCtrl = TextEditingController(text: initialDuration);
-    final distanceCtrl = TextEditingController(text: initialDistance);
-
-    final repsFocus = FocusNode();
-
-    String? weightError;
-    String? repsError;
-    String? distanceError;
-    String? durationError;
-
-    final isDurationTracking = trackingType == 'duration' ||
+    final exId = exercise['id'] as int;
+    final isDuration = trackingType == 'duration' ||
         trackingType == 'time_only' ||
         trackingType == 'distance_duration' ||
         trackingType == 'weight_duration';
-    final isDistanceTracking =
+    final isDistance =
         trackingType == 'distance' || trackingType == 'distance_duration';
-    final isWeightTracking = trackingType == 'weight_reps' ||
+    final isWeight = trackingType == 'weight_reps' ||
         trackingType == 'weight_duration' ||
         trackingType == 'custom';
-    final isRepTracking = trackingType == 'weight_reps' ||
+    final isReps = trackingType == 'weight_reps' ||
         trackingType == 'reps_only' ||
         trackingType == 'bodyweight_reps' ||
         trackingType == 'custom';
 
-    showPremiumDialog(
-      context: context,
-      builder: (ctx) {
-        final dialogColors = AppThemeColors.of(ctx);
-        return StatefulBuilder(
-          builder: (dialogCtx, setDialogState) {
-            return AlertDialog(
-              backgroundColor: dialogColors.card,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadii.xl),
-                side: BorderSide(color: dialogColors.border),
+    final weightCtrl = _inlineWeightControllers['${exId}_$setNumber'];
+    final repsCtrl = _inlineRepsControllers['${exId}_$setNumber'];
+    final durCtrl = _inlineDurationControllers['${exId}_$setNumber'];
+    final distCtrl = _inlineDistanceControllers['${exId}_$setNumber'];
+
+    int? parsedReps;
+    double? parsedWeight;
+    int? parsedDuration;
+    double? parsedDistance;
+
+    if (isDuration) {
+      final text = durCtrl?.text.trim() ?? '';
+      parsedDuration = int.tryParse(text);
+      if (parsedDuration == null || parsedDuration < 1) {
+        showPremiumSnackBar(context, 'Please enter valid duration seconds',
+            isError: true);
+        return;
+      }
+    }
+
+    if (isDistance) {
+      final text = distCtrl?.text.trim() ?? '';
+      parsedDistance = double.tryParse(text);
+      if (parsedDistance == null || parsedDistance < 0) {
+        showPremiumSnackBar(context, 'Please enter a valid distance',
+            isError: true);
+        return;
+      }
+    }
+
+    if (isReps) {
+      final repsText = repsCtrl?.text.trim() ?? '';
+      parsedReps = int.tryParse(repsText);
+      if (parsedReps == null || parsedReps < 1) {
+        showPremiumSnackBar(context, 'Please enter at least 1 rep',
+            isError: true);
+        return;
+      }
+
+      if (isWeight) {
+        final weightText = weightCtrl?.text.trim() ?? '';
+        if (weightText.isNotEmpty) {
+          parsedWeight = double.tryParse(weightText);
+          if (parsedWeight == null || parsedWeight < 0) {
+            showPremiumSnackBar(context, 'Please enter a valid weight',
+                isError: true);
+            return;
+          }
+        }
+      }
+    }
+
+    await _logSet(
+      sessionExerciseId: exId,
+      setNum: setNumber,
+      trackingType: trackingType,
+      weight: parsedWeight,
+      reps: parsedReps,
+      rir: null,
+      durationSeconds: parsedDuration,
+      distanceMeters: parsedDistance,
+    );
+  }
+
+  Widget _buildTableHeader(String trackingType, AppThemeColors colors) {
+    final isWeight = trackingType == 'weight_reps' ||
+        trackingType == 'weight_duration' ||
+        trackingType == 'custom';
+    final isReps = trackingType == 'weight_reps' ||
+        trackingType == 'reps_only' ||
+        trackingType == 'bodyweight_reps' ||
+        trackingType == 'custom';
+    final isDuration = trackingType == 'duration' ||
+        trackingType == 'time_only' ||
+        trackingType == 'distance_duration' ||
+        trackingType == 'weight_duration';
+    final isDistance =
+        trackingType == 'distance' || trackingType == 'distance_duration';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 28,
+            child: Text(
+              'SET',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.8,
+                color: colors.textMuted,
               ),
-              title: Text(
-                loggedSet != null
-                    ? 'Edit Set $setNumber'
-                    : 'Log Set $setNumber',
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'PREVIOUS',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.8,
+                color: colors.textMuted,
+              ),
+            ),
+          ),
+          if (isWeight) ...[
+            const SizedBox(width: 6),
+            SizedBox(
+              width: 58,
+              child: Text(
+                'KG',
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: dialogColors.textPrimary,
-                  fontSize: 18,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                  color: colors.textMuted,
+                ),
+              ),
+            ),
+          ],
+          if (isReps) ...[
+            const SizedBox(width: 6),
+            SizedBox(
+              width: 52,
+              child: Text(
+                'REPS',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                  color: colors.textMuted,
+                ),
+              ),
+            ),
+          ],
+          if (isDuration && !isReps) ...[
+            const SizedBox(width: 6),
+            SizedBox(
+              width: 56,
+              child: Text(
+                'SEC',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                  color: colors.textMuted,
+                ),
+              ),
+            ),
+          ],
+          if (isDistance) ...[
+            const SizedBox(width: 6),
+            SizedBox(
+              width: 60,
+              child: Text(
+                'METERS',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                  color: colors.textMuted,
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 36,
+            child: Center(
+              child: Icon(
+                Icons.check_rounded,
+                size: 16,
+                color: colors.textMuted,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInlineSetRow({
+    required Map<String, dynamic> exercise,
+    required int setNum,
+    required String trackingType,
+    required dynamic targetWeight,
+    required dynamic targetReps,
+    required Map<String, dynamic>? loggedSet,
+    required dynamic prevPerf,
+    required AppThemeColors colors,
+  }) {
+    final exId = exercise['id'] as int;
+    final isDone = loggedSet != null &&
+        (loggedSet['completed'] == 1 || loggedSet['completed'] == true);
+
+    final weightCtrl = _getWeightCtrl(
+      exId,
+      setNum,
+      targetWeight,
+      loggedSet != null
+          ? (loggedSet['weight_kg'] ?? loggedSet['weightKg'])
+          : null,
+    );
+    final repsCtrl = _getRepsCtrl(
+      exId,
+      setNum,
+      targetReps,
+      loggedSet != null ? loggedSet['reps'] : null,
+    );
+    final durCtrl = _getDurationCtrl(
+      exId,
+      setNum,
+      loggedSet != null
+          ? (loggedSet['duration_seconds'] ?? loggedSet['durationSeconds'])
+          : null,
+    );
+    final distCtrl = _getDistanceCtrl(
+      exId,
+      setNum,
+      loggedSet != null
+          ? (loggedSet['distance_meters'] ?? loggedSet['distanceMeters'])
+          : null,
+    );
+
+    final isDuration = trackingType == 'duration' ||
+        trackingType == 'time_only' ||
+        trackingType == 'distance_duration' ||
+        trackingType == 'weight_duration';
+    final isDistance =
+        trackingType == 'distance' || trackingType == 'distance_duration';
+    final isWeight = trackingType == 'weight_reps' ||
+        trackingType == 'weight_duration' ||
+        trackingType == 'custom';
+    final isReps = trackingType == 'weight_reps' ||
+        trackingType == 'reps_only' ||
+        trackingType == 'bodyweight_reps' ||
+        trackingType == 'custom';
+
+    // Format previous or target info cleanly without .00
+    String prevSummary = '—';
+    if (targetWeight != null && targetReps != null) {
+      prevSummary =
+          '${_formatNum(targetWeight)} kg × ${_formatNum(targetReps)}';
+    } else if (targetWeight != null) {
+      prevSummary = '${_formatNum(targetWeight)} kg';
+    } else if (targetReps != null) {
+      prevSummary = '${_formatNum(targetReps)} reps';
+    } else if (prevPerf != null &&
+        prevPerf is Map &&
+        prevPerf['sets'] is List) {
+      final prevSets = prevPerf['sets'] as List;
+      Map? match;
+      for (final s in prevSets) {
+        if (s is Map &&
+            (s['set_number'] ?? s['setNumber']) == setNum) {
+          match = s;
+          break;
+        }
+      }
+      if (match != null) {
+        final pWeight = match['weight_kg'] ?? match['weightKg'];
+        final pReps = match['reps'];
+        if (pWeight != null && pReps != null) {
+          prevSummary =
+              '${_formatNum(pWeight)} kg × ${_formatNum(pReps)}';
+        } else if (pReps != null) {
+          prevSummary = '${_formatNum(pReps)} reps';
+        }
+      }
+    }
+
+    final inputBg = isDone
+        ? colors.emeraldMuted.withValues(alpha: colors.isDark ? 0.22 : 0.65)
+        : (colors.isDark ? const Color(0xFF222224) : const Color(0xFFF4F4F5));
+    final inputBorder = isDone
+        ? colors.emerald.withValues(alpha: 0.35)
+        : (colors.isDark
+            ? Colors.white.withValues(alpha: 0.1)
+            : const Color(0xFFE4E4E7));
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDone
+            ? colors.emeraldMuted.withValues(alpha: colors.isDark ? 0.15 : 0.45)
+            : colors.surfaceElevated,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        border: Border.all(
+          color: isDone
+              ? colors.emerald.withValues(alpha: 0.4)
+              : (colors.isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : colors.border),
+          width: isDone ? 1.2 : 1.0,
+        ),
+      ),
+      child: Row(
+        children: [
+          // 1. SET NUMBER BADGE
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: isDone
+                  ? colors.emeraldMuted
+                  : (colors.isDark ? const Color(0xFF262626) : colors.surface),
+              borderRadius: BorderRadius.circular(AppRadii.sm),
+              border: Border.all(
+                color: isDone
+                    ? colors.emerald.withValues(alpha: 0.4)
+                    : colors.border,
+              ),
+            ),
+            child: Center(
+              child: Text(
+                '$setNum',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: isDone ? colors.emerald : colors.textSecondary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // 2. PREVIOUS / TARGET SUMMARY
+          Expanded(
+            child: Text(
+              prevSummary,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: isDone ? colors.textMuted : colors.textSecondary,
+                decoration: isDone ? TextDecoration.lineThrough : null,
+              ),
+            ),
+          ),
+
+          // 3. WEIGHT INPUT
+          if (isWeight) ...[
+            const SizedBox(width: 6),
+            Container(
+              width: 58,
+              height: 38,
+              decoration: BoxDecoration(
+                color: inputBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: inputBorder),
+              ),
+              child: TextField(
+                key: const Key('set_dialog_weight_input'),
+                controller: weightCtrl,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                textAlign: TextAlign.center,
+                readOnly: _isSessionCompleted,
+                enableInteractiveSelection: !_isSessionCompleted,
+                style: TextStyle(
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
+                  color: isDone ? colors.emerald : colors.textPrimary,
+                ),
+                decoration: InputDecoration(
+                  hintText: _formatNum(targetWeight).isNotEmpty
+                      ? _formatNum(targetWeight)
+                      : 'kg',
+                  hintStyle: TextStyle(fontSize: 11, color: colors.textMuted),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 9),
                 ),
               ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (isWeightTracking) ...[
-                      PremiumTextField(
-                        key: const Key('set_dialog_weight_input'),
-                        label: 'Weight (kg)',
-                        hint: targetWeight != null ? '$targetWeight kg' : '0.0',
-                        controller: weightCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        textInputAction: TextInputAction.next,
-                        onSubmitted: (_) {
-                          FocusScope.of(context).requestFocus(repsFocus);
-                        },
-                        errorText: weightError,
-                        onChanged: (_) {
-                          if (weightError != null) {
-                            setDialogState(() => weightError = null);
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    if (isRepTracking) ...[
-                      PremiumTextField(
-                        key: const Key('set_dialog_reps_input'),
-                        label: 'Reps Completed',
-                        hint: targetReps != null ? '$targetReps' : 'e.g. 10',
-                        controller: repsCtrl,
-                        focusNode: repsFocus,
-                        keyboardType: TextInputType.number,
-                        textInputAction: TextInputAction.done,
-                        errorText: repsError,
-                        onChanged: (_) {
-                          if (repsError != null) {
-                            setDialogState(() => repsError = null);
-                          }
-                        },
-                      ),
-                    ],
-                    if (isDistanceTracking) ...[
-                      PremiumTextField(
-                        key: const Key('set_dialog_distance_input'),
-                        label: 'Distance (meters)',
-                        hint: 'e.g. 1000',
-                        controller: distanceCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        textInputAction: TextInputAction.next,
-                        errorText: distanceError,
-                        onChanged: (_) {
-                          if (distanceError != null) {
-                            setDialogState(() => distanceError = null);
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    if (isDurationTracking) ...[
-                      PremiumTextField(
-                        key: const Key('set_dialog_duration_input'),
-                        label: 'Duration (seconds)',
-                        hint: 'e.g. 60',
-                        controller: durationCtrl,
-                        keyboardType: TextInputType.number,
-                        textInputAction: TextInputAction.done,
-                        errorText: durationError,
-                        onChanged: (_) {
-                          if (durationError != null) {
-                            setDialogState(() => durationError = null);
-                          }
-                        },
-                      ),
-                    ],
-                  ],
+            ),
+          ],
+
+          // 4. REPS INPUT
+          if (isReps) ...[
+            const SizedBox(width: 6),
+            Container(
+              width: 52,
+              height: 38,
+              decoration: BoxDecoration(
+                color: inputBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: inputBorder),
+              ),
+              child: TextField(
+                key: const Key('set_dialog_reps_input'),
+                controller: repsCtrl,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                readOnly: _isSessionCompleted,
+                enableInteractiveSelection: !_isSessionCompleted,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: isDone ? colors.emerald : colors.textPrimary,
+                ),
+                decoration: InputDecoration(
+                  hintText: _formatNum(targetReps).isNotEmpty
+                      ? _formatNum(targetReps)
+                      : 'reps',
+                  hintStyle: TextStyle(fontSize: 11, color: colors.textMuted),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 9),
                 ),
               ),
-              actions: [
-                PremiumButton(
-                  key: const Key('set_dialog_cancel_button'),
-                  text: 'Cancel',
-                  isSecondary: true,
-                  onPressed: () => Navigator.pop(ctx),
+            ),
+          ],
+
+          // 5. DURATION INPUT
+          if (isDuration && !isReps) ...[
+            const SizedBox(width: 6),
+            Container(
+              width: 56,
+              height: 38,
+              decoration: BoxDecoration(
+                color: inputBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: inputBorder),
+              ),
+              child: TextField(
+                key: const Key('set_dialog_duration_input'),
+                controller: durCtrl,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                readOnly: _isSessionCompleted,
+                enableInteractiveSelection: !_isSessionCompleted,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: isDone ? colors.emerald : colors.textPrimary,
                 ),
-                PremiumButton(
-                  key: const Key('set_dialog_save_button'),
-                  text: 'Save Set',
-                  onPressed: () {
-                    int? parsedReps;
-                    double? parsedWeight;
-                    int? parsedDuration;
-                    double? parsedDistance;
+                decoration: const InputDecoration(
+                  hintText: 'sec',
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 9),
+                ),
+              ),
+            ),
+          ],
 
-                    if (isDurationTracking) {
-                      final durText = durationCtrl.text.trim();
-                      parsedDuration = int.tryParse(durText);
-                      if (parsedDuration == null || parsedDuration < 1) {
-                        setDialogState(() {
-                          durationError = 'Please enter valid duration seconds';
-                        });
-                        return;
-                      }
-                    }
+          // 6. DISTANCE INPUT
+          if (isDistance) ...[
+            const SizedBox(width: 6),
+            Container(
+              width: 60,
+              height: 38,
+              decoration: BoxDecoration(
+                color: inputBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: inputBorder),
+              ),
+              child: TextField(
+                key: const Key('set_dialog_distance_input'),
+                controller: distCtrl,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                textAlign: TextAlign.center,
+                readOnly: _isSessionCompleted,
+                enableInteractiveSelection: !_isSessionCompleted,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: isDone ? colors.emerald : colors.textPrimary,
+                ),
+                decoration: const InputDecoration(
+                  hintText: 'meters',
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 9),
+                ),
+              ),
+            ),
+          ],
 
-                    if (isDistanceTracking) {
-                      final distanceText = distanceCtrl.text.trim();
-                      parsedDistance = double.tryParse(distanceText);
-                      if (parsedDistance == null || parsedDistance < 0) {
-                        setDialogState(() {
-                          distanceError = 'Please enter a valid distance';
-                        });
-                        return;
-                      }
-                    }
+          const SizedBox(width: 8),
 
-                    if (isRepTracking) {
-                      final repsText = repsCtrl.text.trim();
-                      parsedReps = int.tryParse(repsText);
-                      if (parsedReps == null || parsedReps < 1) {
-                        setDialogState(() {
-                          repsError = 'Please enter at least 1 rep';
-                        });
-                        return;
-                      }
-
-                      if (isWeightTracking) {
-                        final weightText = weightCtrl.text.trim();
-                        if (weightText.isNotEmpty) {
-                          parsedWeight = double.tryParse(weightText);
-                          if (parsedWeight == null || parsedWeight < 0) {
-                            setDialogState(() {
-                              weightError = 'Please enter a valid weight';
-                            });
-                            return;
-                          }
-                        }
-                      }
-                    }
-
-                    Navigator.pop(ctx);
-                    _logSet(
-                      sessionExerciseId: exercise['id'] as int,
-                      setNum: setNumber,
+          // 7. SINGLE LOG BUTTON (Checkmark)
+          InkWell(
+            key: Key('log_set_button_${exId}_$setNum'),
+            onTap: _isSessionCompleted
+                ? null
+                : () {
+                    _handleInlineLogSet(
+                      exercise: exercise,
+                      setNumber: setNum,
                       trackingType: trackingType,
-                      weight: parsedWeight,
-                      reps: parsedReps,
-                      durationSeconds: parsedDuration,
-                      distanceMeters: parsedDistance,
+                      loggedSet: loggedSet,
                     );
                   },
+            borderRadius: BorderRadius.circular(AppRadii.full),
+            child: Container(
+              key: const Key('set_dialog_save_button'),
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isDone
+                    ? colors.emerald
+                    : (colors.isDark
+                        ? const Color(0xFF27272A)
+                        : const Color(0xFFF4F4F5)),
+                border: Border.all(
+                  color: isDone ? colors.emerald : colors.border,
+                  width: 1.5,
                 ),
-              ],
-            );
-          },
-        );
-      },
+                boxShadow: isDone
+                    ? [
+                        BoxShadow(
+                          color: colors.emerald.withValues(alpha: 0.35),
+                          blurRadius: 6,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Center(
+                child: Icon(
+                  Icons.check_rounded,
+                  size: 18,
+                  color: isDone ? Colors.white : colors.textMuted,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

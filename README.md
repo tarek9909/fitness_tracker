@@ -30,7 +30,7 @@ npm run migrate
 npm run seed
 npm run dev
 ```
-*Listens on `http://localhost:3000/api/v1`.*
+*Listens on `http://localhost:4000/api/v1`.*
 
 ### 2. Admin Dashboard:
 ```powershell
@@ -46,9 +46,9 @@ npm run dev
 cd mobile-app
 flutter pub get
 # Run on Android Emulator:
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000/api/v1
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:4000/api/v1
 # Run on Desktop / iOS Simulator:
-flutter run --dart-define=API_BASE_URL=http://localhost:3000/api/v1
+flutter run --dart-define=API_BASE_URL=http://localhost:4000/api/v1
 ```
 
 ### Local Demo Credentials (Created by SQLite Seed Script Only):

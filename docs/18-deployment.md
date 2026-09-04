@@ -55,7 +55,7 @@ The production architecture separates public-facing static delivery, authenticat
   - Minimum 32-character non-default keys for `ACCESS_TOKEN_SECRET`, `REFRESH_TOKEN_SECRET`, and `COOKIE_SECRET`
   - Valid `https://` URL for `PASSWORD_RESET_BASE_URL`
   - Valid `https://` origin list for `ADMIN_ALLOWED_ORIGINS`
-  - `APP_HOST` (defaults to `0.0.0.0`) and `APP_PORT` (defaults to `3000`)
+  - `APP_HOST` (defaults to `0.0.0.0`) and `APP_PORT` (defaults to `4000`)
 
 ### Secret Provisioning Workflow
 1. Store production secrets in a secure vault (AWS Secrets Manager, HashiCorp Vault, Doppler, or GitHub Actions Encrypted Secrets).

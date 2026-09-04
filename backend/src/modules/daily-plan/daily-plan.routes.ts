@@ -153,7 +153,40 @@ export class DailyPlanService {
         }
 
         const logsByMealId = new Map<number, any>();
+        const logIds = logs.map((l: any) => l.id);
+        let allLogSelections: any[] = [];
+        if (logIds.length > 0) {
+          allLogSelections = await this.db.query(
+            `SELECT * FROM meal_log_selections WHERE meal_log_id IN (${logIds.map(() => '?').join(',')}) ORDER BY id ASC`,
+            logIds,
+          );
+        }
+
+        const selectionsByLogId = new Map<number, any[]>();
+        const customFoodsByLogId = new Map<number, any[]>();
+        for (const sel of allLogSelections) {
+          const lid = Number(sel.meal_log_id);
+          if (sel.diet_meal_option_id != null) {
+            if (!selectionsByLogId.has(lid)) selectionsByLogId.set(lid, []);
+            selectionsByLogId.get(lid)!.push(sel);
+          } else {
+            if (!customFoodsByLogId.has(lid)) customFoodsByLogId.set(lid, []);
+            customFoodsByLogId.get(lid)!.push({
+              name: sel.option_label_snapshot,
+              servingSize: sel.unit_code_snapshot,
+              quantity: sel.quantity_snapshot,
+              calories: sel.calories_snapshot,
+              proteinG: sel.protein_g_snapshot,
+              carbsG: sel.carbs_g_snapshot,
+              fatG: sel.fat_g_snapshot,
+            });
+          }
+        }
+
         for (const log of logs) {
+          const lid = Number(log.id);
+          log.selections = selectionsByLogId.get(lid) || [];
+          log.customFoods = customFoodsByLogId.get(lid) || [];
           logsByMealId.set(Number(log.diet_meal_id), log);
         }
 
@@ -460,7 +493,7 @@ export class DailyPlanService {
             scheduledDateTime,
             spec.dueDateTime,
             status,
-            spec.isCompleted ? new Date().toISOString() : null,
+            spec.isCompleted ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null,
           ]);
         } else {
           // Only perform write if status or due_at changed
@@ -474,7 +507,7 @@ export class DailyPlanService {
             `;
             await conn.execute(updateSql, [
               status,
-              spec.isCompleted ? new Date().toISOString() : null,
+              spec.isCompleted ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null,
               spec.dueDateTime,
               existing.id,
             ]);
@@ -489,6 +522,12 @@ export async function dailyPlanRoutes(fastify: FastifyInstance) {
   const service = new DailyPlanService();
 
   fastify.get('/me/today', { preHandler: [authenticate] }, async (req, res) => {
+    const auth = (req as AuthenticatedRequest).user;
+    const plan = await service.resolveDailyPlan(auth.userId);
+    return res.status(200).send({ success: true, data: plan });
+  });
+
+  fastify.get('/me/daily-plan/today', { preHandler: [authenticate] }, async (req, res) => {
     const auth = (req as AuthenticatedRequest).user;
     const plan = await service.resolveDailyPlan(auth.userId);
     return res.status(200).send({ success: true, data: plan });

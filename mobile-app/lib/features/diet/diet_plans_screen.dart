@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/premium_widgets.dart';
+import 'diet_plan_builder_screen.dart';
 
 class DietPlansScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -165,16 +166,20 @@ class _DietPlansScreenState extends State<DietPlansScreen> {
                     }
                     Navigator.pop(ctx);
                     try {
-                      await widget.apiClient.post('/me/diet-plans', body: {
+                      final cal = int.tryParse(calCtrl.text.trim());
+                      final pro = int.tryParse(proCtrl.text.trim());
+                      final carb = int.tryParse(carbCtrl.text.trim());
+                      final fat = int.tryParse(fatCtrl.text.trim());
+                      final payload = <String, dynamic>{
                         'name': name,
-                        'description': descCtrl.text.trim().isNotEmpty
-                            ? descCtrl.text.trim()
-                            : null,
-                        'dailyCaloriesTarget': int.tryParse(calCtrl.text.trim()),
-                        'dailyProteinTargetG': int.tryParse(proCtrl.text.trim()),
-                        'dailyCarbsTargetG': int.tryParse(carbCtrl.text.trim()),
-                        'dailyFatTargetG': int.tryParse(fatCtrl.text.trim()),
-                      });
+                        if (descCtrl.text.trim().isNotEmpty)
+                          'description': descCtrl.text.trim(),
+                        if (cal != null) 'dailyCaloriesTarget': cal,
+                        if (pro != null) 'dailyProteinTargetG': pro,
+                        if (carb != null) 'dailyCarbsTargetG': carb,
+                        if (fat != null) 'dailyFatTargetG': fat,
+                      };
+                      await widget.apiClient.post('/me/diet-plans', body: payload);
                       if (mounted) {
                         showPremiumSnackBar(
                             context, 'Diet plan created successfully');
@@ -300,7 +305,7 @@ class _DietPlansScreenState extends State<DietPlansScreen> {
                               await Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => DietPlanDetailScreen(
+                                  builder: (_) => DietPlanBuilderScreen(
                                     apiClient: widget.apiClient,
                                     planId: planId,
                                   ),
@@ -668,14 +673,14 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
                 try {
                   final versionId = _currentVersionId;
                   if (versionId == null) return;
+                  final payload = <String, dynamic>{
+                    'name': name,
+                    if (timeCtrl.text.trim().isNotEmpty)
+                      'scheduledTime': timeCtrl.text.trim(),
+                  };
                   await widget.apiClient.post(
                     '/me/diet-plans/${widget.planId}/versions/$versionId/meals',
-                    body: {
-                      'name': name,
-                      'scheduledTime': timeCtrl.text.trim().isNotEmpty
-                          ? timeCtrl.text.trim()
-                          : null,
-                    },
+                    body: payload,
                   );
                   if (mounted) {
                     showPremiumSnackBar(context, 'Meal added to diet plan');

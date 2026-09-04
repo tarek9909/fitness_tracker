@@ -326,7 +326,7 @@ export const AssignmentsPage: React.FC = () => {
                       Active / Current ({categorizedWorkouts.current.length})
                     </div>
                     {categorizedWorkouts.current.map((a) => (
-                      <div key={a.id} style={{ padding: '0.75rem 1rem', background: 'var(--accent-primary-muted)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: 'var(--radius-md)', marginBottom: '0.5rem' }}>
+                      <div key={a.id} style={{ padding: '0.75rem 1rem', background: 'var(--accent-primary-muted)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', marginBottom: '0.5rem' }}>
                         <div style={{ fontWeight: 700 }}>{a.plan_name || a.workout_name || 'Workout Plan'} (v{a.version_number || a.plan_version_number || '—'})</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                           From: {formatDateOnly(a.effective_from || a.effectiveFrom)} {a.effective_to ? `• To: ${formatDateOnly(a.effective_to)}` : '• Ongoing'}
@@ -395,7 +395,7 @@ export const AssignmentsPage: React.FC = () => {
                       Active / Current ({categorizedDiets.current.length})
                     </div>
                     {categorizedDiets.current.map((a) => (
-                      <div key={a.id} style={{ padding: '0.75rem 1rem', background: 'var(--accent-primary-muted)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: 'var(--radius-md)', marginBottom: '0.5rem' }}>
+                      <div key={a.id} style={{ padding: '0.75rem 1rem', background: 'var(--accent-primary-muted)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', marginBottom: '0.5rem' }}>
                         <div style={{ fontWeight: 700 }}>{a.plan_name || a.diet_name || 'Diet Protocol'} (v{a.version_number || a.plan_version_number || '—'})</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                           From: {formatDateOnly(a.effective_from || a.effectiveFrom)} {a.effective_to ? `• To: ${formatDateOnly(a.effective_to)}` : '• Ongoing'}

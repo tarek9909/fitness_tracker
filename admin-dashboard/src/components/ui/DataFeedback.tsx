@@ -168,20 +168,20 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
   const isError = type === 'error';
   const isWarning = type === 'warning';
 
-  let bg = 'var(--accent-primary-muted)';
-  let border = 'rgba(16, 185, 129, 0.3)';
-  let color = '#34d399';
+  let bg = 'rgba(255, 255, 255, 0.06)';
+  let border = 'rgba(255, 255, 255, 0.18)';
+  let color = '#f4f4f5';
   let Icon = CheckCircle2;
 
   if (isError) {
     bg = 'var(--accent-rose-muted)';
-    border = 'rgba(244, 63, 94, 0.3)';
-    color = '#fb7185';
+    border = 'rgba(239, 68, 68, 0.25)';
+    color = '#f87171';
     Icon = AlertCircle;
   } else if (isWarning) {
-    bg = 'var(--accent-amber-muted)';
-    border = 'rgba(245, 158, 11, 0.3)';
-    color = '#fbbf24';
+    bg = 'rgba(212, 212, 216, 0.08)';
+    border = 'rgba(212, 212, 216, 0.2)';
+    color = '#d4d4d8';
     Icon = AlertCircle;
   }
 

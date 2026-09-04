@@ -29,16 +29,18 @@ class PremiumCard extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(
         color: color ?? colors.card,
-        borderRadius: BorderRadius.circular(AppRadii.xl),
+        borderRadius: BorderRadius.circular(AppRadii.lg),
         border: Border.fromBorderSide(
-          border ?? BorderSide(color: colors.border),
+          border ?? BorderSide(color: colors.border, width: 1.0),
         ),
         boxShadow: ambientGlow
-            ? const [
+            ? [
                 BoxShadow(
-                  color: Color(0x1AD4FF00),
-                  blurRadius: 30,
-                  offset: Offset(0, 10),
+                  color: colors.isDark
+                      ? const Color(0x26FFFFFF)
+                      : const Color(0x0F000000),
+                  blurRadius: 20,
+                  offset: const Offset(0, 4),
                 ),
               ]
             : (color == null ? colors.cardShadow : null),
@@ -100,61 +102,63 @@ class PremiumButton extends StatelessWidget {
       fg = colors.textPrimary;
     }
 
-    final borderSide = isOutlined
-        ? BorderSide(color: isDanger ? colors.rose : colors.border)
-        : (isSecondary
-            ? BorderSide(color: colors.border)
-            : BorderSide.none);
+    final borderSide = BorderSide(
+      color: isDanger ? colors.rose : colors.border,
+      width: (isOutlined || isSecondary) ? 1.0 : 0.0,
+    );
+
+    final buttonWidget = ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: bg,
+        foregroundColor: fg,
+        disabledBackgroundColor: bg.withValues(alpha: 0.5),
+        disabledForegroundColor: fg.withValues(alpha: 0.6),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          side: borderSide,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+      ),
+      onPressed: loading ? null : onPressed,
+      child: loading
+          ? SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: fg,
+              ),
+            )
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (icon != null) ...[
+                  icon!,
+                  const SizedBox(width: 8),
+                ],
+                Flexible(
+                  child: Text(
+                    text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      letterSpacing: 0.2,
+                      color: fg,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
 
     return SizedBox(
       width: width,
       height: height,
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: bg,
-          foregroundColor: fg,
-          disabledBackgroundColor: bg.withValues(alpha: 0.5),
-          disabledForegroundColor: fg.withValues(alpha: 0.6),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadii.lg),
-            side: borderSide,
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-        ),
-        onPressed: loading ? null : onPressed,
-        child: loading
-            ? SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: fg,
-                ),
-              )
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (icon != null) ...[
-                    icon!,
-                    const SizedBox(width: 8),
-                  ],
-                  Flexible(
-                    child: Text(
-                      text,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: fg,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-      ),
+      child: buttonWidget,
     );
   }
 }
@@ -184,13 +188,13 @@ class PremiumIconButton extends StatelessWidget {
 
     Widget button = InkWell(
       onTap: onPressed,
-      borderRadius: BorderRadius.circular(AppRadii.md),
+      borderRadius: BorderRadius.circular(AppRadii.sm),
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: backgroundColor ?? colors.surfaceElevated,
-          borderRadius: BorderRadius.circular(AppRadii.md),
-          border: Border.all(color: colors.border),
+          borderRadius: BorderRadius.circular(AppRadii.sm),
+          border: Border.all(color: colors.border, width: 1.0),
         ),
         child: Icon(
           icon,
@@ -207,7 +211,7 @@ class PremiumIconButton extends StatelessWidget {
   }
 }
 
-/// Status and category badge pill
+/// Status and category badge pill (Monochrome Architectural)
 class StatusBadge extends StatelessWidget {
   final String label;
   final Color color;
@@ -222,19 +226,23 @@ class StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppThemeColors.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadii.full),
-        border: Border.all(color: color.withValues(alpha: 0.28)),
+        color: colors.surfaceElevated,
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+        border: Border.all(
+          color: colors.border,
+          width: 1.0,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
             icon!,
-            const SizedBox(width: 5),
+            const SizedBox(width: 4),
           ],
           Flexible(
             child: Text(
@@ -242,10 +250,10 @@ class StatusBadge extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10.5,
                 fontWeight: FontWeight.w700,
-                color: color,
-                letterSpacing: 0.2,
+                color: colors.textPrimary,
+                letterSpacing: 0.3,
               ),
             ),
           ),
@@ -433,56 +441,79 @@ class PremiumTextField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AppThemeColors.of(context);
+    final borderRadius = BorderRadius.circular(AppRadii.md);
+    final borderColor = errorText != null
+        ? colors.rose.withValues(alpha: 0.8)
+        : colors.border;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          decoration: BoxDecoration(
-            color: colors.surfaceElevated,
-            borderRadius: BorderRadius.circular(AppRadii.md),
-            border: Border.all(
-              color: errorText != null
-                  ? colors.rose.withValues(alpha: 0.8)
-                  : colors.border,
-            ),
+        TextField(
+          controller: controller,
+          focusNode: focusNode,
+          keyboardType: keyboardType,
+          textInputAction: textInputAction,
+          onSubmitted: onSubmitted,
+          onChanged: onChanged,
+          maxLines: maxLines,
+          readOnly: readOnly,
+          obscureText: obscureText,
+          onTap: onTap,
+          style: TextStyle(
+            color: colors.textPrimary,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
           ),
-          child: TextField(
-            controller: controller,
-            focusNode: focusNode,
-            keyboardType: keyboardType,
-            textInputAction: textInputAction,
-            onSubmitted: onSubmitted,
-            onChanged: onChanged,
-            maxLines: maxLines,
-            readOnly: readOnly,
-            obscureText: obscureText,
-            onTap: onTap,
-            style: TextStyle(
-              color: colors.textPrimary,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
+          decoration: InputDecoration(
+            labelText: label,
+            hintText: hintText ?? hint,
+            labelStyle: TextStyle(
+              color: colors.textSecondary,
+              fontSize: 13,
             ),
-            decoration: InputDecoration(
-              labelText: label,
-              hintText: hintText ?? hint,
-              labelStyle: TextStyle(
-                color: colors.textSecondary,
-                fontSize: 13,
+            hintStyle: TextStyle(
+              color: colors.textMuted,
+              fontSize: 13,
+            ),
+            prefixIcon: prefixWidget ??
+                (prefixIcon != null
+                    ? Icon(prefixIcon,
+                        color: colors.textSecondary, size: 20)
+                    : null),
+            suffixIcon: suffix,
+            filled: true,
+            fillColor: colors.surfaceElevated,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: borderRadius,
+              borderSide: BorderSide(color: borderColor),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: borderRadius,
+              borderSide: BorderSide(color: borderColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: borderRadius,
+              borderSide: BorderSide(
+                color: errorText != null ? colors.rose : colors.primary,
+                width: 1.5,
               ),
-              hintStyle: TextStyle(
-                color: colors.textMuted,
-                fontSize: 13,
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: borderRadius,
+              borderSide: BorderSide(
+                color: colors.rose,
               ),
-              prefixIcon: prefixWidget ??
-                  (prefixIcon != null
-                      ? Icon(prefixIcon,
-                          color: colors.textSecondary, size: 20)
-                      : null),
-              suffixIcon: suffix,
-              border: InputBorder.none,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: borderRadius,
+              borderSide: BorderSide(
+                color: colors.rose,
+                width: 1.5,
+              ),
             ),
           ),
         ),
@@ -1076,7 +1107,7 @@ void showPremiumSnackBar(
   );
 }
 
-/// Helper to display a standardized modal dialog
+/// Helper to display a standardized modal dialog with smooth scale and fade transition
 Future<T?> showPremiumDialog<T>({
   required BuildContext context,
   String? title,
@@ -1085,11 +1116,16 @@ Future<T?> showPremiumDialog<T>({
   WidgetBuilder? builder,
 }) {
   final colors = AppThemeColors.of(context);
-  return showDialog<T>(
+  return showGeneralDialog<T>(
     context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Dismiss',
     barrierColor: Colors.black.withValues(alpha: 0.65),
-    builder: builder ??
-        ((ctx) => AlertDialog(
+    transitionDuration: const Duration(milliseconds: 220),
+    pageBuilder: (ctx, anim1, anim2) {
+      return builder != null
+          ? builder(ctx)
+          : AlertDialog(
               backgroundColor: colors.card,
               surfaceTintColor: Colors.transparent,
               shape: RoundedRectangleBorder(
@@ -1108,11 +1144,26 @@ Future<T?> showPremiumDialog<T>({
                   : null,
               content: content,
               actions: actions,
-            )),
+            );
+    },
+    transitionBuilder: (ctx, animation, secondaryAnimation, child) {
+      final curvedAnimation = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      return ScaleTransition(
+        scale: Tween<double>(begin: 0.94, end: 1.0).animate(curvedAnimation),
+        child: FadeTransition(
+          opacity: curvedAnimation,
+          child: child,
+        ),
+      );
+    },
   );
 }
 
-/// Helper to display a standardized modal bottom sheet
+/// Helper to display a standardized modal bottom sheet with fluid ease-out animation
 Future<T?> showPremiumModalSheet<T>({
   required BuildContext context,
   required WidgetBuilder builder,
@@ -1122,6 +1173,11 @@ Future<T?> showPremiumModalSheet<T>({
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: isScrollControlled,
+    sheetAnimationStyle: const AnimationStyle(
+      duration: Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    ),
     backgroundColor: colors.card,
     barrierColor: Colors.black.withValues(alpha: 0.6),
     shape: const RoundedRectangleBorder(
@@ -1277,11 +1333,13 @@ class PremiumNavigationBar extends StatelessWidget {
             border: Border(
               top: BorderSide(color: colors.border),
             ),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
-                color: Color(0x0DD4FF00),
-                blurRadius: 30,
-                offset: Offset(0, -10),
+                color: colors.isDark
+                    ? const Color(0x33000000)
+                    : const Color(0x0A000000),
+                blurRadius: 16,
+                offset: const Offset(0, -2),
               ),
             ],
           ),
@@ -1313,12 +1371,14 @@ class PremiumNavigationBar extends StatelessWidget {
   }
 }
 
-/// Standardized themed TabBar primitive
+/// Standardized high-contrast TabBar primitive (Monochrome Architectural)
 class PremiumTabBar extends StatelessWidget implements PreferredSizeWidget {
   final List<Widget> tabs;
   final TabController? controller;
   final ValueChanged<int>? onTap;
   final bool isScrollable;
+  final EdgeInsetsGeometry? padding;
+  final double? height;
 
   const PremiumTabBar({
     super.key,
@@ -1326,19 +1386,32 @@ class PremiumTabBar extends StatelessWidget implements PreferredSizeWidget {
     this.controller,
     this.onTap,
     this.isScrollable = false,
+    this.padding,
+    this.height,
   });
 
   @override
-  Size get preferredSize => const Size.fromHeight(48.0);
+  Size get preferredSize {
+    if (height != null) return Size.fromHeight(height!);
+    final hasIcons = tabs.any((t) => t is Tab && t.icon != null);
+    return Size.fromHeight(hasIcons ? 66.0 : 50.0);
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = AppThemeColors.of(context);
+    final hasIcons = tabs.any((t) => t is Tab && t.icon != null);
+
     return Container(
+      width: double.infinity,
+      padding: padding ?? const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(
-        color: colors.surface,
+        color: colors.background,
         border: Border(
-          bottom: BorderSide(color: colors.border),
+          bottom: BorderSide(
+            color: colors.border,
+            width: 1.0,
+          ),
         ),
       ),
       child: TabBar(
@@ -1346,13 +1419,38 @@ class PremiumTabBar extends StatelessWidget implements PreferredSizeWidget {
         tabs: tabs,
         onTap: onTap,
         isScrollable: isScrollable,
-        indicatorColor: colors.primary,
-        indicatorWeight: 3,
-        labelColor: colors.primary,
+        tabAlignment: isScrollable ? TabAlignment.start : TabAlignment.fill,
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        splashBorderRadius: BorderRadius.circular(AppRadii.md),
+        indicator: BoxDecoration(
+          color: colors.card,
+          borderRadius: BorderRadius.circular(AppRadii.sm),
+          border: Border.all(
+            color: colors.border,
+            width: 1.0,
+          ),
+          boxShadow: colors.isDark
+              ? null
+              : const [
+                  BoxShadow(
+                    color: Color(0x08000000),
+                    offset: Offset(0, 1),
+                    blurRadius: 2,
+                  ),
+                ],
+        ),
+        labelColor: colors.textPrimary,
         unselectedLabelColor: colors.textSecondary,
-        labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-        unselectedLabelStyle:
-            const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+        labelStyle: TextStyle(
+          fontWeight: FontWeight.w800,
+          fontSize: hasIcons ? 12 : 13,
+          letterSpacing: -0.2,
+        ),
+        unselectedLabelStyle: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: hasIcons ? 12 : 13,
+        ),
       ),
     );
   }
@@ -1479,4 +1577,122 @@ class PremiumTabView extends StatelessWidget {
       children: children,
     );
   }
+}
+
+/// Hardware-accelerated, state-preserving animated indexed stack for buttery-smooth tab transitions
+class AnimatedIndexedStack extends StatefulWidget {
+  final int index;
+  final List<Widget> children;
+  final Duration duration;
+
+  const AnimatedIndexedStack({
+    super.key,
+    required this.index,
+    required this.children,
+    this.duration = const Duration(milliseconds: 220),
+  });
+
+  @override
+  State<AnimatedIndexedStack> createState() => _AnimatedIndexedStackState();
+}
+
+class _AnimatedIndexedStackState extends State<AnimatedIndexedStack>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.index;
+    _controller = AnimationController(
+      vsync: this,
+      duration: widget.duration,
+      value: 1.0,
+    );
+    _animation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
+  void didUpdateWidget(AnimatedIndexedStack oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.index != oldWidget.index) {
+      setState(() {
+        _currentIndex = widget.index;
+      });
+      _controller.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, _) {
+        return IndexedStack(
+          index: _currentIndex,
+          children: widget.children.asMap().entries.map((entry) {
+            final idx = entry.key;
+            final child = entry.value;
+            final isActive = idx == _currentIndex;
+
+            if (!isActive) return child;
+
+            return FadeTransition(
+              opacity: _animation,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.015, 0.0),
+                  end: Offset.zero,
+                ).animate(_animation),
+                child: child,
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+}
+
+/// Reusable page route with smooth slide and fade cubic transitions
+class SmoothPageRoute<T> extends PageRouteBuilder<T> {
+  final Widget page;
+
+  SmoothPageRoute({
+    required this.page,
+    super.settings,
+    Duration duration = const Duration(milliseconds: 280),
+  }) : super(
+          pageBuilder: (context, animation, secondaryAnimation) => page,
+          transitionDuration: duration,
+          reverseTransitionDuration: const Duration(milliseconds: 220),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            final curvedAnimation = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            );
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.06, 0.0),
+                end: Offset.zero,
+              ).animate(curvedAnimation),
+              child: FadeTransition(
+                opacity: curvedAnimation,
+                child: child,
+              ),
+            );
+          },
+        );
 }

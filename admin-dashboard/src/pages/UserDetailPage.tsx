@@ -66,8 +66,6 @@ export const UserDetailPage: React.FC<UserDetailPageProps> = ({ userId, onBack }
   const [cardioSpeedMax, setCardioSpeedMax] = useState<string>('');
   const [cardioInclineMin, setCardioInclineMin] = useState<string>('');
   const [cardioInclineMax, setCardioInclineMax] = useState<string>('');
-  const [cardioDistMin, setCardioDistMin] = useState<string>('');
-  const [cardioDistMax, setCardioDistMax] = useState<string>('');
   const [cardioEffectiveFrom, setCardioEffectiveFrom] = useState<string>(new Date().toISOString().split('T')[0]);
   const [cardioEffectiveUntil, setCardioEffectiveUntil] = useState<string>('');
   const [cardioNotes, setCardioNotes] = useState<string>('');
@@ -287,8 +285,6 @@ export const UserDetailPage: React.FC<UserDetailPageProps> = ({ userId, onBack }
       if (cardioSpeedMax.trim() !== '') payload.targetSpeedMaxKmh = parseFloat(cardioSpeedMax);
       if (cardioInclineMin.trim() !== '') payload.targetInclineMin = parseFloat(cardioInclineMin);
       if (cardioInclineMax.trim() !== '') payload.targetInclineMax = parseFloat(cardioInclineMax);
-      if (cardioDistMin.trim() !== '') payload.targetDistanceMinKm = parseFloat(cardioDistMin);
-      if (cardioDistMax.trim() !== '') payload.targetDistanceMaxKm = parseFloat(cardioDistMax);
 
       await api.post(`/admin/users/${userId}/cardio-targets`, payload);
       setFeedback({ type: 'success', message: 'Cardio target created successfully' });
@@ -773,7 +769,6 @@ export const UserDetailPage: React.FC<UserDetailPageProps> = ({ userId, onBack }
                       <div style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)', marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                         {ct.target_speed_min_kmh && <span>Speed: {ct.target_speed_min_kmh}{ct.target_speed_max_kmh ? `-${ct.target_speed_max_kmh}` : ''} km/h</span>}
                         {ct.target_incline_min && <span>Incline: {ct.target_incline_min}{ct.target_incline_max ? `-${ct.target_incline_max}` : ''}%</span>}
-                        {ct.target_distance_min_km && <span>Dist: {ct.target_distance_min_km}{ct.target_distance_max_km ? `-${ct.target_distance_max_km}` : ''} km</span>}
                       </div>
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '6px' }}>
@@ -1248,24 +1243,6 @@ export const UserDetailPage: React.FC<UserDetailPageProps> = ({ userId, onBack }
                 placeholder="e.g. 4.0"
                 value={cardioInclineMax}
                 onChange={e => setCardioInclineMax(e.target.value)}
-              />
-            </FormField>
-          </div>
-
-          {/* Distance range */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <FormField label="Min Distance (km)">
-              <TextInput
-                placeholder="e.g. 3.0"
-                value={cardioDistMin}
-                onChange={e => setCardioDistMin(e.target.value)}
-              />
-            </FormField>
-            <FormField label="Max Distance (km)">
-              <TextInput
-                placeholder="e.g. 5.0"
-                value={cardioDistMax}
-                onChange={e => setCardioDistMax(e.target.value)}
               />
             </FormField>
           </div>

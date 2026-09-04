@@ -42,7 +42,7 @@ services:
     environment:
       NODE_ENV: production
       APP_HOST: 0.0.0.0
-      APP_PORT: 3000
+      APP_PORT: 4000
       TRUST_PROXY: "true"
       DB_CLIENT: mysql
       DATABASE_HOST: mysql
@@ -87,7 +87,7 @@ services:
     environment:
       NODE_ENV: production
       APP_HOST: 0.0.0.0
-      APP_PORT: 3000
+      APP_PORT: 4000
       TRUST_PROXY: "true"
       DB_CLIENT: mysql
       DATABASE_HOST: mysql
@@ -112,9 +112,9 @@ services:
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
-      - "${API_PORT:-3000}:3000"
+      - "${API_PORT:-4000}:4000"
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:' + (process.env.APP_PORT || 3000) + '/api/v1/health/ready').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://localhost:' + (process.env.APP_PORT || 4000) + '/api/v1/health/ready').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -147,7 +147,7 @@ services:
     environment:
       NODE_ENV: production
       APP_HOST: 0.0.0.0
-      APP_PORT: 3000
+      APP_PORT: 4000
       TRUST_PROXY: "true"
       DB_CLIENT: mysql
       DATABASE_HOST: mysql

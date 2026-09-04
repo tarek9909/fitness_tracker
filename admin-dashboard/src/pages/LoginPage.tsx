@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { useAuth } from '../auth/auth-context';
-import { Shield, ArrowRight, Activity, AlertCircle } from 'lucide-react';
+import { Shield, ArrowRight, Activity, AlertCircle, Fingerprint } from 'lucide-react';
 import { Button, FormField, TextInput, Card } from '../components/ui';
 
 export const LoginPage: React.FC = () => {
-  const { login } = useAuth();
+  const { login, loginWithPasskey } = useAuth();
   const isDev = import.meta.env.DEV;
   const [email, setEmail] = useState(isDev ? 'admin@fitnessplatform.com' : '');
   const [password, setPassword] = useState(isDev ? 'Admin123!' : '');
   const [loading, setLoading] = useState(false);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -21,6 +22,22 @@ export const LoginPage: React.FC = () => {
       setError(err.message || 'Authentication failed. Please verify your credentials.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePasskeyLogin = async () => {
+    setPasskeyLoading(true);
+    setError(null);
+    try {
+      await loginWithPasskey(email);
+    } catch (err: any) {
+      if (err.name === 'NotAllowedError') {
+        setError('Passkey prompt was cancelled or timed out.');
+      } else {
+        setError(err.message || 'Passkey authentication failed.');
+      }
+    } finally {
+      setPasskeyLoading(false);
     }
   };
 
@@ -45,14 +62,15 @@ export const LoginPage: React.FC = () => {
             width: '48px',
             height: '48px',
             borderRadius: 'var(--radius-lg)',
-            background: 'linear-gradient(135deg, var(--accent-primary), #059669)',
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border-color)',
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: '1rem',
-            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
+            boxShadow: 'var(--shadow-sm)',
           }}>
-            <Activity size={24} color="#ffffff" strokeWidth={2.5} />
+            <Activity size={24} color="var(--text-primary)" strokeWidth={2} />
           </div>
           <h1 style={{ fontSize: '1.45rem', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
             Fitness Platform
@@ -111,6 +129,38 @@ export const LoginPage: React.FC = () => {
           >
             <span>Sign In to Console</span>
             <ArrowRight size={16} />
+          </Button>
+
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            margin: '0.25rem 0',
+          }}>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border-subtle)' }} />
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              or passwordless
+            </span>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border-subtle)' }} />
+          </div>
+
+          <Button
+            type="button"
+            variant="secondary"
+            loading={passkeyLoading}
+            onClick={handlePasskeyLogin}
+            icon={<Fingerprint size={18} color="var(--accent-primary)" />}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              fontWeight: 600,
+            }}
+          >
+            <span>Sign In with Passkey</span>
           </Button>
         </form>
 

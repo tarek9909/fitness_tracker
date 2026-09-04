@@ -139,7 +139,7 @@ export class WorkoutPlanRepository {
              day_order as order_index 
       FROM workout_plan_days 
       WHERE workout_plan_version_id = ? 
-      ORDER BY weekday ASC, day_order ASC
+      ORDER BY day_order ASC, weekday ASC
     `;
     const days = await client.query(daysSql, [versionId]);
     if (days.length === 0) return [];
@@ -177,6 +177,25 @@ export class WorkoutPlanRepository {
       day.exercises = exercisesByDayId.get(day.id) || [];
     }
 
+    const exerciseIds = allExercises.map((exercise: any) => exercise.id);
+    if (exerciseIds.length > 0) {
+      const setRows = await client.query(
+        `SELECT * FROM workout_plan_exercise_sets
+         WHERE workout_plan_exercise_id IN (${exerciseIds.map(() => '?').join(',')})
+         ORDER BY set_number ASC`,
+        exerciseIds,
+      );
+      const setsByExerciseId = new Map<number, any[]>();
+      for (const set of setRows) {
+        const list = setsByExerciseId.get(set.workout_plan_exercise_id) || [];
+        list.push(set);
+        setsByExerciseId.set(set.workout_plan_exercise_id, list);
+      }
+      for (const exercise of allExercises) {
+        exercise.sets = setsByExerciseId.get(exercise.id) || [];
+      }
+    }
+
     return days;
   }
 
@@ -203,7 +222,7 @@ export class WorkoutPlanRepository {
     return res.insertId;
   }
 
-  async updateDay(dayId: number, data: Partial<{ name: string; isRestDay: number; notes: string | null; orderIndex: number }>): Promise<void> {
+  async updateDay(dayId: number, data: Partial<{ name: string; isRestDay: number; notes: string | null; orderIndex: number }>, client: DbConnection = this.db): Promise<void> {
     const set: string[] = [];
     const values: any[] = [];
     if (data.name !== undefined) { set.push('name = ?'); values.push(data.name); }
@@ -213,11 +232,11 @@ export class WorkoutPlanRepository {
 
     if (set.length === 0) return;
     const sql = `UPDATE workout_plan_days SET ${set.join(', ')} WHERE id = ?`;
-    await this.db.execute(sql, [...values, dayId]);
+    await client.execute(sql, [...values, dayId]);
   }
 
-  async deleteDay(dayId: number): Promise<void> {
-    await this.db.execute('DELETE FROM workout_plan_days WHERE id = ?', [dayId]);
+  async deleteDay(dayId: number, client: DbConnection = this.db): Promise<void> {
+    await client.execute('DELETE FROM workout_plan_days WHERE id = ?', [dayId]);
   }
 
   async addExercise(data: {
@@ -227,9 +246,21 @@ export class WorkoutPlanRepository {
     targetSets: number;
     repsMin?: number | null;
     repsMax?: number | null;
+    targetDurationSeconds?: number | null;
+    targetDistanceMeters?: number | null;
     restSeconds?: number | null;
     notes?: string | null;
     isOptional?: number;
+    sets?: Array<{
+      setNumber: number;
+      targetRepsMin?: number | null;
+      targetRepsMax?: number | null;
+      targetWeightKg?: number | null;
+      targetDurationSeconds?: number | null;
+      targetDistanceMeters?: number | null;
+      restSeconds?: number | null;
+      notes?: string | null;
+    }>;
   }, client: DbConnection = this.db): Promise<number> {
     const exercise = await client.queryOne<{ name: string; tracking_type: string }>('SELECT name, tracking_type FROM exercises WHERE id = ?', [data.exerciseId]);
     const exerciseName = exercise?.name || 'Exercise';
@@ -238,8 +269,9 @@ export class WorkoutPlanRepository {
     const sql = `
       INSERT INTO workout_plan_exercises (
         workout_plan_day_id, exercise_id, exercise_order, exercise_name_snapshot, tracking_type_snapshot,
-        target_sets, target_reps_min, target_reps_max, rest_seconds, notes, is_optional
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        target_sets, target_reps_min, target_reps_max, target_duration_seconds,
+        target_distance_meters, rest_seconds, notes, is_optional
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const res = await client.execute(sql, [
       data.workoutPlanDayId,
@@ -250,10 +282,13 @@ export class WorkoutPlanRepository {
       data.targetSets,
       data.repsMin ?? null,
       data.repsMax ?? null,
+      data.targetDurationSeconds ?? null,
+      data.targetDistanceMeters ?? null,
       data.restSeconds ?? null,
       data.notes || null,
       data.isOptional ? 1 : 0,
     ]);
+    if (data.sets) await this.replaceExerciseSets(res.insertId, data.sets, client);
     return res.insertId;
   }
 
@@ -262,10 +297,12 @@ export class WorkoutPlanRepository {
     targetSets: number;
     repsMin: number | null;
     repsMax: number | null;
+    targetDurationSeconds: number | null;
+    targetDistanceMeters: number | null;
     restSeconds: number | null;
     notes: string | null;
     isOptional: number;
-  }>): Promise<void> {
+  }>, client: DbConnection = this.db): Promise<void> {
     const set: string[] = [];
     const values: any[] = [];
 
@@ -273,16 +310,51 @@ export class WorkoutPlanRepository {
     if (data.targetSets !== undefined) { set.push('target_sets = ?'); values.push(data.targetSets); }
     if (data.repsMin !== undefined) { set.push('target_reps_min = ?'); values.push(data.repsMin); }
     if (data.repsMax !== undefined) { set.push('target_reps_max = ?'); values.push(data.repsMax); }
+    if (data.targetDurationSeconds !== undefined) { set.push('target_duration_seconds = ?'); values.push(data.targetDurationSeconds); }
+    if (data.targetDistanceMeters !== undefined) { set.push('target_distance_meters = ?'); values.push(data.targetDistanceMeters); }
     if (data.restSeconds !== undefined) { set.push('rest_seconds = ?'); values.push(data.restSeconds); }
     if (data.notes !== undefined) { set.push('notes = ?'); values.push(data.notes); }
     if (data.isOptional !== undefined) { set.push('is_optional = ?'); values.push(data.isOptional); }
 
     if (set.length === 0) return;
     const sql = `UPDATE workout_plan_exercises SET ${set.join(', ')} WHERE id = ?`;
-    await this.db.execute(sql, [...values, exerciseId]);
+    await client.execute(sql, [...values, exerciseId]);
   }
 
-  async deleteExercise(exerciseId: number): Promise<void> {
-    await this.db.execute('DELETE FROM workout_plan_exercises WHERE id = ?', [exerciseId]);
+  async replaceExerciseSets(exerciseId: number, sets: Array<{
+    setNumber: number;
+    targetRepsMin?: number | null;
+    targetRepsMax?: number | null;
+    targetWeightKg?: number | null;
+    targetDurationSeconds?: number | null;
+    targetDistanceMeters?: number | null;
+    restSeconds?: number | null;
+    notes?: string | null;
+  }>, client: DbConnection = this.db): Promise<void> {
+    await client.execute('DELETE FROM workout_plan_exercise_sets WHERE workout_plan_exercise_id = ?', [exerciseId]);
+    for (const set of sets) {
+      await client.execute(
+        `INSERT INTO workout_plan_exercise_sets (
+          workout_plan_exercise_id, set_number, target_reps_min, target_reps_max,
+          target_weight_kg, target_duration_seconds, target_distance_meters,
+          rest_seconds, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          exerciseId,
+          set.setNumber,
+          set.targetRepsMin ?? null,
+          set.targetRepsMax ?? null,
+          set.targetWeightKg ?? null,
+          set.targetDurationSeconds ?? null,
+          set.targetDistanceMeters ?? null,
+          set.restSeconds ?? null,
+          set.notes || null,
+        ],
+      );
+    }
+  }
+
+  async deleteExercise(exerciseId: number, client: DbConnection = this.db): Promise<void> {
+    await client.execute('DELETE FROM workout_plan_exercises WHERE id = ?', [exerciseId]);
   }
 }

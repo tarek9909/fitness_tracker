@@ -20,24 +20,21 @@ void main() {
     });
 
     test(
-        'Cardio payload generation validates positive duration and numeric fields',
+        'Cardio payload generation validates duration, incline, and speed only',
         () {
       final validPayload = {
         'cardioActivityId': 1,
         'durationMinutes': 45,
-        'distanceKm': 5.2,
-        'caloriesBurned': 380.0,
-        'speedKmh': 7.0,
         'inclinePct': 2.0,
-        'averageHeartRate': 142.0,
-        'notes': 'Steady morning run',
+        'speedKmh': 7.0,
       };
 
       expect(validPayload['cardioActivityId'], equals(1));
       expect(validPayload['durationMinutes'], greaterThan(0));
-      expect(validPayload['distanceKm'], equals(5.2));
-      expect(validPayload['caloriesBurned'], equals(380.0));
-      expect(validPayload['notes'], isNotEmpty);
+      expect(validPayload['inclinePct'], equals(2.0));
+      expect(validPayload['speedKmh'], equals(7.0));
+      expect(validPayload.containsKey('distanceKm'), isFalse);
+      expect(validPayload.containsKey('caloriesBurned'), isFalse);
     });
 
     test('Offline enqueue for cardio session persists in mutation queue',
@@ -45,8 +42,8 @@ void main() {
       final cardioPayload = {
         'cardioActivityId': 2,
         'durationMinutes': 30,
-        'distanceKm': 3.0,
-        'caloriesBurned': 210,
+        'inclinePct': 3.5,
+        'speedKmh': 8.0,
       };
 
       await syncCoordinator.enqueue(

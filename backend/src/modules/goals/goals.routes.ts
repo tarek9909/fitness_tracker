@@ -252,7 +252,7 @@ export class GoalsRepository {
 
   async deleteCardioTarget(targetId: number, userId: number): Promise<boolean> {
     const res = await this.db.execute(
-      `UPDATE user_cardio_targets SET status = 'inactive' WHERE id = ? AND user_id = ?`,
+      `UPDATE user_cardio_targets SET status = 'cancelled' WHERE id = ? AND user_id = ?`,
       [targetId, userId]
     );
     return res.affectedRows > 0;

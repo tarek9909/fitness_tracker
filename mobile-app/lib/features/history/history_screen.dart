@@ -177,7 +177,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   Widget _buildWorkoutList(AppThemeColors colors) {
     if (_workouts.isEmpty) {
       return const EmptyStateWidget(
-        icon: Icons.fitness_center,
+        icon: Icons.fitness_center_rounded,
         title: 'No Workouts Logged',
         description: 'You have not recorded any workouts yet.',
       );
@@ -188,55 +188,112 @@ class _HistoryScreenState extends State<HistoryScreen>
       child: ListView.separated(
         padding: const EdgeInsets.all(AppSpacing.md),
         itemCount: _workouts.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, idx) {
           final w = _workouts[idx];
-          final name = w['workout_name_snapshot'] as String? ?? 'Workout';
+          final name = w['workout_name_snapshot'] as String? ?? 'Workout Session';
           final date =
               (w['session_date'] ?? w['workout_date']) as String? ?? '';
           final exerciseCount = w['exercise_count'] ?? 0;
           final setsCount = w['completed_sets_count'] ?? 0;
 
           return PremiumCard(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Column(
+            padding: const EdgeInsets.all(14),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16,
-                              color: colors.textPrimary)),
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: colors.primaryMuted,
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                    border: Border.all(
+                      color: colors.border,
+                      width: 1.0,
                     ),
-                    const SizedBox(width: 8),
-                    Text(date,
-                        style: TextStyle(
-                            fontSize: 12, color: colors.textSecondary)),
-                  ],
+                  ),
+                  child: Icon(
+                    Icons.fitness_center_rounded,
+                    color: colors.primary,
+                    size: 20,
+                  ),
                 ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    StatusBadge(
-                      icon: Icon(Icons.fitness_center,
-                          size: 12, color: colors.cyan),
-                      label: '$exerciseCount exercises',
-                      color: colors.cyan,
-                    ),
-                    StatusBadge(
-                      icon: Icon(Icons.check,
-                          size: 12, color: colors.primary),
-                      label: '$setsCount sets logged',
-                      color: colors.primary,
-                    ),
-                  ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                                letterSpacing: -0.2,
+                                color: colors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: colors.surfaceElevated,
+                              borderRadius:
+                                  BorderRadius.circular(AppRadii.sm),
+                              border: Border.all(
+                                color: colors.border.withValues(alpha: 0.25),
+                                width: 1.0,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.calendar_today_rounded,
+                                    size: 10, color: colors.textSecondary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  date,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: colors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          StatusBadge(
+                            icon: Icon(Icons.fitness_center,
+                                size: 12, color: colors.cyan),
+                            label: '$exerciseCount exercises',
+                            color: colors.cyan,
+                          ),
+                          StatusBadge(
+                            icon: Icon(Icons.check_circle_outline,
+                                size: 12, color: colors.primary),
+                            label: '$setsCount sets logged',
+                            color: colors.primary,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -249,7 +306,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   Widget _buildMealList(AppThemeColors colors) {
     if (_meals.isEmpty) {
       return const EmptyStateWidget(
-        icon: Icons.restaurant,
+        icon: Icons.restaurant_rounded,
         title: 'No Meals Logged',
         description: 'No nutrition logs found in your activity history.',
       );
@@ -260,58 +317,99 @@ class _HistoryScreenState extends State<HistoryScreen>
       child: ListView.separated(
         padding: const EdgeInsets.all(AppSpacing.md),
         itemCount: _meals.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, idx) {
           final m = _meals[idx];
-          final name = m['meal_name'] as String? ?? 'Meal';
+          final name = m['meal_name'] as String? ?? 'Nutrition Entry';
           final status = m['status'] as String? ?? 'completed';
           final date = (m['meal_date'] ?? m['entry_date'] ?? '') as String;
           final calories = m['total_calories'];
 
           return PremiumCard(
-            padding: const EdgeInsets.all(AppSpacing.md),
+            padding: const EdgeInsets.all(14),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: colors.amberMuted,
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                    border: Border.all(
+                      color: colors.border,
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.restaurant_rounded,
+                    color: colors.amber,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 15,
-                              color: colors.textPrimary)),
-                      const SizedBox(height: 4),
-                      Text(date,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontSize: 12, color: colors.textSecondary)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                                letterSpacing: -0.2,
+                                color: colors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          StatusBadge(
+                            label: status.toUpperCase(),
+                            color: status == 'completed'
+                                ? colors.primary
+                                : (status == 'skipped'
+                                    ? colors.rose
+                                    : colors.amber),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.calendar_today_rounded,
+                                  size: 11, color: colors.textSecondary),
+                              const SizedBox(width: 4),
+                              Text(
+                                date,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: colors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (calories != null)
+                            StatusBadge(
+                              icon: Icon(Icons.local_fire_department_rounded,
+                                  size: 12, color: colors.amber),
+                              label: '$calories kcal',
+                              color: colors.amber,
+                            ),
+                        ],
+                      ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    StatusBadge(
-                      label: status.toUpperCase(),
-                      color: status == 'completed'
-                          ? colors.primary
-                          : (status == 'skipped'
-                              ? colors.rose
-                              : colors.amber),
-                    ),
-                    if (calories != null) ...[
-                      const SizedBox(height: 4),
-                      Text('$calories kcal',
-                          style: TextStyle(
-                              fontSize: 12, color: colors.textSecondary)),
-                    ],
-                  ],
                 ),
               ],
             ),
@@ -324,7 +422,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   Widget _buildWaterList(AppThemeColors colors) {
     if (_water.isEmpty) {
       return const EmptyStateWidget(
-        icon: Icons.water_drop,
+        icon: Icons.water_drop_rounded,
         title: 'No Water Logged',
         description: 'You have not tracked your daily hydration yet.',
       );
@@ -335,26 +433,62 @@ class _HistoryScreenState extends State<HistoryScreen>
       child: ListView.separated(
         padding: const EdgeInsets.all(AppSpacing.md),
         itemCount: _water.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, idx) {
           final entry = _water[idx];
           final totalMl = entry['total_ml'] ?? entry['amount_ml'] ?? 0;
           final date =
               (entry['intake_date'] ?? entry['entry_date'] ?? '') as String;
+          final pct = (totalMl / 3000 * 100).clamp(0, 100).toInt();
 
           return PremiumCard(
-            padding: const EdgeInsets.all(AppSpacing.md),
+            padding: const EdgeInsets.all(14),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(date,
-                    style: TextStyle(
-                        fontSize: 14,
-                        color: colors.textPrimary,
-                        fontWeight: FontWeight.w600)),
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: colors.cyanMuted,
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                    border: Border.all(
+                      color: colors.border,
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.water_drop_rounded,
+                    color: colors.cyan,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        date,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: colors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '$pct% of 3,000 ml target',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: colors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 StatusBadge(
-                  icon: Icon(Icons.water_drop,
-                      size: 12, color: colors.cyan),
+                  icon: Icon(Icons.water_drop, size: 12, color: colors.cyan),
                   label: '$totalMl ml',
                   color: colors.cyan,
                 ),
@@ -369,7 +503,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   Widget _buildCardioList(AppThemeColors colors) {
     if (_cardio.isEmpty) {
       return const EmptyStateWidget(
-        icon: Icons.directions_run,
+        icon: Icons.directions_run_rounded,
         title: 'No Cardio History',
         description: 'You have not recorded any cardio sessions yet.',
       );
@@ -380,65 +514,120 @@ class _HistoryScreenState extends State<HistoryScreen>
       child: ListView.separated(
         padding: const EdgeInsets.all(AppSpacing.md),
         itemCount: _cardio.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, idx) {
           final c = _cardio[idx];
-          final activity = c['activity_name'] as String? ?? 'Cardio';
+          final activity = c['activity_name'] as String? ?? 'Cardio Session';
           final duration = c['duration_minutes'] ?? 0;
           final date =
               (c['cardio_date'] ?? c['session_date'] ?? '') as String;
-          final distance = c['distance_km'];
-          final calories = c['calories_burned'];
+          final incline = c['incline'] ?? c['incline_pct'];
+          final speed = c['speed_kmh'];
 
           return PremiumCard(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Column(
+            padding: const EdgeInsets.all(14),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(activity,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16,
-                              color: colors.textPrimary)),
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: colors.cyanMuted,
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                    border: Border.all(
+                      color: colors.border,
+                      width: 1.0,
                     ),
-                    const SizedBox(width: 8),
-                    Text(date,
-                        style: TextStyle(
-                            fontSize: 12, color: colors.textSecondary)),
-                  ],
+                  ),
+                  child: Icon(
+                    Icons.directions_run_rounded,
+                    color: colors.cyan,
+                    size: 20,
+                  ),
                 ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  children: [
-                    StatusBadge(
-                      icon: Icon(Icons.timer_outlined,
-                          size: 12, color: colors.cyan),
-                      label: '$duration min',
-                      color: colors.cyan,
-                    ),
-                    if (distance != null)
-                      StatusBadge(
-                        icon: Icon(Icons.straighten,
-                            size: 12, color: colors.primary),
-                        label: '$distance km',
-                        color: colors.primary,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              activity.toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                                letterSpacing: 0.2,
+                                color: colors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: colors.surfaceElevated,
+                              borderRadius:
+                                  BorderRadius.circular(AppRadii.sm),
+                              border: Border.all(
+                                color: colors.border.withValues(alpha: 0.25),
+                                width: 1.0,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.calendar_today_rounded,
+                                    size: 10, color: colors.textSecondary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  date,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: colors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    if (calories != null)
-                      StatusBadge(
-                        icon: Icon(Icons.local_fire_department,
-                            size: 12, color: colors.amber),
-                        label: '$calories kcal',
-                        color: colors.amber,
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          StatusBadge(
+                            icon: Icon(Icons.timer_outlined,
+                                size: 12, color: colors.cyan),
+                            label: '$duration min',
+                            color: colors.cyan,
+                          ),
+                          if (incline != null)
+                            StatusBadge(
+                              icon: Icon(Icons.trending_up,
+                                  size: 12, color: colors.amber),
+                              label: '$incline% incline',
+                              color: colors.amber,
+                            ),
+                          if (speed != null)
+                            StatusBadge(
+                              icon: Icon(Icons.speed,
+                                  size: 12, color: colors.primary),
+                              label: '$speed km/h',
+                              color: colors.primary,
+                            ),
+                        ],
                       ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -462,7 +651,7 @@ class _HistoryScreenState extends State<HistoryScreen>
       child: ListView.separated(
         padding: const EdgeInsets.all(AppSpacing.md),
         itemCount: _weight.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, idx) {
           final w = _weight[idx];
           final kg = w['weight_kg'] ?? w['weightKg'] ?? 0;
@@ -471,20 +660,39 @@ class _HistoryScreenState extends State<HistoryScreen>
                   as String;
 
           return PremiumCard(
-            padding: const EdgeInsets.all(AppSpacing.md),
+            padding: const EdgeInsets.all(14),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
-                  child: Text(date,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontSize: 14,
-                          color: colors.textPrimary,
-                          fontWeight: FontWeight.w600)),
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: colors.violetMuted,
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                    border: Border.all(
+                      color: colors.border,
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.monitor_weight_rounded,
+                    color: colors.violet,
+                    size: 20,
+                  ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    date,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                ),
                 StatusBadge(
                   icon: Icon(Icons.monitor_weight,
                       size: 12, color: colors.violet),

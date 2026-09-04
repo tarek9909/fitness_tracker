@@ -29,7 +29,7 @@ Modern, high-performance administrative web application built with React 18, Vit
 ```properties
 # Base URL for the Backend REST API
 # Development:
-VITE_API_BASE_URL=http://localhost:3000/api/v1
+VITE_API_BASE_URL=http://localhost:4000/api/v1
 
 # Production (Requires HTTPS or same-origin /api/v1):
 # VITE_API_BASE_URL=https://api.yourdomain.com/api/v1

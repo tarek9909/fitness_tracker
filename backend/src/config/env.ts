@@ -35,6 +35,9 @@ export interface EnvConfig {
   smtpPassword?: string;
   smtpFrom?: string;
   passwordResetBaseUrl: string;
+  webauthnRpId: string;
+  webauthnRpName: string;
+  webauthnExpectedOrigins: string[];
   reminderWorkerIntervalSeconds: number;
   rateLimitMax: number;
 }
@@ -318,7 +321,36 @@ export function validateAndLoadEnv(source: Record<string, string | undefined> = 
     }
   }
 
-  const appPort = parseBoundedInteger(source.APP_PORT, 3000, 1, 65535, 'APP_PORT');
+  const webauthnRpId = (source.WEBAUTHN_RP_ID || 'localhost').trim();
+  const webauthnRpName = (source.WEBAUTHN_RP_NAME || 'Fitness Platform').trim();
+  const webauthnExpectedOrigins = (source.WEBAUTHN_EXPECTED_ORIGINS || (nodeEnvValue === 'production'
+    ? ''
+    : 'http://localhost:5173,http://127.0.0.1:5173,http://localhost'))
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
+  if (!webauthnRpId || !webauthnRpName) {
+    throw new Error('FATAL: WEBAUTHN_RP_ID and WEBAUTHN_RP_NAME must be configured');
+  }
+  if (nodeEnvValue === 'production' && webauthnExpectedOrigins.length === 0) {
+    throw new Error('FATAL: WEBAUTHN_EXPECTED_ORIGINS must be configured in production');
+  }
+  if (nodeEnvValue !== 'test') {
+    for (const origin of webauthnExpectedOrigins) {
+      if (origin.startsWith('android:apk-key-hash:')) continue;
+      try {
+        const originUrl = new URL(origin);
+        if (!originUrl.protocol || !originUrl.hostname || (originUrl.pathname !== '/' && originUrl.pathname !== '')) {
+          throw new Error('invalid origin');
+        }
+      } catch {
+        throw new Error(`FATAL: WEBAUTHN_EXPECTED_ORIGINS contains an invalid origin (received: "${origin}")`);
+      }
+    }
+  }
+
+  const appPort = parseBoundedInteger(source.APP_PORT, 4000, 1, 65535, 'APP_PORT');
   const databasePort = parseBoundedInteger(source.DATABASE_PORT, 3306, 1, 65535, 'DATABASE_PORT');
   const smtpPort = parseBoundedInteger(source.SMTP_PORT, 587, 1, 65535, 'SMTP_PORT');
   const databasePoolMin = parseBoundedInteger(source.DATABASE_POOL_MIN, nodeEnvValue === 'production' ? 5 : 2, 1, 100, 'DATABASE_POOL_MIN');
@@ -364,6 +396,9 @@ export function validateAndLoadEnv(source: Record<string, string | undefined> = 
     smtpPassword: source.SMTP_PASSWORD,
     smtpFrom: source.SMTP_FROM || 'noreply@fitnessplatform.local',
     passwordResetBaseUrl,
+    webauthnRpId,
+    webauthnRpName,
+    webauthnExpectedOrigins,
     reminderWorkerIntervalSeconds,
     rateLimitMax,
   };

@@ -21,7 +21,7 @@ NODE_ENV=development
 
 # Server Network Configuration
 APP_HOST=0.0.0.0
-APP_PORT=3000
+APP_PORT=4000
 TRUST_PROXY=false
 
 # Database Engine Configuration
@@ -91,7 +91,7 @@ npm run seed
 npm run dev
 ```
 
-The REST API will listen on `http://localhost:3000/api/v1`.
+The REST API will listen on `http://localhost:4000/api/v1`.
 
 ### Demo Seed Credentials (Development Only):
 - **Super Admin**: `admin@fitnessplatform.com` / `Admin123!`

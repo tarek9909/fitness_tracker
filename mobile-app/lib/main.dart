@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'core/api/api_client.dart';
 import 'core/auth/auth_session.dart';
 import 'core/push/push_registration_service.dart';
@@ -12,10 +15,14 @@ import 'core/widgets/premium_widgets.dart';
 import 'features/auth/login_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/cardio/cardio_screen.dart';
+import 'features/cardio/cardio_quick_log_sheet.dart';
 import 'features/progress/progress_screen.dart';
+import 'features/history/history_screen.dart';
 import 'features/notifications/notifications_screen.dart';
 import 'features/workout/workout_plans_screen.dart';
+import 'features/workout/workout_tab_screen.dart';
 import 'features/diet/diet_plans_screen.dart';
+import 'features/diet/meals_tab_screen.dart';
 import 'features/configuration/fitness_configuration_screen.dart';
 import 'features/auth/security_settings_screen.dart';
 
@@ -82,8 +89,9 @@ class FitnessApp extends StatelessWidget {
   final LocalCache? localCache;
   final PushRegistrationService? pushRegistrationService;
   final ThemeController? themeController;
+  final HomeNavigationObserver navigationObserver = HomeNavigationObserver();
 
-  const FitnessApp({
+  FitnessApp({
     super.key,
     required this.authSession,
     required this.syncCoordinator,
@@ -103,6 +111,7 @@ class FitnessApp extends StatelessWidget {
         return MaterialApp(
           title: 'Kinetic Wellness',
           debugShowCheckedModeBanner: false,
+          navigatorObservers: [navigationObserver],
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: effectiveThemeController.themeMode,
@@ -114,6 +123,7 @@ class FitnessApp extends StatelessWidget {
                   localCache: localCache ?? LocalCache(authSession.storage),
                   pushRegistrationService: pushRegistrationService,
                   themeController: effectiveThemeController,
+                  navigationObserver: navigationObserver,
                 )
               : LoginScreen(
                   apiClient: apiClient,
@@ -127,6 +137,40 @@ class FitnessApp extends StatelessWidget {
   }
 }
 
+/// Collapses any pushed page back to the root shell when the user goes back.
+/// Modal routes are intentionally excluded so dialogs and bottom sheets can
+/// still dismiss normally.
+class HomeNavigationObserver extends NavigatorObserver {
+  VoidCallback? onReturnToHome;
+  bool _isCollapsingToHome = false;
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPop(route, previousRoute);
+
+    if (_isCollapsingToHome ||
+        previousRoute == null ||
+        route is! PageRoute<dynamic>) {
+      return;
+    }
+
+    final navigatorState = navigator;
+    if (navigatorState == null) return;
+
+    _isCollapsingToHome = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        if (navigatorState.mounted) {
+          navigatorState.popUntil((candidate) => candidate.isFirst);
+          onReturnToHome?.call();
+        }
+      } finally {
+        _isCollapsingToHome = false;
+      }
+    });
+  }
+}
+
 class MainNavigationShell extends StatefulWidget {
   final ApiClient apiClient;
   final AuthSession authSession;
@@ -134,6 +178,7 @@ class MainNavigationShell extends StatefulWidget {
   final LocalCache localCache;
   final PushRegistrationService? pushRegistrationService;
   final ThemeController? themeController;
+  final HomeNavigationObserver? navigationObserver;
 
   const MainNavigationShell({
     super.key,
@@ -143,6 +188,7 @@ class MainNavigationShell extends StatefulWidget {
     required this.localCache,
     this.pushRegistrationService,
     this.themeController,
+    this.navigationObserver,
   });
 
   @override
@@ -151,6 +197,74 @@ class MainNavigationShell extends StatefulWidget {
 
 class _MainNavigationShellState extends State<MainNavigationShell> {
   int _currentIndex = 0;
+  bool _isSyncing = false;
+  DateTime? _lastBackPressAt;
+  Timer? _backExitTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.navigationObserver?.onReturnToHome = _returnToHome;
+  }
+
+  @override
+  void didUpdateWidget(covariant MainNavigationShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.navigationObserver != widget.navigationObserver) {
+      oldWidget.navigationObserver?.onReturnToHome = null;
+      widget.navigationObserver?.onReturnToHome = _returnToHome;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.navigationObserver?.onReturnToHome = null;
+    _backExitTimer?.cancel();
+    super.dispose();
+  }
+
+  void _returnToHome() {
+    if (!mounted) return;
+    _backExitTimer?.cancel();
+    _backExitTimer = null;
+    _lastBackPressAt = null;
+    if (_currentIndex != 0) {
+      setState(() => _currentIndex = 0);
+    }
+  }
+
+  void _handleBack() {
+    if (_currentIndex != 0) {
+      _returnToHome();
+      return;
+    }
+
+    final now = DateTime.now();
+    final lastBackPressAt = _lastBackPressAt;
+    if (lastBackPressAt != null &&
+        now.difference(lastBackPressAt) <= const Duration(seconds: 2)) {
+      _backExitTimer?.cancel();
+      _backExitTimer = null;
+      SystemNavigator.pop();
+      return;
+    }
+
+    _lastBackPressAt = now;
+    _backExitTimer?.cancel();
+    _backExitTimer = Timer(const Duration(seconds: 2), () {
+      _lastBackPressAt = null;
+      _backExitTimer = null;
+    });
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('Press back again to exit'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -163,106 +277,297 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         localCache: widget.localCache,
         showAppBar: false,
         onOpenProfile: () => setState(() => _currentIndex = 4),
+        onOpenWorkout: () => setState(() => _currentIndex = 1),
+        onOpenMeals: () => setState(() => _currentIndex = 2),
+        onOpenCardio: () => setState(() => _currentIndex = 3),
+      ),
+      WorkoutTabScreen(
+        apiClient: widget.apiClient,
+        localCache: widget.localCache,
+      ),
+      MealsTabScreen(
+        apiClient: widget.apiClient,
+        localCache: widget.localCache,
       ),
       CardioScreen(apiClient: widget.apiClient),
-      ProgressScreen(apiClient: widget.apiClient),
-      NotificationsScreen(apiClient: widget.apiClient),
       _buildProfileScreen(colors),
     ];
 
-    return PremiumScaffold(
-      appBar: _currentIndex == 0
-          ? PremiumAppBar(
-              title: Row(
-                children: [
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => setState(() => _currentIndex = 4),
-                    child: Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: colors.surfaceElevated,
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.15),
+    return PopScope<void>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: PremiumScaffold(
+        appBar: _currentIndex == 0
+            ? PremiumAppBar(
+                title: Row(
+                  children: [
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => setState(() => _currentIndex = 4),
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: colors.surfaceElevated,
+                          border: Border.all(
+                            color: colors.border,
+                            width: 1.0,
+                          ),
+                        ),
+                        child: ClipOval(
+                          child: Icon(Icons.person,
+                              size: 20, color: colors.textSecondary),
                         ),
                       ),
-                      child: ClipOval(
-                        child: Icon(Icons.person,
-                            size: 20, color: colors.textSecondary),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Kinetic Wellness',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 18,
+                          letterSpacing: -0.3,
+                          color: colors.textPrimary,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Kinetic Wellness',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18,
-                        letterSpacing: -0.3,
-                        color: colors.textPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                PremiumIconButton(
-                  icon: Icons.sync,
-                  color: colors.primary,
-                  tooltip: 'Sync Agenda',
-                  onPressed: () {
-                    widget.syncCoordinator.flushQueue();
-                  },
+                  ],
                 ),
-                const SizedBox(width: 8),
-              ],
-            )
-          : (_currentIndex == 4
-              ? const PremiumAppBar(
-                  titleText: 'Profile & Settings',
-                )
-              : null),
-      body: Column(
-        children: [
-          _buildSyncStatusBanner(colors),
-          Expanded(child: screens[_currentIndex]),
-        ],
+                actions: [
+                  _buildTopActionToolbar(colors),
+                ],
+              )
+            : (_currentIndex == 4
+                ? const PremiumAppBar(
+                    titleText: 'Profile & Settings',
+                  )
+                : null),
+        body: Column(
+          children: [
+            _buildSyncStatusBanner(colors),
+            Expanded(
+              child: AnimatedIndexedStack(
+                index: _currentIndex,
+                children: screens,
+              ),
+            ),
+          ],
+        ),
+        bottomNavigationBar: PremiumNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (idx) {
+            if (idx == 3) {
+              showCardioQuickLogSheet(
+                context: context,
+                apiClient: widget.apiClient,
+                onViewHistory: () {
+                  setState(() => _currentIndex = 3);
+                },
+              );
+              return;
+            }
+            setState(() => _currentIndex = idx);
+          },
+          items: const [
+            PremiumNavigationBarItem(
+              icon: Icons.home_outlined,
+              activeIcon: Icons.home,
+              label: 'Home',
+            ),
+            PremiumNavigationBarItem(
+              icon: Icons.fitness_center_outlined,
+              activeIcon: Icons.fitness_center,
+              label: 'Workout',
+            ),
+            PremiumNavigationBarItem(
+              icon: Icons.restaurant_outlined,
+              activeIcon: Icons.restaurant,
+              label: 'Meals',
+            ),
+            PremiumNavigationBarItem(
+              icon: Icons.directions_run_outlined,
+              activeIcon: Icons.directions_run,
+              label: 'Cardio',
+            ),
+            PremiumNavigationBarItem(
+              icon: Icons.person_outline,
+              activeIcon: Icons.person,
+              label: 'Profile',
+            ),
+          ],
+        ),
       ),
-      bottomNavigationBar: PremiumNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (idx) => setState(() => _currentIndex = idx),
-        items: const [
-          PremiumNavigationBarItem(
-            icon: Icons.home_outlined,
-            activeIcon: Icons.home,
-            label: 'Home',
+    );
+  }
+
+  Future<void> _handleSync() async {
+    if (_isSyncing) return;
+    setState(() => _isSyncing = true);
+    try {
+      await widget.syncCoordinator.flushQueue();
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Text('Agenda synchronized successfully'),
+              ],
+            ),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
-          PremiumNavigationBarItem(
-            icon: Icons.directions_run_outlined,
-            activeIcon: Icons.directions_run,
-            label: 'Cardio',
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sync failed. Please check connection.'),
+            behavior: SnackBarBehavior.floating,
           ),
-          PremiumNavigationBarItem(
-            icon: Icons.insights_outlined,
-            activeIcon: Icons.insights,
-            label: 'Progress',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSyncing = false);
+      }
+    }
+  }
+
+  Widget _buildTopActionToolbar(AppThemeColors colors) {
+    return Container(
+      height: 38,
+      margin: const EdgeInsets.only(right: 12),
+      decoration: BoxDecoration(
+        color: colors.card,
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+        border: Border.all(
+          color: colors.border,
+          width: 1.0,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            _buildActionItem(
+              icon: Icons.notifications_none_rounded,
+              tooltip: 'Alerts',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        NotificationsScreen(apiClient: widget.apiClient),
+                  ),
+                );
+              },
+              colors: colors,
+            ),
+            _buildActionDivider(colors),
+            _buildActionItem(
+              icon: Icons.insights_rounded,
+              tooltip: 'Analytics & Progress',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProgressScreen(apiClient: widget.apiClient),
+                  ),
+                );
+              },
+              colors: colors,
+            ),
+            _buildActionDivider(colors),
+            _buildActionItem(
+              icon: Icons.history_rounded,
+              tooltip: 'Activity History',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => HistoryScreen(
+                      apiClient: widget.apiClient,
+                      localCache: widget.localCache,
+                    ),
+                  ),
+                );
+              },
+              colors: colors,
+            ),
+            _buildActionDivider(colors),
+            _buildActionItem(
+              icon: Icons.sync_rounded,
+              tooltip: 'Sync Agenda',
+              color: colors.primary,
+              isLoading: _isSyncing,
+              onTap: _handleSync,
+              colors: colors,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionDivider(AppThemeColors colors) {
+    return Container(
+      width: 1,
+      height: 18,
+      color: colors.border.withValues(alpha: colors.isDark ? 0.25 : 0.2),
+    );
+  }
+
+  Widget _buildActionItem({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+    required AppThemeColors colors,
+    Color? color,
+    bool isLoading = false,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: isLoading ? null : onTap,
+          child: SizedBox(
+            width: 36,
+            height: 38,
+            child: Center(
+              child: isLoading
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: colors.primary,
+                      ),
+                    )
+                  : Icon(
+                      icon,
+                      size: 19,
+                      color: color ?? colors.textSecondary,
+                    ),
+            ),
           ),
-          PremiumNavigationBarItem(
-            icon: Icons.notifications_outlined,
-            activeIcon: Icons.notifications,
-            label: 'Alerts',
-          ),
-          PremiumNavigationBarItem(
-            icon: Icons.person_outline,
-            activeIcon: Icons.person,
-            label: 'Profile',
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -460,8 +765,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 radius: 28,
                 backgroundColor: colors.primaryMuted,
                 child: Text(
-                  user?.firstName.isNotEmpty == true
-                      ? user!.firstName[0].toUpperCase()
+                  (user != null && user.firstName.trim().isNotEmpty)
+                      ? user.firstName.trim()[0].toUpperCase()
                       : 'U',
                   style: TextStyle(
                       fontSize: 22,
@@ -475,7 +780,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${user?.firstName ?? "User"} ${user?.lastName ?? ""}'.trim(),
+                      '${user?.firstName ?? "User"} ${user?.lastName ?? ""}'
+                          .trim(),
                       style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
@@ -484,20 +790,25 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     const SizedBox(height: 2),
                     Text(
                       user?.email ?? '',
-                      style: TextStyle(
-                          fontSize: 13, color: colors.textSecondary),
+                      style:
+                          TextStyle(fontSize: 13, color: colors.textSecondary),
                     ),
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        Icon(Icons.edit_outlined, size: 14, color: colors.primary),
+                        Icon(Icons.edit_outlined,
+                            size: 14, color: colors.primary),
                         const SizedBox(width: 4),
-                        Text(
-                          'Edit Profile & Goals',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: colors.primary,
+                        Flexible(
+                          child: Text(
+                            'Edit Profile & Goals',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: colors.primary,
+                            ),
                           ),
                         ),
                       ],
@@ -534,8 +845,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                       child: _buildThemeModeButton(
                         label: 'System',
                         icon: Icons.brightness_auto,
-                        isSelected: themeController.themeMode == ThemeMode.system,
-                        onTap: () => themeController.setThemeMode(ThemeMode.system),
+                        isSelected:
+                            themeController.themeMode == ThemeMode.system,
+                        onTap: () =>
+                            themeController.setThemeMode(ThemeMode.system),
                         colors: colors,
                       ),
                     ),
@@ -544,8 +857,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                       child: _buildThemeModeButton(
                         label: 'Light',
                         icon: Icons.light_mode_outlined,
-                        isSelected: themeController.themeMode == ThemeMode.light,
-                        onTap: () => themeController.setThemeMode(ThemeMode.light),
+                        isSelected:
+                            themeController.themeMode == ThemeMode.light,
+                        onTap: () =>
+                            themeController.setThemeMode(ThemeMode.light),
                         colors: colors,
                       ),
                     ),
@@ -555,7 +870,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                         label: 'Dark',
                         icon: Icons.dark_mode_outlined,
                         isSelected: themeController.themeMode == ThemeMode.dark,
-                        onTap: () => themeController.setThemeMode(ThemeMode.dark),
+                        onTap: () =>
+                            themeController.setThemeMode(ThemeMode.dark),
                         colors: colors,
                       ),
                     ),
@@ -580,7 +896,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                         fontSize: 14,
                         color: colors.textPrimary)),
                 subtitle: Text('Create and manage private training splits',
-                    style: TextStyle(fontSize: 12, color: colors.textSecondary)),
+                    style:
+                        TextStyle(fontSize: 12, color: colors.textSecondary)),
                 trailing: Icon(Icons.chevron_right,
                     size: 20, color: colors.textMuted),
                 onTap: () {
@@ -602,7 +919,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                         fontSize: 14,
                         color: colors.textPrimary)),
                 subtitle: Text('Create and manage private meal plans',
-                    style: TextStyle(fontSize: 12, color: colors.textSecondary)),
+                    style:
+                        TextStyle(fontSize: 12, color: colors.textSecondary)),
                 trailing: Icon(Icons.chevron_right,
                     size: 20, color: colors.textMuted),
                 onTap: () {
@@ -624,15 +942,16 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                         fontSize: 14,
                         color: colors.textPrimary)),
                 subtitle: Text('Profile, water, cardio targets, and reminders',
-                    style: TextStyle(fontSize: 12, color: colors.textSecondary)),
+                    style:
+                        TextStyle(fontSize: 12, color: colors.textSecondary)),
                 trailing: Icon(Icons.chevron_right,
                     size: 20, color: colors.textMuted),
                 onTap: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          FitnessConfigurationScreen(apiClient: widget.apiClient),
+                      builder: (_) => FitnessConfigurationScreen(
+                          apiClient: widget.apiClient),
                     ),
                   );
                 },
@@ -655,7 +974,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                         fontSize: 14,
                         color: colors.textPrimary)),
                 subtitle: Text('Update password or email with OTP verification',
-                    style: TextStyle(fontSize: 12, color: colors.textSecondary)),
+                    style:
+                        TextStyle(fontSize: 12, color: colors.textSecondary)),
                 trailing: Icon(Icons.chevron_right,
                     size: 20, color: colors.textMuted),
                 onTap: () {
@@ -788,6 +1108,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           ),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
@@ -795,16 +1116,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               color: isSelected ? colors.primary : colors.textSecondary,
             ),
             const SizedBox(height: 6),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? colors.primary : colors.textSecondary,
-                ),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? colors.primary : colors.textSecondary,
               ),
             ),
           ],

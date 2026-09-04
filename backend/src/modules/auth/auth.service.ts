@@ -44,6 +44,10 @@ export class AuthService {
       throw new UnauthorizedError('Invalid email or password', 'INVALID_CREDENTIALS');
     }
 
+    return this.issueSession(user, deviceName, ipAddress, userAgent);
+  }
+
+  async issueSession(user: any, deviceName?: string, ipAddress?: string, userAgent?: string): Promise<LoginResult> {
     const payload: UserAuthPayload = {
       userId: user.id,
       roleId: user.role_id,

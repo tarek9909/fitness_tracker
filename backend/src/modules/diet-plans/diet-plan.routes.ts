@@ -104,6 +104,7 @@ export class DietPlanService {
           scheduledTime: meal.scheduled_time,
           orderIndex: meal.order_index,
           notes: meal.notes,
+          isRequired: meal.is_required,
         }, conn);
 
         for (const group of meal.optionGroups || []) {
@@ -114,6 +115,7 @@ export class DietPlanService {
             minSelections: group.min_selections,
             maxSelections: group.max_selections,
             orderIndex: group.order_index,
+            notes: group.notes,
           }, conn);
 
           for (const opt of group.options || []) {
@@ -127,8 +129,10 @@ export class DietPlanService {
               proteinG: opt.protein_g,
               carbsG: opt.carbs_g,
               fatG: opt.fat_g,
+              fiberG: opt.fiber_g,
               isDefault: opt.is_default,
               orderIndex: opt.order_index,
+              notes: opt.notes,
             }, conn);
           }
         }
@@ -138,12 +142,12 @@ export class DietPlanService {
     });
   }
 
-  async updatePlan(planId: number, data: Partial<{ name: string; description?: string; isArchived?: boolean }>) {
+  async updatePlan(planId: number, data: Partial<{ name: string; description?: string | null; isArchived?: boolean; dailyCaloriesTarget?: number | null; dailyProteinTargetG?: number | null; dailyCarbsTargetG?: number | null; dailyFatTargetG?: number | null }>) {
     await this.getPlanById(planId);
     await this.repo.updatePlan(planId, {
       name: data.name,
-      description: data.description,
-      isArchived: data.isArchived ? 1 : 0,
+      description: data.description !== undefined ? data.description : undefined,
+      isArchived: data.isArchived !== undefined ? (data.isArchived ? 1 : 0) : undefined,
     });
     return this.getPlanById(planId);
   }
@@ -238,6 +242,7 @@ export class DietPlanService {
             scheduledTime: meal.scheduled_time,
             orderIndex: meal.order_index,
             notes: meal.notes,
+            isRequired: meal.is_required,
           }, conn);
 
           for (const group of meal.optionGroups || []) {
@@ -248,6 +253,7 @@ export class DietPlanService {
               minSelections: group.min_selections,
               maxSelections: group.max_selections,
               orderIndex: group.order_index,
+              notes: group.notes,
             }, conn);
 
             for (const opt of group.options || []) {
@@ -261,8 +267,10 @@ export class DietPlanService {
                 proteinG: opt.protein_g,
                 carbsG: opt.carbs_g,
                 fatG: opt.fat_g,
+                fiberG: opt.fiber_g,
                 isDefault: opt.is_default,
                 orderIndex: opt.order_index,
+                notes: opt.notes,
               }, conn);
             }
           }
@@ -335,33 +343,63 @@ export class DietPlanService {
     return this.getVersionDetails(versionId);
   }
 
-  private async assertDraftVersion(versionId: number) {
-    const version = await this.repo.findVersionById(versionId);
-    if (!version) throw new NotFoundError('Diet plan version not found');
-    if (version.status === 'published') {
-      throw new ConflictError('Published diet versions are immutable. Create a new draft version to make changes.', 'PLAN_VERSION_IMMUTABLE');
+  private async validatePublishedStructure(versionId: number, conn: any): Promise<void> {
+    const meals = await conn.query('SELECT id FROM diet_meals WHERE diet_plan_version_id = ?', [versionId]);
+    if (meals.length === 0) throw new ValidationError('Published diet plans must contain at least one meal');
+    const mealIds = meals.map((meal: any) => meal.id);
+    const groups = await conn.query(
+      `SELECT id, diet_meal_id, min_selection_count, max_selection_count
+       FROM diet_meal_option_groups WHERE diet_meal_id IN (${mealIds.map(() => '?').join(',')})`,
+      mealIds,
+    );
+    if (groups.length === 0) throw new ValidationError('Published diet plans must contain at least one option group');
+    const groupsByMeal = new Map<number, any[]>();
+    for (const group of groups) {
+      const mealGroups = groupsByMeal.get(group.diet_meal_id) || [];
+      mealGroups.push(group);
+      groupsByMeal.set(group.diet_meal_id, mealGroups);
     }
-    return version;
+    for (const meal of meals) {
+      if ((groupsByMeal.get(meal.id) || []).length === 0) {
+        throw new ValidationError('Published diet meals must contain at least one option group');
+      }
+    }
+    const groupIds = groups.map((group: any) => group.id);
+    const options = await conn.query(
+      `SELECT id, diet_meal_option_group_id, food_id
+       FROM diet_meal_options WHERE diet_meal_option_group_id IN (${groupIds.map(() => '?').join(',')})`,
+      groupIds,
+    );
+    const optionsByGroup = new Map<number, any[]>();
+    for (const option of options) {
+      const list = optionsByGroup.get(option.diet_meal_option_group_id) || [];
+      list.push(option);
+      optionsByGroup.set(option.diet_meal_option_group_id, list);
+    }
+    for (const group of groups) {
+      const min = group.min_selection_count;
+      const max = group.max_selection_count;
+      if (min != null && max != null && max < min) throw new ValidationError('Published diet option group selection limits are invalid');
+      const groupOptions = optionsByGroup.get(group.id) || [];
+      if (groupOptions.length === 0) throw new ValidationError('Published diet option groups must contain at least one food option');
+      if (groupOptions.some((option) => !option.food_id)) throw new ValidationError('Published diet options must reference a food');
+    }
   }
 
   async updateVersion(versionId: number, data: {
-    title?: string;
-    dailyCaloriesTarget?: number;
-    dailyProteinTargetG?: number;
-    dailyCarbsTargetG?: number;
-    dailyFatTargetG?: number;
-    changeSummary?: string;
+    title?: string | null;
+    dailyCaloriesTarget?: number | null;
+    dailyProteinTargetG?: number | null;
+    dailyCarbsTargetG?: number | null;
+    dailyFatTargetG?: number | null;
+    changeSummary?: string | null;
   }) {
     await this.db.withTransaction(async (conn) => {
       const version = await conn.queryOne<any>('SELECT status FROM diet_plan_versions WHERE id = ?', [versionId]);
       if (!version) throw new NotFoundError('Diet plan version not found');
-      if (version.status === 'published') {
-        throw new ConflictError('Published diet versions are immutable. Create a new draft version to make changes.', 'PLAN_VERSION_IMMUTABLE');
-      }
-
       const set: string[] = [];
       const values: any[] = [];
-      if (data.title !== undefined) { set.push('version_notes = ?'); values.push(data.title); }
+      if (data.title !== undefined) { set.push('change_notes = ?'); values.push(data.title); }
       if (data.dailyCaloriesTarget !== undefined) { set.push('daily_calorie_target = ?'); values.push(data.dailyCaloriesTarget); }
       if (data.dailyProteinTargetG !== undefined) { set.push('daily_protein_target_g = ?'); values.push(data.dailyProteinTargetG); }
       if (data.dailyCarbsTargetG !== undefined) { set.push('daily_carbs_target_g = ?'); values.push(data.dailyCarbsTargetG); }
@@ -371,18 +409,15 @@ export class DietPlanService {
       if (set.length > 0) {
         await conn.execute(`UPDATE diet_plan_versions SET ${set.join(', ')} WHERE id = ?`, [...values, versionId]);
       }
+      if (version.status === 'published') await this.validatePublishedStructure(versionId, conn);
     });
     return this.getVersionDetails(versionId);
   }
 
-  async addMeal(versionId: number, data: { name: string; scheduledTime?: string; orderIndex?: number; notes?: string }) {
+  async addMeal(versionId: number, data: { name: string; scheduledTime?: string | null; orderIndex?: number | null; notes?: string | null; isRequired?: boolean | null }) {
     await this.db.withTransaction(async (conn) => {
       const version = await conn.queryOne<any>('SELECT status FROM diet_plan_versions WHERE id = ?', [versionId]);
       if (!version) throw new NotFoundError('Diet plan version not found');
-      if (version.status === 'published') {
-        throw new ConflictError('Published diet versions are immutable. Create a new draft version to make changes.', 'PLAN_VERSION_IMMUTABLE');
-      }
-
       let orderIndex = data.orderIndex;
       if (orderIndex === undefined) {
         const maxRes = await conn.queryOne<{ max_order: number | null }>(
@@ -393,21 +428,23 @@ export class DietPlanService {
       }
 
       await conn.execute(
-        `INSERT INTO diet_meals (diet_plan_version_id, name, scheduled_time, meal_order, description)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO diet_meals (diet_plan_version_id, name, scheduled_time, meal_order, description, is_required)
+         VALUES (?, ?, ?, ?, ?, ?)`,
         [
           versionId,
           data.name,
           data.scheduledTime || null,
           orderIndex,
           data.notes || null,
+          data.isRequired !== false ? 1 : 0,
         ]
       );
+      if (version.status === 'published') await this.validatePublishedStructure(versionId, conn);
     });
     return this.getVersionDetails(versionId);
   }
 
-  async updateMeal(mealId: number, data: { name?: string; scheduledTime?: string; orderIndex?: number; notes?: string }) {
+  async updateMeal(mealId: number, data: { name?: string | null; scheduledTime?: string | null; orderIndex?: number | null; notes?: string | null; isRequired?: boolean | null }) {
     let versionId: number = 0;
     await this.db.withTransaction(async (conn) => {
       const meal = await conn.queryOne<any>(
@@ -418,9 +455,6 @@ export class DietPlanService {
         [mealId]
       );
       if (!meal) throw new NotFoundError('Meal not found');
-      if (meal.status === 'published') {
-        throw new ConflictError('Published diet versions are immutable. Create a new draft version to make changes.', 'PLAN_VERSION_IMMUTABLE');
-      }
       versionId = meal.diet_plan_version_id;
 
       const updatePayload = { ...data };
@@ -443,10 +477,12 @@ export class DietPlanService {
       if (updatePayload.scheduledTime !== undefined) { set.push('scheduled_time = ?'); values.push(updatePayload.scheduledTime); }
       if (updatePayload.orderIndex !== undefined) { set.push('meal_order = ?'); values.push(updatePayload.orderIndex); }
       if (updatePayload.notes !== undefined) { set.push('description = ?'); values.push(updatePayload.notes); }
+      if (updatePayload.isRequired !== undefined) { set.push('is_required = ?'); values.push(updatePayload.isRequired ? 1 : 0); }
 
       if (set.length > 0) {
         await conn.execute(`UPDATE diet_meals SET ${set.join(', ')} WHERE id = ?`, [...values, mealId]);
       }
+      if (meal.status === 'published') await this.validatePublishedStructure(meal.diet_plan_version_id, conn);
     });
     return this.getVersionDetails(versionId);
   }
@@ -462,18 +498,16 @@ export class DietPlanService {
         [mealId]
       );
       if (!meal) throw new NotFoundError('Meal not found');
-      if (meal.status === 'published') {
-        throw new ConflictError('Published diet versions are immutable. Create a new draft version to make changes.', 'PLAN_VERSION_IMMUTABLE');
-      }
       versionId = meal.diet_plan_version_id;
 
       await conn.execute('DELETE FROM diet_meals WHERE id = ?', [mealId]);
+      if (meal.status === 'published') await this.validatePublishedStructure(meal.diet_plan_version_id, conn);
     });
     return { success: true, versionId };
   }
 
-  async addOptionGroup(mealId: number, data: { name: string; isRequired?: boolean; minSelections?: number; maxSelections?: number; orderIndex?: number }) {
-    if (data.minSelections !== undefined && data.maxSelections !== undefined && data.maxSelections < data.minSelections) {
+  async addOptionGroup(mealId: number, data: { name: string; isRequired?: boolean | null; minSelections?: number | null; maxSelections?: number | null; orderIndex?: number | null; notes?: string | null }) {
+    if (data.minSelections != null && data.maxSelections != null && data.maxSelections < data.minSelections) {
       throw new ValidationError('maxSelections cannot be less than minSelections');
     }
 
@@ -486,10 +520,6 @@ export class DietPlanService {
         [mealId]
       );
       if (!meal) throw new NotFoundError('Meal not found');
-      if (meal.status === 'published') {
-        throw new ConflictError('Published diet versions are immutable. Create a new draft version to make changes.', 'PLAN_VERSION_IMMUTABLE');
-      }
-
       let orderIndex = data.orderIndex;
       if (orderIndex === undefined) {
         const maxRes = await conn.queryOne<{ max_order: number | null }>(
@@ -501,8 +531,8 @@ export class DietPlanService {
 
       const res = await conn.execute(
         `INSERT INTO diet_meal_option_groups (
-          diet_meal_id, name, is_required, min_selection_count, max_selection_count, group_order
-        ) VALUES (?, ?, ?, ?, ?, ?)`,
+          diet_meal_id, name, is_required, min_selection_count, max_selection_count, group_order, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           mealId,
           data.name,
@@ -510,13 +540,15 @@ export class DietPlanService {
           data.minSelections ?? 1,
           data.maxSelections ?? 1,
           orderIndex,
+          data.notes || null,
         ]
       );
+      if (meal.status === 'published') await this.validatePublishedStructure(meal.diet_plan_version_id, conn);
       return { id: res.insertId };
     });
   }
 
-  async updateOptionGroup(groupId: number, data: { name?: string; isRequired?: boolean; minSelections?: number; maxSelections?: number; orderIndex?: number }) {
+  async updateOptionGroup(groupId: number, data: { name?: string | null; isRequired?: boolean | null; minSelections?: number | null; maxSelections?: number | null; orderIndex?: number | null; notes?: string | null }) {
     return this.db.withTransaction(async (conn) => {
       const group = await conn.queryOne<any>(
         `SELECT dm.diet_plan_version_id, dmog.diet_meal_id, dmog.group_order, dmog.min_selection_count, dmog.max_selection_count, dpv.status
@@ -527,9 +559,6 @@ export class DietPlanService {
         [groupId]
       );
       if (!group) throw new NotFoundError('Option group not found');
-      if (group.status === 'published') {
-        throw new ConflictError('Published diet versions are immutable. Create a new draft version to make changes.', 'PLAN_VERSION_IMMUTABLE');
-      }
       const effectiveMin = data.minSelections ?? group.min_selection_count;
       const effectiveMax = data.maxSelections ?? group.max_selection_count;
       if (effectiveMin !== null && effectiveMin !== undefined && effectiveMax !== null && effectiveMax !== undefined && effectiveMax < effectiveMin) {
@@ -557,10 +586,12 @@ export class DietPlanService {
       if (updatePayload.minSelections !== undefined) { set.push('min_selection_count = ?'); values.push(updatePayload.minSelections); }
       if (updatePayload.maxSelections !== undefined) { set.push('max_selection_count = ?'); values.push(updatePayload.maxSelections); }
       if (updatePayload.orderIndex !== undefined) { set.push('group_order = ?'); values.push(updatePayload.orderIndex); }
+      if (updatePayload.notes !== undefined) { set.push('notes = ?'); values.push(updatePayload.notes); }
 
       if (set.length > 0) {
         await conn.execute(`UPDATE diet_meal_option_groups SET ${set.join(', ')} WHERE id = ?`, [...values, groupId]);
       }
+      if (group.status === 'published') await this.validatePublishedStructure(group.diet_plan_version_id, conn);
       return { id: groupId };
     });
   }
@@ -576,26 +607,25 @@ export class DietPlanService {
         [groupId]
       );
       if (!group) throw new NotFoundError('Option group not found');
-      if (group.status === 'published') {
-        throw new ConflictError('Published diet versions are immutable. Create a new draft version to make changes.', 'PLAN_VERSION_IMMUTABLE');
-      }
-
       await conn.execute('DELETE FROM diet_meal_option_groups WHERE id = ?', [groupId]);
+      if (group.status === 'published') await this.validatePublishedStructure(group.diet_plan_version_id, conn);
       return { success: true };
     });
   }
 
   async addOption(groupId: number, data: {
-    foodId?: number;
-    customLabel?: string;
+    foodId?: number | null;
+    customLabel?: string | null;
     servingQuantity: number;
-    servingUnitId?: number;
-    calories?: number;
-    proteinG?: number;
-    carbsG?: number;
-    fatG?: number;
-    isDefault?: boolean;
-    orderIndex?: number;
+    servingUnitId?: number | null;
+    calories?: number | null;
+    proteinG?: number | null;
+    carbsG?: number | null;
+    fatG?: number | null;
+    fiberG?: number | null;
+    isDefault?: boolean | null;
+    orderIndex?: number | null;
+    notes?: string | null;
   }) {
     return this.db.withTransaction(async (conn) => {
       const group = await conn.queryOne<any>(
@@ -607,10 +637,6 @@ export class DietPlanService {
         [groupId]
       );
       if (!group) throw new NotFoundError('Option group not found');
-      if (group.status === 'published') {
-        throw new ConflictError('Published diet versions are immutable. Create a new draft version to make changes.', 'PLAN_VERSION_IMMUTABLE');
-      }
-
       let orderIndex = data.orderIndex;
       if (orderIndex === undefined) {
         const maxRes = await conn.queryOne<{ max_order: number | null }>(
@@ -624,9 +650,10 @@ export class DietPlanService {
       let proteinG = data.proteinG ?? null;
       let carbsG = data.carbsG ?? null;
       let fatG = data.fatG ?? null;
+      let fiberG = data.fiberG ?? null;
       let servingUnitId = data.servingUnitId ?? null;
 
-      if (data.foodId && (calories === null || proteinG === null || carbsG === null || fatG === null)) {
+      if (data.foodId && (calories === null || proteinG === null || carbsG === null || fatG === null || fiberG === null)) {
         const food = await conn.queryOne<any>('SELECT * FROM foods WHERE id = ?', [data.foodId]);
         if (food) {
           const referenceQuantity = Number(food.reference_quantity || 100);
@@ -635,6 +662,7 @@ export class DietPlanService {
           if (proteinG === null) proteinG = Math.round((food.protein_g || 0) * ratio * 10) / 10;
           if (carbsG === null) carbsG = Math.round((food.carbs_g || 0) * ratio * 10) / 10;
           if (fatG === null) fatG = Math.round((food.fat_g || 0) * ratio * 10) / 10;
+          if (fiberG === null) fiberG = Math.round((food.fiber_g || 0) * ratio * 10) / 10;
           if (servingUnitId === null) servingUnitId = food.reference_unit_id;
         }
       }
@@ -642,8 +670,8 @@ export class DietPlanService {
       const res = await conn.execute(
         `INSERT INTO diet_meal_options (
           diet_meal_option_group_id, food_id, option_order, label, quantity, unit_id,
-          calories_snapshot, protein_g_snapshot, carbs_g_snapshot, fat_g_snapshot
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          calories_snapshot, protein_g_snapshot, carbs_g_snapshot, fat_g_snapshot, fiber_g_snapshot, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           groupId,
           data.foodId || null,
@@ -655,27 +683,33 @@ export class DietPlanService {
           proteinG,
           carbsG,
           fatG,
+          fiberG,
+          data.notes || null,
         ]
       );
+      if (group.status === 'published') await this.validatePublishedStructure(group.diet_plan_version_id, conn);
       return { id: res.insertId };
     });
   }
 
   async updateOption(optionId: number, data: {
-    foodId?: number;
-    customLabel?: string;
+    foodId?: number | null;
+    customLabel?: string | null;
     servingQuantity?: number;
-    servingUnitId?: number;
-    calories?: number;
-    proteinG?: number;
-    carbsG?: number;
-    fatG?: number;
-    isDefault?: boolean;
-    orderIndex?: number;
+    servingUnitId?: number | null;
+    calories?: number | null;
+    proteinG?: number | null;
+    carbsG?: number | null;
+    fatG?: number | null;
+    fiberG?: number | null;
+    isDefault?: boolean | null;
+    orderIndex?: number | null;
+    notes?: string | null;
   }) {
     return this.db.withTransaction(async (conn) => {
       const option = await conn.queryOne<any>(
-        `SELECT dm.diet_plan_version_id, dmo.diet_meal_option_group_id, dmo.option_order, dpv.status 
+        `SELECT dm.diet_plan_version_id, dmo.diet_meal_option_group_id, dmo.option_order,
+                dmo.food_id, dmo.quantity, dpv.status 
          FROM diet_meal_options dmo
          JOIN diet_meal_option_groups dmog ON dmog.id = dmo.diet_meal_option_group_id
          JOIN diet_meals dm ON dm.id = dmog.diet_meal_id
@@ -684,11 +718,23 @@ export class DietPlanService {
         [optionId]
       );
       if (!option) throw new NotFoundError('Option not found');
-      if (option.status === 'published') {
-        throw new ConflictError('Published diet versions are immutable. Create a new draft version to make changes.', 'PLAN_VERSION_IMMUTABLE');
-      }
 
       const updatePayload = { ...data };
+      const foodId = data.foodId !== undefined ? data.foodId : option.food_id;
+      const quantity = data.servingQuantity ?? option.quantity ?? 100;
+      if (foodId && (data.calories === undefined || data.proteinG === undefined || data.carbsG === undefined || data.fatG === undefined || data.fiberG === undefined)) {
+        const food = await conn.queryOne<any>('SELECT * FROM foods WHERE id = ?', [foodId]);
+        if (food) {
+          const referenceQuantity = Number(food.reference_quantity || 100);
+          const ratio = Number(quantity || referenceQuantity) / referenceQuantity;
+          if (updatePayload.calories === undefined) updatePayload.calories = Math.round(Number(food.calories || 0) * ratio);
+          if (updatePayload.proteinG === undefined) updatePayload.proteinG = Math.round(Number(food.protein_g || 0) * ratio * 10) / 10;
+          if (updatePayload.carbsG === undefined) updatePayload.carbsG = Math.round(Number(food.carbs_g || 0) * ratio * 10) / 10;
+          if (updatePayload.fatG === undefined) updatePayload.fatG = Math.round(Number(food.fat_g || 0) * ratio * 10) / 10;
+          if (updatePayload.fiberG === undefined) updatePayload.fiberG = Math.round(Number(food.fiber_g || 0) * ratio * 10) / 10;
+          if (updatePayload.servingUnitId === undefined && food.reference_unit_id) updatePayload.servingUnitId = food.reference_unit_id;
+        }
+      }
       if (data.orderIndex !== undefined && data.orderIndex !== option.option_order) {
         const existingAtTarget = await conn.queryOne<any>(
           'SELECT id, option_order FROM diet_meal_options WHERE diet_meal_option_group_id = ? AND option_order = ? AND id != ?',
@@ -712,11 +758,14 @@ export class DietPlanService {
       if (updatePayload.proteinG !== undefined) { set.push('protein_g_snapshot = ?'); values.push(updatePayload.proteinG); }
       if (updatePayload.carbsG !== undefined) { set.push('carbs_g_snapshot = ?'); values.push(updatePayload.carbsG); }
       if (updatePayload.fatG !== undefined) { set.push('fat_g_snapshot = ?'); values.push(updatePayload.fatG); }
+      if (updatePayload.fiberG !== undefined) { set.push('fiber_g_snapshot = ?'); values.push(updatePayload.fiberG); }
       if (updatePayload.orderIndex !== undefined) { set.push('option_order = ?'); values.push(updatePayload.orderIndex); }
+      if (updatePayload.notes !== undefined) { set.push('notes = ?'); values.push(updatePayload.notes); }
 
       if (set.length > 0) {
         await conn.execute(`UPDATE diet_meal_options SET ${set.join(', ')} WHERE id = ?`, [...values, optionId]);
       }
+      if (option.status === 'published') await this.validatePublishedStructure(option.diet_plan_version_id, conn);
       return { id: optionId };
     });
   }
@@ -733,11 +782,8 @@ export class DietPlanService {
         [optionId]
       );
       if (!option) throw new NotFoundError('Option not found');
-      if (option.status === 'published') {
-        throw new ConflictError('Published diet versions are immutable. Create a new draft version to make changes.', 'PLAN_VERSION_IMMUTABLE');
-      }
-
       await conn.execute('DELETE FROM diet_meal_options WHERE id = ?', [optionId]);
+      if (option.status === 'published') await this.validatePublishedStructure(option.diet_plan_version_id, conn);
       return { success: true };
     });
   }
@@ -745,11 +791,11 @@ export class DietPlanService {
 
 const createPlanSchema = z.object({
   name: z.string().min(1).max(150),
-  description: z.string().max(2000).optional(),
-  dailyCaloriesTarget: z.number().int().min(500).max(10000).optional(),
-  dailyProteinTargetG: z.number().min(0).max(1000).optional(),
-  dailyCarbsTargetG: z.number().min(0).max(1000).optional(),
-  dailyFatTargetG: z.number().min(0).max(1000).optional(),
+  description: z.string().max(2000).nullish(),
+  dailyCaloriesTarget: z.number().int().min(500).max(10000).nullish(),
+  dailyProteinTargetG: z.number().min(0).max(1000).nullish(),
+  dailyCarbsTargetG: z.number().min(0).max(1000).nullish(),
+  dailyFatTargetG: z.number().min(0).max(1000).nullish(),
 });
 
 const updatePlanSchema = createPlanSchema.partial().extend({
@@ -761,33 +807,35 @@ const cloneVersionSchema = z.object({
 });
 
 const updateVersionSchema = z.object({
-  title: z.string().max(150).optional(),
-  dailyCaloriesTarget: z.number().int().min(500).max(10000).optional(),
-  dailyProteinTargetG: z.number().min(0).max(1000).optional(),
-  dailyCarbsTargetG: z.number().min(0).max(1000).optional(),
-  dailyFatTargetG: z.number().min(0).max(1000).optional(),
-  changeSummary: z.string().max(2000).optional(),
+  title: z.string().max(150).nullish(),
+  dailyCaloriesTarget: z.number().int().min(500).max(10000).nullish(),
+  dailyProteinTargetG: z.number().min(0).max(1000).nullish(),
+  dailyCarbsTargetG: z.number().min(0).max(1000).nullish(),
+  dailyFatTargetG: z.number().min(0).max(1000).nullish(),
+  changeSummary: z.string().max(2000).nullish(),
 });
 
 const addMealSchema = z.object({
   name: z.string().min(1).max(100),
-  scheduledTime: z.string().max(20).optional(),
-  orderIndex: z.number().int().min(1).optional(),
-  notes: z.string().max(2000).optional(),
+  scheduledTime: z.string().max(20).nullish(),
+  orderIndex: z.number().int().min(1).nullish(),
+  notes: z.string().max(2000).nullish(),
+  isRequired: z.boolean().nullish(),
 });
 
 const updateMealSchema = addMealSchema.partial();
 
 const groupFields = {
   name: z.string().min(1).max(100),
-  isRequired: z.boolean().optional(),
-  minSelections: z.number().int().min(0).max(20).optional(),
-  maxSelections: z.number().int().min(1).max(20).optional(),
-  orderIndex: z.number().int().min(1).optional(),
+  isRequired: z.boolean().nullish(),
+  minSelections: z.number().int().min(0).max(20).nullish(),
+  maxSelections: z.number().int().min(1).max(20).nullish(),
+  orderIndex: z.number().int().min(1).nullish(),
+  notes: z.string().max(1000).nullish(),
 };
 
-const validateSelectionRange = (data: { minSelections?: number; maxSelections?: number }, ctx: z.RefinementCtx) => {
-  if (data.minSelections !== undefined && data.maxSelections !== undefined && data.maxSelections < data.minSelections) {
+const validateSelectionRange = (data: { minSelections?: number | null; maxSelections?: number | null }, ctx: z.RefinementCtx) => {
+  if (data.minSelections != null && data.maxSelections != null && data.maxSelections < data.minSelections) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['maxSelections'], message: 'maxSelections cannot be less than minSelections' });
   }
 };
@@ -797,16 +845,18 @@ const addGroupSchema = z.object(groupFields).superRefine(validateSelectionRange)
 const updateGroupSchema = z.object(groupFields).partial().superRefine(validateSelectionRange);
 
 const addOptionSchema = z.object({
-  foodId: z.number().int().positive().optional(),
-  customLabel: z.string().max(150).optional(),
+  foodId: z.number().int().positive().nullish(),
+  customLabel: z.string().max(150).nullish(),
   servingQuantity: z.number().min(0.01).max(10000),
-  servingUnitId: z.number().int().positive().optional(),
-  calories: z.number().min(0).max(10000).optional(),
-  proteinG: z.number().min(0).max(1000).optional(),
-  carbsG: z.number().min(0).max(1000).optional(),
-  fatG: z.number().min(0).max(1000).optional(),
-  isDefault: z.boolean().optional(),
-  orderIndex: z.number().int().min(1).optional(),
+  servingUnitId: z.number().int().positive().nullish(),
+  calories: z.number().min(0).max(10000).nullish(),
+  proteinG: z.number().min(0).max(1000).nullish(),
+  carbsG: z.number().min(0).max(1000).nullish(),
+  fatG: z.number().min(0).max(1000).nullish(),
+  fiberG: z.number().min(0).max(1000).nullish(),
+  isDefault: z.boolean().nullish(),
+  orderIndex: z.number().int().min(1).nullish(),
+  notes: z.string().max(2000).nullish(),
 });
 
 const updateOptionSchema = addOptionSchema.partial();
@@ -876,7 +926,16 @@ export class DietPlanController {
   async createPlan(request: FastifyRequest, reply: FastifyReply) {
     const body = createPlanSchema.parse(request.body);
     const auth = (request as AuthenticatedRequest).user;
-    const plan = await this.service.createPlan({ ...body, createdBy: auth.userId, visibility: 'admin' });
+    const plan = await this.service.createPlan({
+      ...body,
+      description: body.description ?? undefined,
+      dailyCaloriesTarget: body.dailyCaloriesTarget ?? undefined,
+      dailyProteinTargetG: body.dailyProteinTargetG ?? undefined,
+      dailyCarbsTargetG: body.dailyCarbsTargetG ?? undefined,
+      dailyFatTargetG: body.dailyFatTargetG ?? undefined,
+      createdBy: auth.userId,
+      visibility: 'admin',
+    });
     await recordAuditEvent(request, 'diet_plan.created', 'diet_plan', plan.id, { name: plan.name });
     return reply.status(201).send({ success: true, data: plan });
   }
@@ -921,6 +980,7 @@ export class DietPlanController {
     assertCanModifyDietPlan(plan, auth);
     const body = updateVersionSchema.parse(request.body);
     const version = await this.service.updateVersion(versionId, body);
+    await recordAuditEvent(request, 'diet_plan_version.updated', 'diet_plan_version', versionId, body);
     return reply.status(200).send({ success: true, data: version });
   }
 
@@ -955,6 +1015,7 @@ export class DietPlanController {
     assertCanModifyDietPlan(plan, auth);
     const body = addMealSchema.parse(request.body);
     const version = await this.service.addMeal(versionId, body);
+    await recordAuditEvent(request, 'diet_meal.created', 'diet_meal', versionId, { versionId, name: body.name });
     return reply.status(201).send({ success: true, data: version });
   }
 
@@ -966,6 +1027,7 @@ export class DietPlanController {
     assertCanModifyDietPlan(plan, auth);
     const body = updateMealSchema.parse(request.body);
     const version = await this.service.updateMeal(mealId, body);
+    await recordAuditEvent(request, 'diet_meal.updated', 'diet_meal', mealId, body);
     return reply.status(200).send({ success: true, data: version });
   }
 
@@ -976,6 +1038,7 @@ export class DietPlanController {
     const plan = await this.getPlanForMeal(mealId);
     assertCanModifyDietPlan(plan, auth);
     const result = await this.service.deleteMeal(mealId);
+    await recordAuditEvent(request, 'diet_meal.deleted', 'diet_meal', mealId, {});
     return reply.status(200).send({ success: true, data: result });
   }
 
@@ -987,6 +1050,7 @@ export class DietPlanController {
     assertCanModifyDietPlan(plan, auth);
     const body = addGroupSchema.parse(request.body);
     const result = await this.service.addOptionGroup(mealId, body);
+    await recordAuditEvent(request, 'diet_option_group.created', 'diet_option_group', result.id, { mealId });
     return reply.status(201).send({ success: true, data: result });
   }
 
@@ -998,6 +1062,7 @@ export class DietPlanController {
     assertCanModifyDietPlan(plan, auth);
     const body = updateGroupSchema.parse(request.body);
     const result = await this.service.updateOptionGroup(groupId, body);
+    await recordAuditEvent(request, 'diet_option_group.updated', 'diet_option_group', groupId, body);
     return reply.status(200).send({ success: true, data: result });
   }
 
@@ -1008,6 +1073,7 @@ export class DietPlanController {
     const plan = await this.getPlanForGroup(groupId);
     assertCanModifyDietPlan(plan, auth);
     const result = await this.service.deleteOptionGroup(groupId);
+    await recordAuditEvent(request, 'diet_option_group.deleted', 'diet_option_group', groupId, {});
     return reply.status(200).send({ success: true, data: result });
   }
 
@@ -1019,6 +1085,7 @@ export class DietPlanController {
     assertCanModifyDietPlan(plan, auth);
     const body = addOptionSchema.parse(request.body);
     const result = await this.service.addOption(groupId, body);
+    await recordAuditEvent(request, 'diet_option.created', 'diet_option', result.id, { groupId });
     return reply.status(201).send({ success: true, data: result });
   }
 
@@ -1030,6 +1097,7 @@ export class DietPlanController {
     assertCanModifyDietPlan(plan, auth);
     const body = updateOptionSchema.parse(request.body);
     const result = await this.service.updateOption(optionId, body);
+    await recordAuditEvent(request, 'diet_option.updated', 'diet_option', optionId, body);
     return reply.status(200).send({ success: true, data: result });
   }
 
@@ -1040,6 +1108,7 @@ export class DietPlanController {
     const plan = await this.getPlanForOption(optionId);
     assertCanModifyDietPlan(plan, auth);
     const result = await this.service.deleteOption(optionId);
+    await recordAuditEvent(request, 'diet_option.deleted', 'diet_option', optionId, {});
     return reply.status(200).send({ success: true, data: result });
   }
 
@@ -1056,6 +1125,11 @@ export class DietPlanController {
     const body = createPlanSchema.parse(request.body);
     const plan = await this.service.createPlan({
       ...body,
+      description: body.description ?? undefined,
+      dailyCaloriesTarget: body.dailyCaloriesTarget ?? undefined,
+      dailyProteinTargetG: body.dailyProteinTargetG ?? undefined,
+      dailyCarbsTargetG: body.dailyCarbsTargetG ?? undefined,
+      dailyFatTargetG: body.dailyFatTargetG ?? undefined,
       createdBy: auth.userId,
       ownerUserId: auth.userId,
       visibility: 'private',
@@ -1134,6 +1208,7 @@ export async function dietPlansRoutes(fastify: FastifyInstance) {
   fastify.post('/me/diet-plans/:id/activate', { preHandler: [authenticate] }, (req, res) => controller.activateMyPlan(req, res));
 
   fastify.get('/me/diet-plans/:id/versions/:versionId', { preHandler: [authenticate] }, (req, res) => controller.getVersion(req, res));
+  fastify.patch('/me/diet-plans/:id/versions/:versionId', { preHandler: [authenticate] }, (req, res) => controller.updateVersion(req, res));
   fastify.post('/me/diet-plans/:id/versions/:versionId/publish', { preHandler: [authenticate] }, (req, res) => controller.publishVersion(req, res));
   fastify.post('/me/diet-plans/:id/versions/:versionId/meals', { preHandler: [authenticate] }, (req, res) => controller.addMeal(req, res));
   fastify.put('/me/diet-plans/:id/meals/:mealId', { preHandler: [authenticate] }, (req, res) => controller.updateMeal(req, res));

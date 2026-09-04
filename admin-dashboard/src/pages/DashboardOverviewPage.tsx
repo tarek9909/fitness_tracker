@@ -70,8 +70,8 @@ export const DashboardOverviewPage: React.FC<{ onNavigate: (tab: any) => void }>
       <div style={{
         padding: '2rem 2.25rem',
         borderRadius: 'var(--radius-xl)',
-        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(56, 189, 248, 0.04) 100%)',
-        border: '1px solid rgba(16, 185, 129, 0.2)',
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-color)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',

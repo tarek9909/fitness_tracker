@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/auth/auth_session.dart';
+import '../../core/auth/passkey_service.dart';
 import '../../core/push/push_registration_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_controller.dart';
@@ -28,8 +29,63 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _passwordFocusNode = FocusNode();
+  late final PasskeyService _passkeyService;
   bool _isLoading = false;
+  bool _isPasskeyLoading = false;
+  bool _hasLocalPasskey = false;
+  String? _localPasskeyEmail;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _passkeyService = PasskeyService(
+      apiClient: widget.apiClient,
+      authSession: widget.authSession,
+    );
+    _checkLocalPasskey();
+  }
+
+  Future<void> _checkLocalPasskey() async {
+    final hasPasskey = await _passkeyService.hasLocalPasskey();
+    final info = await _passkeyService.getLocalPasskeyInfo();
+    if (mounted) {
+      setState(() {
+        _hasLocalPasskey = hasPasskey;
+        _localPasskeyEmail = info?.email;
+        if (_localPasskeyEmail != null && _emailController.text.isEmpty) {
+          _emailController.text = _localPasskeyEmail!;
+        }
+      });
+    }
+  }
+
+  Future<void> _handlePasskeyLogin() async {
+    setState(() {
+      _isPasskeyLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final email = _emailController.text.trim().isNotEmpty
+          ? _emailController.text.trim()
+          : _localPasskeyEmail;
+      await _passkeyService.loginWithPasskey(email: email);
+      widget.pushRegistrationService?.registerDeviceIfNeeded();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPasskeyLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -328,11 +384,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: Colors.white.withValues(alpha: 0.08),
                           width: 1,
                         ),
-                        boxShadow: const [
+                        boxShadow: [
                           BoxShadow(
-                            color: Color(0x0DD4FF00),
+                            color: colors.isDark
+                                ? const Color(0x20FFFFFF)
+                                : const Color(0x0A000000),
                             blurRadius: 20,
-                            offset: Offset(0, 4),
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
@@ -459,6 +517,53 @@ class _LoginScreenState extends State<LoginScreen> {
                           loading: _isLoading,
                           onPressed: _handleLogin,
                           height: 50,
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(child: Divider(color: colors.border)),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              child: Text(
+                                'OR',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: colors.textSecondary,
+                                ),
+                              ),
+                            ),
+                            Expanded(child: Divider(color: colors.border)),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        OutlinedButton.icon(
+                          onPressed: _isPasskeyLoading || _isLoading ? null : _handlePasskeyLogin,
+                          icon: _isPasskeyLoading
+                              ? SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: colors.primary),
+                                )
+                              : Icon(Icons.fingerprint, size: 22, color: colors.primary),
+                          label: Text(
+                            _hasLocalPasskey && _localPasskeyEmail != null
+                                ? 'Sign in with Passkey ($_localPasskeyEmail)'
+                                : 'Log in with Passkey',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: colors.textPrimary,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(50),
+                            side: BorderSide(color: colors.primary.withValues(alpha: 0.5), width: 1.5),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            backgroundColor: colors.primary.withValues(alpha: 0.05),
+                          ),
                         ),
                       ],
                     ),

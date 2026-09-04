@@ -31,7 +31,7 @@ FROM node:20-alpine AS runner
 
 ENV NODE_ENV=production
 ENV APP_HOST=0.0.0.0
-ENV APP_PORT=3000
+ENV APP_PORT=4000
 
 WORKDIR /app
 
@@ -43,11 +43,11 @@ COPY --chown=node:node --from=builder /app/node_modules ./node_modules
 COPY --chown=node:node --from=builder /app/package*.json ./
 COPY --chown=node:node --from=builder /app/dist ./dist
 
-EXPOSE 3000
+EXPOSE 4000
 
 # Liveness & Readiness Healthcheck
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "fetch('http://localhost:' + (process.env.APP_PORT || 3000) + '/api/v1/health/live').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
+  CMD node -e "fetch('http://localhost:' + (process.env.APP_PORT || 4000) + '/api/v1/health/live').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
 
 # Default command: run compiled Fastify server
 CMD ["node", "dist/app/server.js"]

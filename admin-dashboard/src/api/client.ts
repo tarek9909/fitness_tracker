@@ -22,7 +22,7 @@ function resolveApiBaseUrl(): string {
   }
 
   // Development default
-  return envUrl || 'http://localhost:3000/api/v1';
+  return envUrl || 'http://localhost:4000/api/v1';
 }
 
 export const API_BASE_URL = resolveApiBaseUrl();

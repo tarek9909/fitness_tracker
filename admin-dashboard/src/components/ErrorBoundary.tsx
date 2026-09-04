@@ -34,14 +34,14 @@ export class ErrorBoundary extends Component<Props, State> {
           alignItems: 'center',
           justifyContent: 'center',
           padding: '24px',
-          background: 'var(--bg-primary, #0f172a)',
-          color: 'var(--text-primary, #f8fafc)',
+          background: 'var(--bg-primary, #09090b)',
+          color: 'var(--text-primary, #f4f4f5)',
           fontFamily: 'Inter, system-ui, sans-serif',
         }}>
           <div style={{
             maxWidth: '500px',
             width: '100%',
-            background: 'var(--bg-secondary, #1e293b)',
+            background: 'var(--bg-secondary, #111113)',
             border: '1px solid rgba(239, 68, 68, 0.3)',
             borderRadius: '16px',
             padding: '32px',

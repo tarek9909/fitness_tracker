@@ -164,5 +164,76 @@ void main() {
       await tester.tap(find.text('+250 ml'));
       expect(buttonTapped, isTrue);
     });
+
+    testWidgets('AnimatedIndexedStack smoothly transitions between children and preserves state',
+        (WidgetTester tester) async {
+      int activeIndex = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StatefulBuilder(
+            builder: (context, setState) {
+              return Scaffold(
+                body: AnimatedIndexedStack(
+                  index: activeIndex,
+                  children: const [
+                    Text('Tab Content 0'),
+                    Text('Tab Content 1'),
+                  ],
+                ),
+                floatingActionButton: FloatingActionButton(
+                  onPressed: () => setState(() => activeIndex = 1),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+
+      expect(find.text('Tab Content 0'), findsOneWidget);
+
+      // Trigger transition to Tab 1
+      await tester.tap(find.byType(FloatingActionButton));
+      await tester.pump(); // Start animation
+      expect(find.byType(FadeTransition), findsWidgets);
+      expect(find.byType(SlideTransition), findsWidgets);
+
+      await tester.pumpAndSettle(); // Complete transition
+      expect(find.text('Tab Content 1'), findsOneWidget);
+    });
+
+    testWidgets('showPremiumDialog opens and animates with smooth scale and fade',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) {
+                return ElevatedButton(
+                  onPressed: () {
+                    showPremiumDialog(
+                      context: context,
+                      title: 'Smooth Dialog',
+                      content: const Text('Dialog body content'),
+                    );
+                  },
+                  child: const Text('Open Dialog'),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Dialog'));
+      await tester.pump(); // animation started
+      expect(find.byType(ScaleTransition), findsWidgets);
+      expect(find.byType(FadeTransition), findsWidgets);
+
+      await tester.pumpAndSettle();
+      expect(find.text('Smooth Dialog'), findsOneWidget);
+      expect(find.text('Dialog body content'), findsOneWidget);
+    });
   });
 }

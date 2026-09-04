@@ -11,8 +11,14 @@ interface Migration {
   up: (db: DatabasePool) => Promise<void>;
 }
 
+function configuredDbClient(): 'sqlite' | 'mysql' {
+  // Tests and one-off migration commands may set DB_CLIENT after this module
+  // has been imported. Honor that explicit process value when present.
+  return process.env.DB_CLIENT === 'sqlite' ? 'sqlite' : env.dbClient;
+}
+
 async function migrationSql(): Promise<string> {
-  if (env.dbClient === 'sqlite') return SCHEMA_SQL;
+  if (configuredDbClient() === 'sqlite') return SCHEMA_SQL;
 
   const candidates = [
     path.resolve(process.cwd(), 'src', 'database', 'fitness_tracker.sql'),
@@ -53,7 +59,7 @@ async function ensureColumnExists(
   columnName: string,
   columnDef: string
 ): Promise<void> {
-  if (env.dbClient === 'sqlite') {
+  if (configuredDbClient() === 'sqlite') {
     const tableExists = await db.queryOne<{ count: number }>(
       `SELECT COUNT(*) as count FROM sqlite_master WHERE type='table' AND name='${tableName}'`
     );
@@ -106,7 +112,7 @@ async function mysqlConstraintExists(db: DatabasePool, tableName: string, constr
   return (result?.count || 0) > 0;
 }
 
-export function getScheduledAtBackfillExpr(client: 'sqlite' | 'mysql' = env.dbClient): string {
+export function getScheduledAtBackfillExpr(client: 'sqlite' | 'mysql' = configuredDbClient()): string {
   if (client === 'mysql') {
     return 'TIMESTAMP(task_date, scheduled_time)';
   }
@@ -121,7 +127,7 @@ async function backfillColumnData(
   sourceColNameToCheck: string,
   whereCondition?: string
 ): Promise<void> {
-  if (env.dbClient === 'sqlite') {
+  if (configuredDbClient() === 'sqlite') {
     const tableExists = await db.queryOne<{ count: number }>(
       `SELECT COUNT(*) as count FROM sqlite_master WHERE type='table' AND name='${tableName}'`
     );
@@ -157,7 +163,7 @@ const migrations: Migration[] = [
     up: async (db) => {
       const sourceSql = await migrationSql();
       const statements = splitStatements(sourceSql).map(statement => {
-        if (env.dbClient === 'mysql' && /^CREATE TABLE\s+/i.test(statement)) {
+        if (configuredDbClient() === 'mysql' && /^CREATE TABLE\s+/i.test(statement)) {
           return statement.replace(/^CREATE TABLE\s+/i, 'CREATE TABLE IF NOT EXISTS ');
         }
         return statement;
@@ -180,7 +186,7 @@ const migrations: Migration[] = [
       
       // 1. Find and deduplicate any duplicate (user_id, workout_date) entries deterministically
       try {
-        const hasSessionDate = env.dbClient === 'sqlite'
+        const hasSessionDate = configuredDbClient() === 'sqlite'
           ? await db.queryOne<{ count: number }>(`SELECT COUNT(*) as count FROM pragma_table_info('workout_sessions') WHERE name = 'session_date'`)
           : { count: 0 };
         const dateCol = (hasSessionDate?.count || 0) > 0 ? 'session_date' : 'workout_date';
@@ -220,7 +226,7 @@ const migrations: Migration[] = [
       }
 
       // 2. Create unique index
-      if (env.dbClient === 'sqlite') {
+      if (configuredDbClient() === 'sqlite') {
         const hasSessionDate = await db.queryOne<{ count: number }>(`SELECT COUNT(*) as count FROM pragma_table_info('workout_sessions') WHERE name = 'session_date'`);
         const dateCol = (hasSessionDate?.count || 0) > 0 ? 'session_date' : 'workout_date';
         await db.execute(`
@@ -482,7 +488,7 @@ const migrations: Migration[] = [
       await backfillColumnData(db, 'workout_sets', 'performed_at', 'created_at', 'created_at');
       await backfillColumnData(db, 'daily_tasks', 'title_snapshot', 'title', 'title');
       await backfillColumnData(db, 'daily_tasks', 'description_snapshot', 'description', 'description');
-      await backfillColumnData(db, 'daily_tasks', 'scheduled_at', getScheduledAtBackfillExpr(env.dbClient), 'scheduled_time');
+      await backfillColumnData(db, 'daily_tasks', 'scheduled_at', getScheduledAtBackfillExpr(configuredDbClient()), 'scheduled_time');
       await backfillColumnData(db, 'user_adherence_configs', 'diet_weight_pct', 'diet_weight * 100', 'diet_weight', 'diet_weight <= 1.0');
       await backfillColumnData(db, 'user_adherence_configs', 'workout_weight_pct', 'workout_weight * 100', 'workout_weight', 'workout_weight <= 1.0');
       await backfillColumnData(db, 'user_adherence_configs', 'cardio_weight_pct', 'cardio_weight * 100', 'cardio_weight', 'cardio_weight <= 1.0');
@@ -528,7 +534,7 @@ const migrations: Migration[] = [
       await ensureColumnExists(db, 'user_weight_goals', 'goal_type', "VARCHAR(30) NULL DEFAULT 'lose_weight'");
 
       // 5. Auth OTP Challenges table
-      if (env.dbClient === 'sqlite') {
+      if (configuredDbClient() === 'sqlite') {
         await db.execute(`
           CREATE TABLE IF NOT EXISTS auth_otp_challenges (
             id VARCHAR(64) PRIMARY KEY,
@@ -603,7 +609,7 @@ const migrations: Migration[] = [
       }
 
       // 6. Complete RIR Removal
-      if (env.dbClient === 'sqlite') {
+      if (configuredDbClient() === 'sqlite') {
         const hasRirTarget = await db.queryOne<{ count: number }>(
           `SELECT COUNT(*) as count FROM pragma_table_info('workout_plan_exercises') WHERE name = 'rir_target'`
         );
@@ -655,6 +661,161 @@ const migrations: Migration[] = [
       }
     },
   },
+  {
+    version: '006-cardio-and-plan-validation-compatibility',
+    up: async (db) => {
+      logger.info('Running migration 006: target status enum harmonization and self-service plan compatibility');
+
+      if (configuredDbClient() === 'mysql') {
+        try {
+          await db.execute(`
+            ALTER TABLE user_cardio_targets 
+            MODIFY COLUMN status ENUM('active', 'ended', 'cancelled', 'inactive') NOT NULL DEFAULT 'active'
+          `);
+        } catch (err) {
+          logger.warn({ err }, 'Could not modify user_cardio_targets status enum');
+        }
+
+        try {
+          await db.execute(`
+            ALTER TABLE user_water_targets 
+            MODIFY COLUMN status ENUM('active', 'ended', 'cancelled', 'inactive') NOT NULL DEFAULT 'active'
+          `);
+        } catch (err) {
+          logger.warn({ err }, 'Could not modify user_water_targets status enum');
+        }
+      }
+    },
+  },
+  {
+    version: '007-passkey-authentication-tables',
+    up: async (db) => {
+      logger.info('Running migration 007: creating passkey and webauthn challenge tables');
+
+      if (configuredDbClient() === 'sqlite') {
+        await db.execute(`
+          CREATE TABLE IF NOT EXISTS user_passkeys (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            credential_id VARCHAR(255) NOT NULL UNIQUE,
+            public_key TEXT NOT NULL,
+            credential_format VARCHAR(30) NOT NULL DEFAULT 'webauthn-cose',
+            counter INTEGER NOT NULL DEFAULT 0,
+            device_name VARCHAR(150) NOT NULL,
+            transports VARCHAR(255) NULL,
+            aaguid VARCHAR(64) NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_used_at DATETIME NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+          )
+        `);
+
+        await db.execute(`
+          CREATE TABLE IF NOT EXISTS auth_webauthn_challenges (
+            id VARCHAR(100) PRIMARY KEY,
+            user_id INTEGER NULL,
+            challenge VARCHAR(255) NOT NULL,
+            ceremony_type VARCHAR(30) NOT NULL,
+            expires_at DATETIME NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+          )
+        `);
+
+        await db.execute(`CREATE INDEX IF NOT EXISTS idx_user_passkeys_user ON user_passkeys (user_id)`);
+        await db.execute(`CREATE INDEX IF NOT EXISTS idx_webauthn_challenges_exp ON auth_webauthn_challenges (expires_at)`);
+      } else {
+        await db.execute(`
+          CREATE TABLE IF NOT EXISTS user_passkeys (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id BIGINT UNSIGNED NOT NULL,
+            credential_id VARCHAR(255) NOT NULL,
+            public_key TEXT NOT NULL,
+            credential_format VARCHAR(30) NOT NULL DEFAULT 'webauthn-cose',
+            counter BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            device_name VARCHAR(150) NOT NULL,
+            transports VARCHAR(255) NULL,
+            aaguid VARCHAR(64) NULL,
+            created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            last_used_at TIMESTAMP(3) NULL,
+            CONSTRAINT uq_passkeys_credential_id UNIQUE (credential_id),
+            CONSTRAINT fk_passkeys_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            INDEX idx_passkeys_user (user_id)
+          ) ENGINE=InnoDB
+        `);
+
+        await db.execute(`
+          CREATE TABLE IF NOT EXISTS auth_webauthn_challenges (
+            id VARCHAR(100) PRIMARY KEY,
+            user_id BIGINT UNSIGNED NULL,
+            challenge VARCHAR(255) NOT NULL,
+            ceremony_type VARCHAR(30) NOT NULL,
+            expires_at TIMESTAMP(3) NOT NULL,
+            created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            CONSTRAINT fk_webauthn_challenges_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            INDEX idx_webauthn_challenges_exp (expires_at)
+          ) ENGINE=InnoDB
+        `);
+      }
+    },
+  },
+  {
+    version: '008-passkey-credential-format-and-plan-set-compatibility',
+    up: async (db) => {
+      logger.info('Running migration 008: hardening passkey storage and reconciling plan prescription columns');
+
+      await ensureColumnExists(db, 'user_passkeys', 'credential_format', "VARCHAR(30) NOT NULL DEFAULT 'webauthn-cose'");
+
+      // Keep the canonical workout date populated even when an older database
+      // recorded migration 004 before the legacy session-date column existed.
+      await ensureColumnExists(db, 'workout_sessions', 'workout_date', 'DATE NULL');
+      await backfillColumnData(db, 'workout_sessions', 'workout_date', 'session_date', 'session_date');
+
+      // Canonical ordering is stored in the runtime columns used by the
+      // services; retain compatibility with databases that only have the
+      // previous order_index aliases.
+      await ensureColumnExists(db, 'diet_meals', 'meal_order', 'INTEGER NOT NULL DEFAULT 1');
+      await ensureColumnExists(db, 'diet_meal_option_groups', 'group_order', 'INTEGER NOT NULL DEFAULT 1');
+      await ensureColumnExists(db, 'diet_meal_options', 'option_order', 'INTEGER NOT NULL DEFAULT 1');
+      await ensureColumnExists(db, 'diet_meal_options', 'fiber_g_snapshot', 'DECIMAL(10,2) NULL');
+      await backfillColumnData(db, 'diet_meals', 'meal_order', 'order_index', 'order_index');
+      await backfillColumnData(db, 'diet_meal_option_groups', 'group_order', 'order_index', 'order_index');
+      await backfillColumnData(db, 'diet_meal_options', 'option_order', 'order_index', 'order_index');
+
+      // Previous records were created by the hand-rolled HMAC/SPKI flow and
+      // cannot be trusted as WebAuthn registrations. Preserve them for
+      // re-enrollment visibility, but make them unusable for authentication.
+      await db.execute(`
+        UPDATE user_passkeys
+        SET credential_format = CASE
+          WHEN public_key LIKE 'hmac:%' THEN 'legacy-hmac'
+          ELSE 'legacy-unverified'
+        END
+        WHERE credential_format = 'webauthn-cose'
+      `);
+
+      // Older databases used alternate names for the per-set prescription
+      // columns. Ensure the canonical columns exist for both SQLite and MySQL
+      // and backfill them from the old names where those names are present.
+      await ensureColumnExists(db, 'workout_plan_exercise_sets', 'set_number', 'INTEGER NOT NULL DEFAULT 1');
+      await ensureColumnExists(db, 'workout_plan_exercise_sets', 'target_reps_min', 'INTEGER NULL');
+      await ensureColumnExists(db, 'workout_plan_exercise_sets', 'target_reps_max', 'INTEGER NULL');
+      await ensureColumnExists(db, 'workout_plan_exercise_sets', 'target_weight_kg', 'DECIMAL(8,2) NULL');
+      await ensureColumnExists(db, 'workout_plan_exercise_sets', 'target_duration_seconds', 'INTEGER NULL');
+      await ensureColumnExists(db, 'workout_plan_exercise_sets', 'target_distance_meters', 'DECIMAL(10,2) NULL');
+      await ensureColumnExists(db, 'workout_plan_exercise_sets', 'rest_seconds', 'INTEGER NULL');
+      await ensureColumnExists(db, 'workout_plan_exercise_sets', 'notes', 'VARCHAR(1000) NULL');
+
+      await backfillColumnData(db, 'workout_plan_exercise_sets', 'set_number', 'set_order', 'set_order');
+      await backfillColumnData(db, 'workout_plan_exercise_sets', 'target_reps_min', 'reps_min_target', 'reps_min_target');
+      await backfillColumnData(db, 'workout_plan_exercise_sets', 'target_reps_max', 'reps_max_target', 'reps_max_target');
+      await backfillColumnData(db, 'workout_plan_exercise_sets', 'target_reps_min', 'target_reps', 'target_reps');
+      await backfillColumnData(db, 'workout_plan_exercise_sets', 'target_reps_max', 'target_reps', 'target_reps');
+      await backfillColumnData(db, 'workout_plan_exercise_sets', 'target_weight_kg', 'weight_kg_target', 'weight_kg_target');
+      await backfillColumnData(db, 'workout_plan_exercise_sets', 'target_duration_seconds', 'duration_seconds_target', 'duration_seconds_target');
+      await backfillColumnData(db, 'workout_plan_exercise_sets', 'rest_seconds', 'rest_seconds_target', 'rest_seconds_target');
+    },
+  },
 ];
 
 export async function runMigrations(customDb?: DatabasePool) {
@@ -682,7 +843,7 @@ export async function runMigrations(customDb?: DatabasePool) {
   }
 
   // Idempotent safeguard: ensure unique index is created on active SQLite DB
-  if (env.dbClient === 'sqlite') {
+  if (configuredDbClient() === 'sqlite') {
     const hasSessionDate = await db.queryOne<{ count: number }>(`SELECT COUNT(*) as count FROM pragma_table_info('workout_sessions') WHERE name = 'session_date'`);
     const dateCol = (hasSessionDate?.count || 0) > 0 ? 'session_date' : 'workout_date';
     await db.execute(`

@@ -1,0 +1,313 @@
+import crypto from 'node:crypto';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { encodeCBOR } from '@levischuck/tiny-cbor';
+import { buildApp } from '../src/app/app.js';
+import { runMigrations } from '../src/database/migrate.js';
+import { getDatabasePool } from '../src/database/pool.js';
+import { FastifyInstance } from 'fastify';
+
+describe('Passkey (FIDO2 / WebAuthn) Authentication Test Suite', () => {
+  let app: FastifyInstance;
+  let testUserToken: string;
+  let testUserId: number;
+  const testEmail = 'passkey_test_user@fitnessplatform.com';
+
+  // Generate an EC P-256 keypair and complete WebAuthn binary responses to
+  // exercise the same standard contract used by browsers and native bridges.
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const jwk = publicKey.export({ format: 'jwk' }) as { x?: string; y?: string };
+  const testCredentialId = crypto.randomBytes(16).toString('base64url');
+
+  const decode = (value: string) => Buffer.from(value, 'base64url');
+  const webAuthnResponse = (challenge: string, type: 'webauthn.create' | 'webauthn.get', counter: number) => {
+    const clientDataJSON = Buffer.from(JSON.stringify({ type, challenge, origin: 'http://localhost' }));
+    const rpIdHash = crypto.createHash('sha256').update('localhost').digest();
+    const authData = Buffer.alloc(37);
+    rpIdHash.copy(authData, 0);
+    authData[32] = type === 'webauthn.create' ? 0x41 : 0x01; // user present; attested data on registration
+    authData.writeUInt32BE(counter, 33);
+
+    if (type === 'webauthn.create') {
+      const credentialId = decode(testCredentialId);
+      const credentialPublicKey = encodeCBOR(new Map<any, any>([
+        [1, 2], [3, -7], [-1, 1], [-2, decode(jwk.x!)], [-3, decode(jwk.y!)],
+      ]));
+      const attestedData = Buffer.concat([
+        Buffer.alloc(16),
+        Buffer.from([(credentialId.length >> 8) & 0xff, credentialId.length & 0xff]),
+        credentialId,
+        Buffer.from(credentialPublicKey),
+      ]);
+      return {
+        id: testCredentialId,
+        rawId: testCredentialId,
+        type: 'public-key',
+        clientExtensionResults: {},
+        response: {
+          clientDataJSON: clientDataJSON.toString('base64url'),
+          attestationObject: Buffer.from(encodeCBOR(new Map<any, any>([
+            ['fmt', 'none'], ['attStmt', new Map<any, any>()], ['authData', Buffer.concat([authData, attestedData])],
+          ]))).toString('base64url'),
+        },
+      };
+    }
+
+    const signedData = Buffer.concat([
+      authData,
+      crypto.createHash('sha256').update(clientDataJSON).digest(),
+    ]);
+    const signature = crypto.createSign('SHA256').update(signedData).sign(privateKey);
+    return {
+      id: testCredentialId,
+      rawId: testCredentialId,
+      type: 'public-key',
+      clientExtensionResults: {},
+      response: {
+        clientDataJSON: clientDataJSON.toString('base64url'),
+        authenticatorData: authData.toString('base64url'),
+        signature: signature.toString('base64url'),
+      },
+    };
+  };
+
+  beforeAll(async () => {
+    await runMigrations();
+    const db = getDatabasePool();
+
+    // Ensure test user exists
+    const existing = await db.queryOne<any>('SELECT id FROM users WHERE email = ?', [testEmail]);
+    if (!existing) {
+      const bcryptModule = await import('bcryptjs');
+      const bcrypt = bcryptModule.default || bcryptModule;
+      const passHash = await bcrypt.hash('Password123!', 10);
+      const res = await db.execute(
+        `INSERT INTO users (role_id, first_name, last_name, email, password_hash, status)
+         VALUES (3, 'Passkey', 'Tester', ?, ?, 'active')`,
+        [testEmail, passHash]
+      );
+      testUserId = res.insertId;
+    } else {
+      testUserId = existing.id;
+    }
+
+    app = await buildApp();
+    await app.ready();
+
+    // Log in with password to get token for registration tests
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      payload: { email: testEmail, password: 'Password123!' },
+    });
+    testUserToken = loginRes.json().data.accessToken;
+  });
+
+  it('1. Registration Options: requires authentication and generates challenge', async () => {
+    // Unauthenticated request fails with 401
+    const unauthRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/register-options',
+    });
+    expect(unauthRes.statusCode).toBe(401);
+
+    // Authenticated request succeeds
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/register-options',
+      headers: { authorization: `Bearer ${testUserToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.success).toBe(true);
+    expect(body.data.challengeId).toBeDefined();
+    expect(body.data.challenge).toBeDefined();
+    expect(body.data.rp.name).toBeDefined();
+    expect(body.data.user.name).toBe(testEmail);
+  });
+
+  it('2. Registration Verify: registers new passkey credential and prevents duplicates', async () => {
+    // 1. Get fresh challenge
+    const optRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/register-options',
+      headers: { authorization: `Bearer ${testUserToken}` },
+    });
+    const challengeId = optRes.json().data.challengeId;
+
+    // 2. Register credential
+    const regRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/register-verify',
+      headers: { authorization: `Bearer ${testUserToken}` },
+      payload: {
+        challengeId,
+        response: webAuthnResponse(optRes.json().data.challenge, 'webauthn.create', 0),
+        deviceName: 'Pixel 8 Pro (Test Authenticator)',
+        transports: ['internal', 'hybrid'],
+      },
+    });
+    expect(regRes.statusCode).toBe(201);
+    const regBody = regRes.json();
+    expect(regBody.success).toBe(true);
+    expect(regBody.data.credentialId).toBe(testCredentialId);
+    expect(regBody.data.deviceName).toBe('Pixel 8 Pro (Test Authenticator)');
+
+    // 3. Challenge is consumed: replay fails
+    const replayRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/register-verify',
+      headers: { authorization: `Bearer ${testUserToken}` },
+      payload: {
+        challengeId,
+        response: webAuthnResponse(optRes.json().data.challenge, 'webauthn.create', 0),
+      },
+    });
+    expect(replayRes.statusCode).toBe(400);
+
+    // 4. Duplicate credentialId fails with 409
+    const optRes2 = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/register-options',
+      headers: { authorization: `Bearer ${testUserToken}` },
+    });
+    const dupRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/register-verify',
+      headers: { authorization: `Bearer ${testUserToken}` },
+      payload: {
+        challengeId: optRes2.json().data.challengeId,
+        response: webAuthnResponse(optRes2.json().data.challenge, 'webauthn.create', 0), // duplicate
+      },
+    });
+    expect(dupRes.statusCode).toBe(409);
+  });
+
+  it('3. Login Options: returns challenge and allowCredentials for registered user', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-options',
+      payload: { email: testEmail },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.success).toBe(true);
+    expect(body.data.challengeId).toBeDefined();
+    expect(body.data.challenge).toBeDefined();
+    expect(body.data.allowCredentials).toBeDefined();
+    expect(body.data.allowCredentials.some((c: any) => c.id === testCredentialId)).toBe(true);
+  });
+
+  it('4. Login Verify: cryptographically verifies signature and issues valid session tokens', async () => {
+    // 1. Fetch challenge
+    const optRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-options',
+      payload: { email: testEmail },
+    });
+    const { challengeId, challenge } = optRes.json().data;
+
+    // 5. Submit to login-verify
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-verify',
+      payload: {
+        challengeId,
+        response: webAuthnResponse(challenge, 'webauthn.get', 1),
+        deviceName: 'Pixel 8 Pro (Test Authenticator)',
+      },
+    });
+
+    expect(loginRes.statusCode).toBe(200);
+    const loginBody = loginRes.json();
+    expect(loginBody.success).toBe(true);
+    expect(loginBody.data.accessToken).toBeDefined();
+    expect(loginBody.data.refreshToken).toBeDefined();
+    expect(loginBody.data.user.email).toBe(testEmail);
+
+    // 6. Verify accessToken accesses protected endpoints
+    const meRes = await app.inject({
+      method: 'GET',
+      url: '/api/v1/me',
+      headers: { authorization: `Bearer ${loginBody.data.accessToken}` },
+    });
+    expect(meRes.statusCode).toBe(200);
+    expect(meRes.json().data.email).toBe(testEmail);
+
+    // 7. Anti-replay: cannot use same challenge again
+    const replayRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-verify',
+      payload: {
+        challengeId,
+        response: webAuthnResponse(challenge, 'webauthn.get', 2),
+      },
+    });
+    expect(replayRes.statusCode).toBe(401);
+  });
+
+  it('5. Passkey Management: lists user passkeys and allows revocation', async () => {
+    // Legacy HMAC records are retained for visibility but can never be used
+    // as WebAuthn credentials after the cryptographic migration.
+    const db = getDatabasePool();
+    const legacyCredentialId = 'legacy-hmac-passkey-fixture';
+    const legacy = await db.queryOne<any>('SELECT id FROM user_passkeys WHERE credential_id = ?', [legacyCredentialId]);
+    if (!legacy) {
+      await db.execute(
+        `INSERT INTO user_passkeys (user_id, credential_id, public_key, credential_format, counter, device_name)
+         VALUES (?, ?, ?, 'legacy-hmac', 0, 'Legacy HMAC fixture')`,
+        [testUserId, legacyCredentialId, 'hmac:unsupported-fixture'],
+      );
+    }
+    const legacyOptions = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-options',
+      payload: { email: testEmail },
+    });
+    const legacyLogin = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-verify',
+      payload: {
+        challengeId: legacyOptions.json().data.challengeId,
+        response: {
+          id: legacyCredentialId,
+          rawId: legacyCredentialId,
+          type: 'public-key',
+          clientExtensionResults: {},
+          response: { clientDataJSON: '', authenticatorData: '', signature: '' },
+        },
+      },
+    });
+    expect(legacyLogin.statusCode).toBe(401);
+    expect(legacyLogin.json().error.code).toBe('PASSKEY_REENROLL_REQUIRED');
+
+    // List passkeys
+    const listRes = await app.inject({
+      method: 'GET',
+      url: '/api/v1/me/passkeys',
+      headers: { authorization: `Bearer ${testUserToken}` },
+    });
+    expect(listRes.statusCode).toBe(200);
+    const listBody = listRes.json();
+    expect(listBody.success).toBe(true);
+    expect(Array.isArray(listBody.data)).toBe(true);
+    const registered = listBody.data.find((p: any) => p.credentialId === testCredentialId);
+    expect(registered).toBeDefined();
+    expect(registered.deviceName).toBe('Pixel 8 Pro (Test Authenticator)');
+
+    // Delete passkey
+    const delRes = await app.inject({
+      method: 'DELETE',
+      url: `/api/v1/me/passkeys/${registered.id}`,
+      headers: { authorization: `Bearer ${testUserToken}` },
+    });
+    expect(delRes.statusCode).toBe(200);
+
+    // Confirm it is gone
+    const listRes2 = await app.inject({
+      method: 'GET',
+      url: '/api/v1/me/passkeys',
+      headers: { authorization: `Bearer ${testUserToken}` },
+    });
+    expect(listRes2.json().data.some((p: any) => p.credentialId === testCredentialId)).toBe(false);
+  });
+});

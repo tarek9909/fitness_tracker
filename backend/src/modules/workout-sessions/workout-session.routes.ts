@@ -397,6 +397,9 @@ export class WorkoutSessionController {
           [sessionId, auth.userId],
         );
         if (!session) throw new NotFoundError('Workout session not found');
+        if (session.status === 'completed') {
+          throw new ConflictError('Workout session is already completed', 'WORKOUT_ALREADY_COMPLETED');
+        }
 
         const updateRes = await conn.execute(
           `UPDATE workout_sessions SET status = 'skipped', notes = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`,
@@ -459,6 +462,15 @@ export class WorkoutSessionController {
 
     try {
       const responseBody = await this.db.withTransaction(async (conn) => {
+        const session = await conn.queryOne<any>(
+          'SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?',
+          [sessionId, auth.userId]
+        );
+        if (!session) throw new NotFoundError('Workout session not found');
+        if (session.status === 'completed') {
+          throw new ConflictError('Workout session is already completed', 'WORKOUT_ALREADY_COMPLETED');
+        }
+
         const res = await conn.execute(
           `UPDATE workout_sessions SET status = 'skipped', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`,
           [sessionId, auth.userId]
@@ -585,6 +597,7 @@ export async function workoutSessionRoutes(fastify: FastifyInstance) {
 
   fastify.post('/me/workouts/start', { preHandler: [authenticate] }, (req, res) => controller.startWorkout(req, res));
   fastify.get('/me/workouts/active', { preHandler: [authenticate] }, (req, res) => controller.getActiveWorkout(req, res));
+  fastify.get('/me/workouts/active-session', { preHandler: [authenticate] }, (req, res) => controller.getActiveWorkout(req, res));
   fastify.get('/me/workouts/history', { preHandler: [authenticate] }, (req, res) => controller.getWorkoutHistory(req, res));
   fastify.get('/me/workouts/:sessionId', { preHandler: [authenticate] }, (req, res) => controller.getSession(req, res));
   fastify.post('/me/workouts/:sessionId/sets', { preHandler: [authenticate] }, (req, res) => controller.logSet(req, res));

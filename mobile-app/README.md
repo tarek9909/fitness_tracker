@@ -48,17 +48,17 @@ Production-grade cross-platform Flutter mobile application for daily fitness tra
 
 ### Android Emulator:
 ```powershell
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000/api/v1
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:4000/api/v1
 ```
 
 ### iOS Simulator / Desktop:
 ```powershell
-flutter run --dart-define=API_BASE_URL=http://localhost:3000/api/v1
+flutter run --dart-define=API_BASE_URL=http://localhost:4000/api/v1
 ```
 
 ### Physical Device over Local Network:
 ```powershell
-flutter run --dart-define=API_BASE_URL=http://192.168.1.100:3000/api/v1
+flutter run --dart-define=API_BASE_URL=http://192.168.1.100:4000/api/v1
 ```
 
 ---

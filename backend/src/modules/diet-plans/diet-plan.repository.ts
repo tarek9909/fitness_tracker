@@ -190,6 +190,7 @@ export class DietPlanRepository {
                dmo.protein_g_snapshot as protein_g,
                dmo.carbs_g_snapshot as carbs_g,
                dmo.fat_g_snapshot as fat_g,
+               dmo.fiber_g_snapshot as fiber_g,
                f.name as food_name, 
                f.calories as food_base_calories, 
                mu.code as unit_code
@@ -226,10 +227,10 @@ export class DietPlanRepository {
     return meals;
   }
 
-  async createMeal(data: { dietPlanVersionId: number; name: string; scheduledTime?: string | null; orderIndex: number; notes?: string | null }, client: DbConnection = this.db): Promise<number> {
+  async createMeal(data: { dietPlanVersionId: number; name: string; scheduledTime?: string | null; orderIndex: number; notes?: string | null; isRequired?: number | null }, client: DbConnection = this.db): Promise<number> {
     const sql = `
-      INSERT INTO diet_meals (diet_plan_version_id, name, scheduled_time, meal_order, description)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO diet_meals (diet_plan_version_id, name, scheduled_time, meal_order, description, is_required)
+      VALUES (?, ?, ?, ?, ?, ?)
     `;
     const res = await client.execute(sql, [
       data.dietPlanVersionId,
@@ -237,14 +238,15 @@ export class DietPlanRepository {
       data.scheduledTime || null,
       data.orderIndex,
       data.notes || null,
+      data.isRequired !== 0 ? 1 : 0,
     ]);
     return res.insertId;
   }
 
-  async createOptionGroup(data: { dietMealId: number; name: string; isRequired: number; minSelections: number; maxSelections: number; orderIndex: number }, client: DbConnection = this.db): Promise<number> {
+  async createOptionGroup(data: { dietMealId: number; name: string; isRequired: number; minSelections: number; maxSelections: number; orderIndex: number; notes?: string | null }, client: DbConnection = this.db): Promise<number> {
     const sql = `
-      INSERT INTO diet_meal_option_groups (diet_meal_id, name, is_required, min_selection_count, max_selection_count, group_order)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO diet_meal_option_groups (diet_meal_id, name, is_required, min_selection_count, max_selection_count, group_order, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
     const res = await client.execute(sql, [
       data.dietMealId,
@@ -253,6 +255,7 @@ export class DietPlanRepository {
       data.minSelections,
       data.maxSelections,
       data.orderIndex,
+      data.notes || null,
     ]);
     return res.insertId;
   }
@@ -267,14 +270,16 @@ export class DietPlanRepository {
     proteinG?: number | null;
     carbsG?: number | null;
     fatG?: number | null;
+    fiberG?: number | null;
     isDefault?: number;
     orderIndex?: number;
+    notes?: string | null;
   }, client: DbConnection = this.db): Promise<number> {
     const sql = `
       INSERT INTO diet_meal_options (
         diet_meal_option_group_id, food_id, option_order, label, quantity, unit_id,
-        calories_snapshot, protein_g_snapshot, carbs_g_snapshot, fat_g_snapshot
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        calories_snapshot, protein_g_snapshot, carbs_g_snapshot, fat_g_snapshot, fiber_g_snapshot, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const res = await client.execute(sql, [
       data.dietMealOptionGroupId,
@@ -287,6 +292,8 @@ export class DietPlanRepository {
       data.proteinG || null,
       data.carbsG || null,
       data.fatG || null,
+      data.fiberG || null,
+      data.notes || null,
     ]);
     return res.insertId;
   }

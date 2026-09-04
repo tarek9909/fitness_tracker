@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api, clearCsrfToken } from '../api/client';
+import { executePasskeyLogin, WebAuthnLoginOptions } from '../lib/webauthn';
 
 export interface AdminUser {
   id: number;
@@ -13,6 +14,7 @@ interface AuthContextType {
   user: AdminUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithPasskey: (email?: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -94,6 +96,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
+  const loginWithPasskey = async (email?: string) => {
+    // 1. Obtain authentication challenge options
+    const options = await api.post<WebAuthnLoginOptions>(
+      '/auth/passkey/login-options',
+      { email: email?.trim() || undefined }
+    );
+
+    // 2. Perform authenticator ceremony
+    const assertionPayload = await executePasskeyLogin(options);
+
+    // 3. Verify assertion on server and issue session cookies
+    const res = await api.post<{ user: any; expiresInSeconds: number; csrfToken?: string }>(
+      '/auth/passkey/login-verify',
+      assertionPayload
+    );
+
+    if (res.user.role !== 'admin' && res.user.role !== 'super_admin') {
+      await logout();
+      throw new Error('Access denied: Administrator privileges required.');
+    }
+
+    setUser({
+      id: res.user.id,
+      role: res.user.role,
+      firstName: res.user.first_name || res.user.firstName || 'Admin',
+      lastName: res.user.last_name || res.user.lastName || null,
+      email: res.user.email,
+    });
+  };
+
   const logout = async () => {
     try {
       await api.post('/auth/logout', {});
@@ -106,7 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithPasskey, logout }}>
       {children}
     </AuthContext.Provider>
   );

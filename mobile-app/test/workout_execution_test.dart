@@ -62,6 +62,7 @@ void main() {
             'reps_min_target': 8,
             'reps_max_target': 12,
             'target_weight_kg': 65.0,
+            'rir_target': 2,
             'sets': <dynamic>[],
           }
         ],
@@ -91,12 +92,14 @@ void main() {
                   'reps_min_target': 8,
                   'reps_max_target': 12,
                   'target_weight_kg': 65.0,
+                  'rir_target': 2,
                   'sets': [
                     {
                       'id': 301,
                       'set_number': body['setNumber'],
                       'weight_kg': body['weightKg'],
                       'reps': body['reps'],
+                      'rir': body['rir'],
                       'completed': 1,
                     }
                   ],
@@ -126,26 +129,20 @@ void main() {
       // Verify exercise rendered with target info
       expect(find.text('Barbell Bench Press'), findsOneWidget);
       expect(find.text('Target: 3 Sets × 8-12 reps'), findsOneWidget);
-      expect(find.text('Log Set'), findsWidgets);
-
-      // Open Log Set for Set 1
-      await tester.tap(find.byKey(const Key('log_set_button_201_1')));
-      await tester.pumpAndSettle();
-
-      // Verify dialog is open
-      expect(find.text('Log Set 1'), findsOneWidget);
 
       // Verify inputs pre-filled with planned target (65kg, 8 reps) instead of fake 80kg/10reps
-      final weightField = tester.widget<PremiumTextField>(
-          find.byKey(const Key('set_dialog_weight_input')));
-      final repsField = tester.widget<PremiumTextField>(
-          find.byKey(const Key('set_dialog_reps_input')));
+      final weightFields = find.byKey(const Key('set_dialog_weight_input'));
+      final repsFields = find.byKey(const Key('set_dialog_reps_input'));
 
-      expect(weightField.controller.text, equals('65'));
-      expect(repsField.controller.text, equals('8'));
+      expect(
+          tester.widget<TextField>(weightFields.first).controller?.text,
+          equals('65'));
+      expect(
+          tester.widget<TextField>(repsFields.first).controller?.text,
+          equals('8'));
 
-      // Tap Save Set
-      await tester.tap(find.byKey(const Key('set_dialog_save_button')));
+      // Tap 1-tap circular save button for Set 1
+      await tester.tap(find.byKey(const Key('log_set_button_201_1')));
       await tester.pumpAndSettle();
 
       // Verify request payload
@@ -175,6 +172,7 @@ void main() {
             'reps_min_target': null,
             'reps_max_target': null,
             'target_weight_kg': null,
+            'rir_target': null,
             'sets': <dynamic>[],
           }
         ],
@@ -212,35 +210,31 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Open Log Set for Set 1
-      await tester.tap(find.byKey(const Key('log_set_button_202_1')));
-      await tester.pumpAndSettle();
-
-      final weightField = tester.widget<PremiumTextField>(
-          find.byKey(const Key('set_dialog_weight_input')));
-      final repsField = tester.widget<PremiumTextField>(
-          find.byKey(const Key('set_dialog_reps_input')));
+      final weightFields = find.byKey(const Key('set_dialog_weight_input'));
+      final repsFields = find.byKey(const Key('set_dialog_reps_input'));
 
       // Must NOT invent fake defaults like 80kg or 10 reps
-      expect(weightField.controller.text, isEmpty);
-      expect(repsField.controller.text, isEmpty);
+      expect(
+          tester.widget<TextField>(weightFields.first).controller?.text,
+          isEmpty);
+      expect(
+          tester.widget<TextField>(repsFields.first).controller?.text,
+          isEmpty);
 
       // Attempt to save without reps -> triggers validation error
-      await tester.tap(find.byKey(const Key('set_dialog_save_button')));
+      await tester.tap(find.byKey(const Key('log_set_button_202_1')));
       await tester.pumpAndSettle();
 
       expect(find.text('Please enter at least 1 rep'), findsOneWidget);
       expect(capturedSetRequest, isNull); // Request was blocked by validation
 
       // Enter valid reps and weight
-      await tester.enterText(
-          find.byKey(const Key('set_dialog_weight_input')), '0');
-      await tester.enterText(
-          find.byKey(const Key('set_dialog_reps_input')), '15');
+      await tester.enterText(weightFields.first, '0');
+      await tester.enterText(repsFields.first, '15');
       await tester.pumpAndSettle();
 
       // Tap Save Set
-      await tester.tap(find.byKey(const Key('set_dialog_save_button')));
+      await tester.tap(find.byKey(const Key('log_set_button_202_1')));
       await tester.pumpAndSettle();
 
       // Verify payload sent
@@ -269,12 +263,14 @@ void main() {
             'reps_min_target': 10,
             'reps_max_target': 12,
             'target_weight_kg': 28.0,
+            'rir_target': 2,
             'sets': [
               {
                 'id': 401,
                 'set_number': 1,
                 'weight_kg': 32.5,
                 'reps': 10,
+                'rir': 1,
                 'completed': 1,
               }
             ],
@@ -314,33 +310,23 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Verify Set 1 is shown as completed with logged values
-      expect(find.text('32.5 kg × 10 reps'), findsOneWidget);
-      expect(find.text('Edit'), findsOneWidget);
+      // Verify previous logged values are populated in the inline inputs
+      final weightFields = find.byKey(const Key('set_dialog_weight_input'));
+      final repsFields = find.byKey(const Key('set_dialog_reps_input'));
 
-      // Tap Edit
-      await tester.tap(find.byKey(const Key('log_set_button_203_1')));
-      await tester.pumpAndSettle();
-
-      // Verify Edit dialog title
-      expect(find.text('Edit Set 1'), findsOneWidget);
-
-      // Verify previous logged values are populated
-      final weightField = tester.widget<PremiumTextField>(
-          find.byKey(const Key('set_dialog_weight_input')));
-      final repsField = tester.widget<PremiumTextField>(
-          find.byKey(const Key('set_dialog_reps_input')));
-
-      expect(weightField.controller.text, equals('32.5'));
-      expect(repsField.controller.text, equals('10'));
+      expect(
+          tester.widget<TextField>(weightFields.first).controller?.text,
+          equals('32.5'));
+      expect(
+          tester.widget<TextField>(repsFields.first).controller?.text,
+          equals('10'));
 
       // Update reps to 11
-      await tester.enterText(
-          find.byKey(const Key('set_dialog_reps_input')), '11');
+      await tester.enterText(repsFields.first, '11');
       await tester.pumpAndSettle();
 
       // Tap Save Set
-      await tester.tap(find.byKey(const Key('set_dialog_save_button')));
+      await tester.tap(find.byKey(const Key('log_set_button_203_1')));
       await tester.pumpAndSettle();
 
       // Verify payload sent with edited reps and preserved weight
@@ -408,7 +394,7 @@ void main() {
       expect(find.text('Session Notes (optional)'), findsOneWidget);
 
       // Tap Finish Workout inside dialog without entering notes or rating
-      await tester.tap(find.widgetWithText(PremiumButton, 'Finish Workout'));
+      await tester.tap(find.byKey(const Key('confirm_finish_workout_button')));
       await tester.pumpAndSettle();
 
       // Verify no synthetic note "Completed on mobile app" or rating 5 was injected
@@ -481,7 +467,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap Finish Workout
-      await tester.tap(find.widgetWithText(PremiumButton, 'Finish Workout'));
+      await tester.tap(find.byKey(const Key('confirm_finish_workout_button')));
       await tester.pumpAndSettle();
 
       // Verify payload contains explicit user values
@@ -566,22 +552,20 @@ void main() {
       // Verify unconfigured message rendered and NO synthetic Set 1 card
       expect(find.text('No planned sets configured.'), findsOneWidget);
       expect(find.byKey(const Key('add_set_button_206')), findsOneWidget);
-      expect(find.text('Set 1'), findsNothing);
 
       // Tap Add Set
       await tester.tap(find.byKey(const Key('add_set_button_206')));
       await tester.pumpAndSettle();
 
-      // Dialog opens for Set 1
-      expect(find.text('Log Set 1'), findsOneWidget);
+      // Row appears for Set 1
+      final weightFields = find.byKey(const Key('set_dialog_weight_input'));
+      final repsFields = find.byKey(const Key('set_dialog_reps_input'));
 
-      await tester.enterText(
-          find.byKey(const Key('set_dialog_weight_input')), '24');
-      await tester.enterText(
-          find.byKey(const Key('set_dialog_reps_input')), '20');
+      await tester.enterText(weightFields.first, '24');
+      await tester.enterText(repsFields.first, '20');
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('set_dialog_save_button')));
+      await tester.tap(find.byKey(const Key('log_set_button_206_1')));
       await tester.pumpAndSettle();
 
       expect(capturedSetRequest, isNotNull);
@@ -644,10 +628,6 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Open Log Set for Set 1
-      await tester.tap(find.byKey(const Key('log_set_button_207_1')));
-      await tester.pumpAndSettle();
-
       // Verify duration input is present and weight/reps inputs are absent
       expect(
           find.byKey(const Key('set_dialog_duration_input')), findsOneWidget);
@@ -659,7 +639,7 @@ void main() {
           find.byKey(const Key('set_dialog_duration_input')), '90');
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('set_dialog_save_button')));
+      await tester.tap(find.byKey(const Key('log_set_button_207_1')));
       await tester.pumpAndSettle();
 
       expect(capturedSetRequest, isNotNull);
@@ -670,6 +650,7 @@ void main() {
       expect(sentBody['durationSeconds'], equals(90));
       expect(sentBody.containsKey('weightKg'), isFalse);
       expect(sentBody.containsKey('reps'), isFalse);
+      expect(sentBody.containsKey('rir'), isFalse);
     });
 
     testWidgets(
@@ -711,6 +692,7 @@ void main() {
                     {
                       'weight_kg': 45.0,
                       'reps': 8,
+                      'rir': 2,
                     }
                   ],
                 },
@@ -755,6 +737,7 @@ void main() {
                 'id': 991,
                 'set_number': 1,
                 'reps': 12,
+                'rir': 2,
                 'completed': 1,
               }
             ],
@@ -787,7 +770,10 @@ void main() {
 
       // Verify that the locally cached session was restored and rendered
       expect(find.text('Locally Restored Pull-ups'), findsOneWidget);
-      expect(find.text('12 reps'), findsOneWidget);
+      final repsFields = find.byKey(const Key('set_dialog_reps_input'));
+      expect(
+          tester.widget<TextField>(repsFields.first).controller?.text,
+          equals('12'));
     });
   });
 }

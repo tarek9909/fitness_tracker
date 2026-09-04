@@ -18,8 +18,20 @@ const logMealSchema = z.object({
     foodId: z.number().int().positive().optional(),
     quantity: z.number().positive().max(100000).optional(),
   })).max(100).optional(),
+  customFoods: z.array(z.object({
+    name: z.string().min(1).max(255),
+    servingSize: z.string().max(100).optional(),
+    quantity: z.number().positive().max(100000).optional(),
+    calories: z.number().min(0).max(10000).optional(),
+    proteinG: z.number().min(0).max(1000).optional(),
+    carbsG: z.number().min(0).max(1000).optional(),
+    fatG: z.number().min(0).max(1000).optional(),
+    notes: z.string().max(255).optional(),
+  })).max(50).optional(),
   notes: z.string().max(2000).optional(),
   clientOperationId: z.string().min(8).max(191).optional(),
+  timeOverride: z.boolean().optional(),
+  loggedAtTime: z.string().max(50).optional(),
 });
 
 export class MealsController {
@@ -91,7 +103,7 @@ export class MealsController {
         const selections = body.selections || [];
         let groupsById = new Map<number, any>();
         let optionsById = new Map<number, any>();
-        if (body.selections !== undefined) {
+        if (body.selections !== undefined && selections.length > 0) {
           const groups = await conn.query<any>(
             'SELECT * FROM diet_meal_option_groups WHERE diet_meal_id = ? ORDER BY group_order ASC',
             [mealId],
@@ -134,21 +146,36 @@ export class MealsController {
           for (const group of groups) {
             const groupId = Number(group.id);
             const selectedCount = selectionsByGroup.get(groupId) || 0;
-            const minimum = Number(group.min_selection_count || 0);
-            const requiredMinimum = Number(group.is_required) === 1 ? Math.max(1, minimum) : minimum;
             const maximum = group.max_selection_count == null ? null : Number(group.max_selection_count);
-            if (selectedCount < requiredMinimum) {
-              throw new ValidationError(`Select at least ${requiredMinimum} option(s) for ${group.name}`);
-            }
+            // Groups are not strictly required: users can customize food or omit groups
             if (maximum !== null && selectedCount > maximum) {
               throw new ValidationError(`Select no more than ${maximum} option(s) for ${group.name}`);
             }
           }
         }
 
+        let totalCalories = 0;
+        let totalProtein = 0;
+        let totalCarbs = 0;
+        let totalFat = 0;
+        let hasCustomMacros = false;
+
         for (const sel of selections) {
           const group = groupsById.get(sel.optionGroupId)!;
           const opt = optionsById.get(sel.optionId)!;
+          const optCalories = opt.calories_snapshot ?? opt.calories ?? null;
+          const optProtein = opt.protein_g_snapshot ?? opt.protein_g ?? null;
+          const optCarbs = opt.carbs_g_snapshot ?? opt.carbs_g ?? null;
+          const optFat = opt.fat_g_snapshot ?? opt.fat_g ?? null;
+
+          if (optCalories != null) {
+            totalCalories += Number(optCalories);
+            hasCustomMacros = true;
+          }
+          if (optProtein != null) totalProtein += Number(optProtein);
+          if (optCarbs != null) totalCarbs += Number(optCarbs);
+          if (optFat != null) totalFat += Number(optFat);
+
           await conn.execute(
             `INSERT INTO meal_log_selections (
                meal_log_id, diet_meal_option_group_id, diet_meal_option_id, group_name_snapshot,
@@ -158,13 +185,57 @@ export class MealsController {
               currentLogId,
               sel.optionGroupId,
               sel.optionId,
-              group.name,
+              group?.name || 'Meal Item',
               opt.label || opt.custom_label || 'Serving',
               sel.quantity ?? opt.quantity ?? opt.serving_quantity ?? 1,
-              opt.calories_snapshot || opt.calories || null,
-              opt.protein_g_snapshot || opt.protein_g || null,
-              opt.carbs_g_snapshot || opt.carbs_g || null,
-              opt.fat_g_snapshot || opt.fat_g || null,
+              optCalories,
+              optProtein,
+              optCarbs,
+              optFat,
+            ]
+          );
+        }
+
+        // Record any custom foods added inside the meal
+        const customFoods = body.customFoods || [];
+        for (const cf of customFoods) {
+          if (cf.calories != null) {
+            totalCalories += Number(cf.calories);
+            hasCustomMacros = true;
+          }
+          if (cf.proteinG != null) totalProtein += Number(cf.proteinG);
+          if (cf.carbsG != null) totalCarbs += Number(cf.carbsG);
+          if (cf.fatG != null) totalFat += Number(cf.fatG);
+
+          await conn.execute(
+            `INSERT INTO meal_log_selections (
+               meal_log_id, diet_meal_option_group_id, diet_meal_option_id, group_name_snapshot,
+               option_label_snapshot, quantity_snapshot, unit_code_snapshot,
+               calories_snapshot, protein_g_snapshot, carbs_g_snapshot, fat_g_snapshot
+             ) VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              currentLogId,
+              'Custom Food',
+              cf.name,
+              cf.quantity ?? 1,
+              cf.servingSize || null,
+              cf.calories ?? null,
+              cf.proteinG ?? null,
+              cf.carbsG ?? null,
+              cf.fatG ?? null,
+            ]
+          );
+        }
+
+        if (hasCustomMacros || customFoods.length > 0 || selections.length > 0) {
+          await conn.execute(
+            `UPDATE meal_logs SET actual_calories = ?, actual_protein_g = ?, actual_carbs_g = ?, actual_fat_g = ? WHERE id = ?`,
+            [
+              totalCalories > 0 ? totalCalories : null,
+              totalProtein > 0 ? totalProtein : null,
+              totalCarbs > 0 ? totalCarbs : null,
+              totalFat > 0 ? totalFat : null,
+              currentLogId,
             ]
           );
         }
@@ -250,8 +321,42 @@ export class MealsController {
        WHERE user_id = ? AND meal_date = ? AND diet_meal_id IN (${mealPlaceholders})`,
       [auth.userId, dateStr, ...mealIds]
     );
+
+    const logIds = logs.map((l: any) => l.id);
+    let allLogSelections: any[] = [];
+    if (logIds.length > 0) {
+      allLogSelections = await this.db.query(
+        `SELECT * FROM meal_log_selections WHERE meal_log_id IN (${logIds.map(() => '?').join(',')}) ORDER BY id ASC`,
+        logIds,
+      );
+    }
+
+    const selectionsByLogId = new Map<number, any[]>();
+    const customFoodsByLogId = new Map<number, any[]>();
+    for (const sel of allLogSelections) {
+      const lid = Number(sel.meal_log_id);
+      if (sel.diet_meal_option_id != null) {
+        if (!selectionsByLogId.has(lid)) selectionsByLogId.set(lid, []);
+        selectionsByLogId.get(lid)!.push(sel);
+      } else {
+        if (!customFoodsByLogId.has(lid)) customFoodsByLogId.set(lid, []);
+        customFoodsByLogId.get(lid)!.push({
+          name: sel.option_label_snapshot,
+          servingSize: sel.unit_code_snapshot,
+          quantity: sel.quantity_snapshot,
+          calories: sel.calories_snapshot,
+          proteinG: sel.protein_g_snapshot,
+          carbsG: sel.carbs_g_snapshot,
+          fatG: sel.fat_g_snapshot,
+        });
+      }
+    }
+
     const logsByMealId = new Map<number, any>();
     for (const log of logs) {
+      const lid = Number(log.id);
+      log.selections = selectionsByLogId.get(lid) || [];
+      log.customFoods = customFoodsByLogId.get(lid) || [];
       logsByMealId.set(log.diet_meal_id, log);
     }
 

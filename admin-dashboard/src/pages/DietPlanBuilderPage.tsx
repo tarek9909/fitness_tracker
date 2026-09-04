@@ -257,7 +257,7 @@ export const DietPlanBuilderPage: React.FC<DietPlanBuilderProps> = ({ planId, in
     setEditingGroup(null);
     setShowAddGroupModal(mealId);
     setGroupName('');
-    setGroupRequired(true);
+    setGroupRequired(false);
     setMinSelections('');
     setMaxSelections('');
   };
