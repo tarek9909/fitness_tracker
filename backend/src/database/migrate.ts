@@ -146,7 +146,7 @@ async function backfillColumnData(
     }
   } else {
     const hasCols = await db.queryOne<{ count: number }>(
-      `SELECT COUNT(*) as count FROM information_schema.COLUMNS 
+      `SELECT COUNT(*) as count FROM information_schema.COLUMNS
        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME IN (?, ?)`,
       [tableName, targetCol, sourceColNameToCheck]
     );
@@ -154,6 +154,65 @@ async function backfillColumnData(
       const whereClause = whereCondition ? `WHERE ${whereCondition}` : `WHERE ${sourceColNameToCheck} IS NOT NULL`;
       await db.execute(`UPDATE ${tableName} SET ${targetCol} = ${sourceExpr} ${whereClause}`);
     }
+  }
+}
+
+async function reconcileOrderingColumns(
+  db: DatabasePool,
+  tableName: string,
+  canonicalCol: string,
+  legacyCol: string
+): Promise<void> {
+  if (configuredDbClient() === 'sqlite') {
+    const tableExists = await db.queryOne<{ count: number }>(
+      `SELECT COUNT(*) as count FROM sqlite_master WHERE type='table' AND name='${tableName}'`
+    );
+    if ((tableExists?.count || 0) === 0) return;
+
+    const hasCanonical = await db.queryOne<{ count: number }>(
+      `SELECT COUNT(*) as count FROM pragma_table_info('${tableName}') WHERE name = '${canonicalCol}'`
+    );
+    const hasLegacy = await db.queryOne<{ count: number }>(
+      `SELECT COUNT(*) as count FROM pragma_table_info('${tableName}') WHERE name = '${legacyCol}'`
+    );
+    if ((hasCanonical?.count || 0) === 0 || (hasLegacy?.count || 0) === 0) return;
+  } else {
+    const cols = await db.queryOne<{ count: number }>(
+      `SELECT COUNT(*) as count FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME IN (?, ?)`,
+      [tableName, canonicalCol, legacyCol]
+    );
+    if ((cols?.count || 0) < 2) return;
+  }
+
+  const rowCount = await db.queryOne<{ count: number }>(
+    `SELECT COUNT(*) as count FROM ${tableName}`
+  );
+  if ((rowCount?.count || 0) === 0) return;
+
+  const stats = await db.queryOne<{ distinctCanonical: number; distinctLegacy: number }>(
+    `SELECT COUNT(DISTINCT ${canonicalCol}) as distinctCanonical, COUNT(DISTINCT ${legacyCol}) as distinctLegacy FROM ${tableName}`
+  );
+
+  const distinctCanonical = Number(stats?.distinctCanonical || 0);
+  const distinctLegacy = Number(stats?.distinctLegacy || 0);
+
+  if (distinctLegacy > 1 && distinctCanonical <= 1) {
+    // Legacy column has distinct values while canonical has at most 1 distinct value:
+    // canonical column was likely newly added with a default (e.g. 1). Backfill canonical from legacy.
+    await db.execute(`UPDATE ${tableName} SET ${canonicalCol} = ${legacyCol} WHERE ${legacyCol} IS NOT NULL`);
+  } else if (distinctCanonical > 0 && distinctLegacy <= 1) {
+    // Canonical column has distinct values while legacy has at most 1 distinct value:
+    // canonical column is already populated with actual ordering. Keep canonical and sync legacy.
+    await db.execute(`UPDATE ${tableName} SET ${legacyCol} = ${canonicalCol} WHERE ${canonicalCol} IS NOT NULL`);
+  }
+
+  // Ensure any rows with NULL in one column inherit the other column's value
+  try {
+    await db.execute(`UPDATE ${tableName} SET ${canonicalCol} = ${legacyCol} WHERE ${canonicalCol} IS NULL AND ${legacyCol} IS NOT NULL`);
+    await db.execute(`UPDATE ${tableName} SET ${legacyCol} = ${canonicalCol} WHERE ${legacyCol} IS NULL AND ${canonicalCol} IS NOT NULL`);
+  } catch {
+    // Columns might be NOT NULL with no NULL rows; safe to ignore
   }
 }
 
@@ -778,9 +837,9 @@ const migrations: Migration[] = [
       await ensureColumnExists(db, 'diet_meal_option_groups', 'group_order', 'INTEGER NOT NULL DEFAULT 1');
       await ensureColumnExists(db, 'diet_meal_options', 'option_order', 'INTEGER NOT NULL DEFAULT 1');
       await ensureColumnExists(db, 'diet_meal_options', 'fiber_g_snapshot', 'DECIMAL(10,2) NULL');
-      await backfillColumnData(db, 'diet_meals', 'meal_order', 'order_index', 'order_index');
-      await backfillColumnData(db, 'diet_meal_option_groups', 'group_order', 'order_index', 'order_index');
-      await backfillColumnData(db, 'diet_meal_options', 'option_order', 'order_index', 'order_index');
+      await reconcileOrderingColumns(db, 'diet_meals', 'meal_order', 'order_index');
+      await reconcileOrderingColumns(db, 'diet_meal_option_groups', 'group_order', 'order_index');
+      await reconcileOrderingColumns(db, 'diet_meal_options', 'option_order', 'order_index');
 
       // Previous records were created by the hand-rolled HMAC/SPKI flow and
       // cannot be trusted as WebAuthn registrations. Preserve them for
@@ -806,7 +865,7 @@ const migrations: Migration[] = [
       await ensureColumnExists(db, 'workout_plan_exercise_sets', 'rest_seconds', 'INTEGER NULL');
       await ensureColumnExists(db, 'workout_plan_exercise_sets', 'notes', 'VARCHAR(1000) NULL');
 
-      await backfillColumnData(db, 'workout_plan_exercise_sets', 'set_number', 'set_order', 'set_order');
+      await reconcileOrderingColumns(db, 'workout_plan_exercise_sets', 'set_number', 'set_order');
       await backfillColumnData(db, 'workout_plan_exercise_sets', 'target_reps_min', 'reps_min_target', 'reps_min_target');
       await backfillColumnData(db, 'workout_plan_exercise_sets', 'target_reps_max', 'reps_max_target', 'reps_max_target');
       await backfillColumnData(db, 'workout_plan_exercise_sets', 'target_reps_min', 'target_reps', 'target_reps');

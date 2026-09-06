@@ -82,6 +82,58 @@ paths:
                       timestamp: { type: string, format: date-time }
                       database: { type: string, example: "unreachable" }
 
+  /auth/register:
+    post:
+      summary: User Registration / Sign Up
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [firstName, email, password]
+              properties:
+                firstName: { type: string, example: "John" }
+                lastName: { type: string, example: "Doe" }
+                email: { type: string, format: email, example: "user@example.com" }
+                password: { type: string, example: "Secret123!" }
+                phone: { type: string, example: "+1234567890" }
+                gender: { type: string, enum: [male, female, other, prefer_not_to_say] }
+                heightCm: { type: number, example: 178 }
+                timezone: { type: string, example: "America/New_York" }
+                locale: { type: string, example: "en" }
+                deviceName: { type: string, example: "Pixel 8 Pro" }
+      responses:
+        '201':
+          description: Registration successful and session created
+
+  /auth/signup:
+    post:
+      summary: User Registration / Sign Up (Alias)
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [firstName, email, password]
+              properties:
+                firstName: { type: string, example: "John" }
+                lastName: { type: string, example: "Doe" }
+                email: { type: string, format: email, example: "user@example.com" }
+                password: { type: string, example: "Secret123!" }
+                phone: { type: string, example: "+1234567890" }
+                gender: { type: string, enum: [male, female, other, prefer_not_to_say] }
+                heightCm: { type: number, example: 178 }
+                timezone: { type: string, example: "America/New_York" }
+                locale: { type: string, example: "en" }
+                deviceName: { type: string, example: "Pixel 8 Pro" }
+      responses:
+        '201':
+          description: Registration successful and session created
+
   /auth/login:
     post:
       summary: User / Admin Login

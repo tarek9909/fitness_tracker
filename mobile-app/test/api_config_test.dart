@@ -151,5 +151,27 @@ void main() {
       );
       expect(url, 'https://api.fitnessplatform.com:8443/api/v1');
     });
+
+    test('Candidate base URLs contain active LAN IP and reverse proxy ports 3000 & 4000', () {
+      final candidates = ApiConfig.getCandidateBaseUrls();
+      expect(candidates, isNotEmpty);
+      expect(candidates.any((c) => c.contains(':3000/api/v1')), isTrue);
+      expect(candidates.any((c) => c.contains(':4000/api/v1')), isTrue);
+      expect(candidates.any((c) => c.contains('192.168.10.210')), isTrue);
+    });
+
+    test('Setting active working base URL prioritizes it and resolveBaseUrl returns it', () {
+      addTearDown(() => ApiConfig.resetActiveWorkingBaseUrl());
+
+      ApiConfig.setActiveWorkingBaseUrl('http://127.0.0.1:3000/api/v1');
+      expect(ApiConfig.getActiveWorkingBaseUrl(), 'http://127.0.0.1:3000/api/v1');
+      expect(ApiConfig.resolveBaseUrl(), 'http://127.0.0.1:3000/api/v1');
+
+      final candidates = ApiConfig.getCandidateBaseUrls();
+      expect(candidates.first, 'http://127.0.0.1:3000/api/v1');
+
+      ApiConfig.resetActiveWorkingBaseUrl();
+      expect(ApiConfig.getActiveWorkingBaseUrl(), isNull);
+    });
   });
 }

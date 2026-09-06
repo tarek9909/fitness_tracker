@@ -6,6 +6,7 @@ import '../../core/push/push_registration_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../core/widgets/premium_widgets.dart';
+import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -580,12 +581,35 @@ class _LoginScreenState extends State<LoginScreen> {
                             color: colors.textSecondary,
                           ),
                         ),
-                        Text(
-                          'Sign up',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: colors.primary,
+                        InkWell(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => SignUpScreen(
+                                  apiClient: widget.apiClient,
+                                  authSession: widget.authSession,
+                                  pushRegistrationService:
+                                      widget.pushRegistrationService,
+                                  themeController: widget.themeController,
+                                ),
+                              ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(4),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
+                            child: Text(
+                              'Sign up',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: colors.primary,
+                              ),
+                            ),
                           ),
                         ),
                       ],

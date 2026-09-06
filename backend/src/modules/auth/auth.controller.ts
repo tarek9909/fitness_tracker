@@ -5,6 +5,20 @@ import { env } from '../../config/env.js';
 import { generateCsrfToken, setCsrfCookie } from '../../middleware/csrf.js';
 import { recordAuditEvent } from '../../shared/utils/audit-utils.js';
 
+const registerSchema = z.object({
+  firstName: z.string().trim().min(1, 'First name is required').max(100),
+  lastName: z.string().trim().max(100).optional(),
+  email: z.string().trim().email('Invalid email address').max(255),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(128),
+  phone: z.string().trim().max(30).optional(),
+  gender: z.enum(['male', 'female', 'other', 'prefer_not_to_say']).optional(),
+  heightCm: z.number().min(50).max(300).optional(),
+  timezone: z.string().optional(),
+  locale: z.string().optional(),
+  deviceName: z.string().optional(),
+  clientType: z.enum(['web', 'mobile']).optional(),
+});
+
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
@@ -37,6 +51,56 @@ export class AuthController {
     return reply.status(200).send({
       success: true,
       data: { csrfToken },
+    });
+  }
+
+  async register(request: FastifyRequest, reply: FastifyReply) {
+    const body = registerSchema.parse(request.body);
+    const ip = request.ip;
+    const userAgent = request.headers['user-agent'];
+
+    const result = await this.service.register({
+      ...body,
+      ipAddress: ip,
+      userAgent,
+    });
+
+    await recordAuditEvent(request, 'auth.user_registered', 'user', result.user.id, {
+      email: result.user.email,
+      role: result.user.role,
+    });
+
+    // Set HttpOnly Secure SameSite session cookies
+    reply.setCookie('access_token', result.accessToken, {
+      path: '/',
+      httpOnly: true,
+      secure: env.nodeEnv === 'production',
+      sameSite: env.cookieSameSite,
+      maxAge: env.accessTokenTtlSeconds,
+    });
+    reply.setCookie('refresh_token', result.refreshToken, {
+      path: '/api/v1/auth',
+      httpOnly: true,
+      secure: env.nodeEnv === 'production',
+      sameSite: env.cookieSameSite,
+      maxAge: env.refreshTokenTtlDays * 86400,
+    });
+
+    const csrfToken = generateCsrfToken();
+    setCsrfCookie(reply, csrfToken);
+
+    const isWebClient = body.clientType === 'web' || request.headers['x-client-type'] === 'web';
+    const responseData = isWebClient
+      ? {
+          user: result.user,
+          expiresInSeconds: result.expiresInSeconds,
+          csrfToken,
+        }
+      : result;
+
+    return reply.status(201).send({
+      success: true,
+      data: responseData,
     });
   }
 

@@ -5,9 +5,10 @@ import { env } from '../../config/env.js';
 import { getDatabasePool } from '../../database/pool.js';
 import { signAccessToken, generateSecureToken, hashToken } from '../../shared/utils/crypto-utils.js';
 import { UserAuthPayload } from '../../shared/types/index.js';
-import { UnauthorizedError, ForbiddenError, AppError } from '../../shared/errors/app-error.js';
+import { UnauthorizedError, ForbiddenError, AppError, ConflictError } from '../../shared/errors/app-error.js';
 import { otpService } from '../../shared/services/otp.service.js';
 import { logger } from '../../config/logger.js';
+import { UsersRepository } from '../users/users.repository.js';
 
 export interface LoginResult {
   user: {
@@ -24,10 +25,55 @@ export interface LoginResult {
   expiresInSeconds: number;
 }
 
+export interface RegisterData {
+  firstName: string;
+  lastName?: string;
+  email: string;
+  password: string;
+  phone?: string;
+  gender?: string;
+  heightCm?: number;
+  timezone?: string;
+  locale?: string;
+  deviceName?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
 // In-memory test token delivery container (used strictly during automated tests)
 export class AuthService {
   private repo = new AuthRepository();
+  private usersRepo = new UsersRepository();
   private db = getDatabasePool();
+
+  async register(data: RegisterData): Promise<LoginResult> {
+    const normalizedEmail = data.email.toLowerCase().trim();
+    const existing = await this.repo.findUserByEmail(normalizedEmail);
+    if (existing) {
+      throw new ConflictError('Email already in use', 'EMAIL_ALREADY_EXISTS');
+    }
+
+    const passwordHash = await bcrypt.hash(data.password, 10);
+    const userId = await this.usersRepo.createUser({
+      role_id: 3, // Standard user role
+      first_name: data.firstName.trim(),
+      last_name: data.lastName?.trim() || null,
+      email: normalizedEmail,
+      password_hash: passwordHash,
+      phone: data.phone?.trim() || null,
+      height_cm: data.heightCm,
+      gender: data.gender || null,
+      timezone: data.timezone || 'UTC',
+      locale: data.locale || 'en',
+    });
+
+    const user = await this.repo.findUserById(userId);
+    if (!user) {
+      throw new AppError('Failed to initialize user session after registration', 500);
+    }
+
+    return this.issueSession(user, data.deviceName, data.ipAddress, data.userAgent);
+  }
 
   async login(email: string, password: string, deviceName?: string, ipAddress?: string, userAgent?: string): Promise<LoginResult> {
     const user = await this.repo.findUserByEmail(email);
