@@ -133,6 +133,31 @@ describe('Production Environment Configuration & Validation Suite', () => {
     expect(() => validateAndLoadEnv(env)).toThrow(/PASSWORD_RESET_BASE_URL must be configured as a valid https:\/\/ URL/);
   });
 
+  it('Production accepts http:// URLs when ALLOW_INSECURE_HTTP is set to true', () => {
+    const env = {
+      ...validProdBase,
+      ALLOW_INSECURE_HTTP: 'true',
+      PASSWORD_RESET_BASE_URL: 'http://72.61.107.124:8080/reset-password',
+      ADMIN_ALLOWED_ORIGINS: 'http://72.61.107.124:8080',
+      WEBAUTHN_EXPECTED_ORIGINS: 'http://72.61.107.124:8080',
+    };
+    const config = validateAndLoadEnv(env);
+    expect(config.passwordResetBaseUrl).toBe('http://72.61.107.124:8080/reset-password');
+    expect(config.adminAllowedOrigins).toEqual(['http://72.61.107.124:8080']);
+  });
+
+  it('Production falls back WEBAUTHN_EXPECTED_ORIGINS to ADMIN_ALLOWED_ORIGINS if omitted', () => {
+    const env = {
+      ...validProdBase,
+      ALLOW_INSECURE_HTTP: 'true',
+      PASSWORD_RESET_BASE_URL: 'http://72.61.107.124:8080/reset-password',
+      ADMIN_ALLOWED_ORIGINS: 'http://72.61.107.124:8080',
+    };
+    delete (env as any).WEBAUTHN_EXPECTED_ORIGINS;
+    const config = validateAndLoadEnv(env);
+    expect(config.webauthnExpectedOrigins).toEqual(['http://72.61.107.124:8080']);
+  });
+
   it('Validates RATE_LIMIT_MAX with safe defaults and accepts valid values', () => {
     // 1. Defaults to 100 in production when omitted
     const prodConfig = validateAndLoadEnv(validProdBase);

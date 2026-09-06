@@ -225,18 +225,32 @@ export function validateAndLoadEnv(source: Record<string, string | undefined> = 
     ) {
       throw new Error('FATAL: COOKIE_SECRET must be set to a secure 32+ character non-default secret in production');
     }
+    const allowInsecureHttp = source.ALLOW_INSECURE_HTTP === 'true';
     const passwordResetUrlRaw = source.PASSWORD_RESET_BASE_URL;
-    if (isBlankValue(passwordResetUrlRaw) || isPlaceholderValue(passwordResetUrlRaw) || !passwordResetUrlRaw || !passwordResetUrlRaw.startsWith('https://')) {
-      throw new Error('FATAL: PASSWORD_RESET_BASE_URL must be configured as a valid https:// URL in production');
+    if (
+      isBlankValue(passwordResetUrlRaw) ||
+      isPlaceholderValue(passwordResetUrlRaw) ||
+      !passwordResetUrlRaw ||
+      (!allowInsecureHttp && !passwordResetUrlRaw.startsWith('https://')) ||
+      (allowInsecureHttp && !passwordResetUrlRaw.startsWith('https://') && !passwordResetUrlRaw.startsWith('http://'))
+    ) {
+      throw new Error(
+        allowInsecureHttp
+          ? 'FATAL: PASSWORD_RESET_BASE_URL must be configured as a valid http:// or https:// URL in production'
+          : 'FATAL: PASSWORD_RESET_BASE_URL must be configured as a valid https:// URL in production'
+      );
     }
     let parsedResetUrl: URL;
     try {
       parsedResetUrl = new URL(passwordResetUrlRaw);
     } catch {
-      throw new Error(`FATAL: PASSWORD_RESET_BASE_URL must be configured as a valid https:// URL in production (received: "${passwordResetUrlRaw}")`);
+      throw new Error(`FATAL: PASSWORD_RESET_BASE_URL must be configured as a valid ${allowInsecureHttp ? 'http:// or https://' : 'https://'} URL in production (received: "${passwordResetUrlRaw}")`);
     }
-    if (parsedResetUrl.protocol !== 'https:' || !parsedResetUrl.hostname || parsedResetUrl.hostname.trim() === '') {
-      throw new Error(`FATAL: PASSWORD_RESET_BASE_URL must be configured as a valid https:// URL in production (received: "${passwordResetUrlRaw}")`);
+    const isResetProtocolValid = allowInsecureHttp
+      ? parsedResetUrl.protocol === 'https:' || parsedResetUrl.protocol === 'http:'
+      : parsedResetUrl.protocol === 'https:';
+    if (!isResetProtocolValid || !parsedResetUrl.hostname || parsedResetUrl.hostname.trim() === '') {
+      throw new Error(`FATAL: PASSWORD_RESET_BASE_URL must be configured as a valid ${allowInsecureHttp ? 'http:// or https://' : 'https://'} URL in production (received: "${passwordResetUrlRaw}")`);
     }
     if (parsedResetUrl.username || parsedResetUrl.password) {
       throw new Error(`FATAL: PASSWORD_RESET_BASE_URL cannot contain embedded credentials in production (received: "${passwordResetUrlRaw}")`);
@@ -260,17 +274,23 @@ export function validateAndLoadEnv(source: Record<string, string | undefined> = 
       if (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
         throw new Error(`FATAL: ADMIN_ALLOWED_ORIGINS cannot contain unencrypted localhost in production (received: "${origin}")`);
       }
-      if (!origin.startsWith('https://')) {
+      if (!allowInsecureHttp && !origin.startsWith('https://')) {
         throw new Error(`FATAL: ADMIN_ALLOWED_ORIGINS must use HTTPS in production (received: "${origin}")`);
+      }
+      if (allowInsecureHttp && !origin.startsWith('https://') && !origin.startsWith('http://')) {
+        throw new Error(`FATAL: ADMIN_ALLOWED_ORIGINS must use HTTP or HTTPS in production (received: "${origin}")`);
       }
       let originUrl: URL;
       try {
         originUrl = new URL(origin);
       } catch {
-        throw new Error(`FATAL: ADMIN_ALLOWED_ORIGINS contains an invalid HTTPS origin (received: "${origin}")`);
+        throw new Error(`FATAL: ADMIN_ALLOWED_ORIGINS contains an invalid ${allowInsecureHttp ? 'origin' : 'HTTPS origin'} (received: "${origin}")`);
       }
-      if (originUrl.protocol !== 'https:' || !originUrl.hostname) {
-        throw new Error(`FATAL: ADMIN_ALLOWED_ORIGINS must use HTTPS in production (received: "${origin}")`);
+      const isOriginProtocolValid = allowInsecureHttp
+        ? originUrl.protocol === 'https:' || originUrl.protocol === 'http:'
+        : originUrl.protocol === 'https:';
+      if (!isOriginProtocolValid || !originUrl.hostname) {
+        throw new Error(`FATAL: ADMIN_ALLOWED_ORIGINS must use ${allowInsecureHttp ? 'HTTP or HTTPS' : 'HTTPS'} in production (received: "${origin}")`);
       }
       if (isLoopbackHostname(originUrl.hostname)) {
         throw new Error(`FATAL: ADMIN_ALLOWED_ORIGINS cannot use localhost or loopback addresses in production (received: "${origin}")`);
@@ -323,9 +343,12 @@ export function validateAndLoadEnv(source: Record<string, string | undefined> = 
 
   const webauthnRpId = (source.WEBAUTHN_RP_ID || 'localhost').trim();
   const webauthnRpName = (source.WEBAUTHN_RP_NAME || 'Fitness Platform').trim();
-  const webauthnExpectedOrigins = (source.WEBAUTHN_EXPECTED_ORIGINS || (nodeEnvValue === 'production'
-    ? ''
-    : 'http://localhost:5173,http://127.0.0.1:5173,http://localhost'))
+  const webauthnExpectedOrigins = (
+    source.WEBAUTHN_EXPECTED_ORIGINS ||
+    (nodeEnvValue === 'production'
+      ? (source.ADMIN_ALLOWED_ORIGINS || '')
+      : 'http://localhost:5173,http://127.0.0.1:5173,http://localhost')
+  )
     .split(',')
     .map(origin => origin.trim())
     .filter(Boolean);
