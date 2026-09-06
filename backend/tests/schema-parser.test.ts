@@ -7,20 +7,22 @@ describe('Runtime SQL Schema Parser & MySQL Audit Suite', () => {
     const canonicalPath = path.resolve(process.cwd(), '../fitness_tracker.db');
     const audit = auditSchemaDiscrepancies(canonicalPath);
 
-    expect(audit.canonicalTableCount).toBe(52);
+    expect(audit.canonicalTableCount).toBe(55);
     expect(audit.canonicalTables).toContain('users');
     expect(audit.canonicalTables).toContain('roles');
     expect(audit.canonicalTables).toContain('workout_sessions');
     expect(audit.canonicalTables).toContain('workout_sets');
     expect(audit.canonicalTables).toContain('meal_logs');
+    expect(audit.canonicalTables).toContain('user_passkeys');
   });
 
   it('parseSqlTables accurately parses active SQLite schema.ts', () => {
     const audit = auditSchemaDiscrepancies();
 
-    expect(audit.activeTableCount).toBe(53);
+    expect(audit.activeTableCount).toBe(55);
     expect(audit.activeTables).toContain('worker_locks');
-    expect(audit.tablesOnlyInActive).toContain('worker_locks');
+    expect(audit.activeTables).toContain('user_passkeys');
+    expect(audit.tablesOnlyInActive.length).toBe(0);
   });
 
   it('auditSchemaDiscrepancies dynamically evaluates canonical vs active schema consistency', () => {
@@ -29,15 +31,16 @@ describe('Runtime SQL Schema Parser & MySQL Audit Suite', () => {
     // Verify dynamic invariant calculation
     const expectedHarmonized =
       audit.tablesOnlyInCanonical.length === 0 &&
-      audit.tablesOnlyInActive.filter(t => t !== 'worker_locks').length === 0 &&
+      audit.tablesOnlyInActive.length === 0 &&
       audit.columnDiscrepancies.length === 0;
 
     expect(audit.isHarmonized).toBe(expectedHarmonized);
     expect(audit.isHarmonized).toBe(true);
     expect(audit.columnDiscrepancies.length).toBe(0);
     expect(audit.tablesOnlyInCanonical.length).toBe(0);
-    expect(audit.canonicalTableCount).toBe(52);
-    expect(audit.activeTableCount).toBe(53);
+    expect(audit.tablesOnlyInActive.length).toBe(0);
+    expect(audit.canonicalTableCount).toBe(55);
+    expect(audit.activeTableCount).toBe(55);
   });
 
   it('runMySQLIntegrationTests successfully passes SCHEMA_AUDIT stage and either completes or fails closed at CONNECTION stage', async () => {

@@ -868,6 +868,31 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS user_passkeys (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    credential_id VARCHAR(255) NOT NULL UNIQUE,
+    public_key TEXT NOT NULL,
+    credential_format VARCHAR(30) NOT NULL DEFAULT 'webauthn-cose',
+    counter INTEGER NOT NULL DEFAULT 0,
+    device_name VARCHAR(150) NOT NULL,
+    transports VARCHAR(255) NULL,
+    aaguid VARCHAR(64) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_used_at DATETIME NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS auth_webauthn_challenges (
+    id VARCHAR(100) PRIMARY KEY,
+    user_id INTEGER NULL,
+    challenge VARCHAR(255) NOT NULL,
+    ceremony_type VARCHAR(30) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS worker_locks (
     worker_name VARCHAR(100) PRIMARY KEY,
     locked_until TIMESTAMP NOT NULL,

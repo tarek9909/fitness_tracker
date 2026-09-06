@@ -2759,5 +2759,54 @@ FROM body_weight_entries;
 
 
 -- =====================================================================
--- END OF INITIAL SCHEMA
+-- 56. USER PASSKEYS (WEBAUTHN / BIOMETRICS)
 -- =====================================================================
+
+CREATE TABLE IF NOT EXISTS user_passkeys (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    credential_id VARCHAR(255) NOT NULL,
+    public_key TEXT NOT NULL,
+    credential_format VARCHAR(30) NOT NULL DEFAULT 'webauthn-cose',
+    counter BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    device_name VARCHAR(150) NOT NULL,
+    transports VARCHAR(255) NULL,
+    aaguid VARCHAR(64) NULL,
+    created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    last_used_at TIMESTAMP(3) NULL,
+    CONSTRAINT uq_passkeys_credential_id UNIQUE (credential_id),
+    CONSTRAINT fk_passkeys_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_passkeys_user (user_id)
+) ENGINE=InnoDB;
+
+-- =====================================================================
+-- 57. WEBAUTHN CHALLENGES
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS auth_webauthn_challenges (
+    id VARCHAR(100) PRIMARY KEY,
+    user_id BIGINT UNSIGNED NULL,
+    challenge VARCHAR(255) NOT NULL,
+    ceremony_type VARCHAR(30) NOT NULL,
+    expires_at TIMESTAMP(3) NOT NULL,
+    created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    CONSTRAINT fk_webauthn_challenges_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_webauthn_challenges_exp (expires_at)
+) ENGINE=InnoDB;
+
+-- =====================================================================
+-- 58. WORKER LOCKS
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS worker_locks (
+    worker_name VARCHAR(100) PRIMARY KEY,
+    locked_until DATETIME(3) NOT NULL,
+    locked_by VARCHAR(255) NOT NULL,
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+) ENGINE=InnoDB;
+
+
+
+-- =====================================================================
+-- END OF INITIAL SCHEMA
+-- =====================================================================

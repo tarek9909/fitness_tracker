@@ -24,7 +24,8 @@
     "seed": "tsx src/database/seed.ts",
     "migrate": "tsx src/database/migrate.ts",
     "migrate:prod": "node dist/database/migrate.js",
-    "reset:dev": "tsx src/scripts/reset-dev-db.ts"
+    "reset:dev": "tsx src/scripts/reset-dev-db.ts",
+    "db:dump": "tsx src/scripts/export-database-dump.ts"
   },
   "keywords": [
     "fitness",

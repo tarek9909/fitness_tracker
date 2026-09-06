@@ -23,8 +23,9 @@ build/
 **/tests/.tmp/
 *.log
 
-# Explicitly preserve authoritative MySQL canonical dump
+# Explicitly preserve authoritative MySQL canonical dump & seed export
 !**/fitness_tracker.db
 !**/fitness_tracker.sql
+!**/fitness_tracker_dump.sql
 
 
