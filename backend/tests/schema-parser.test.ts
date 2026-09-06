@@ -40,14 +40,18 @@ describe('Runtime SQL Schema Parser & MySQL Audit Suite', () => {
     expect(audit.activeTableCount).toBe(53);
   });
 
-  it('runMySQLIntegrationTests successfully passes SCHEMA_AUDIT stage and fails closed at CONNECTION stage without live credentials', async () => {
+  it('runMySQLIntegrationTests successfully passes SCHEMA_AUDIT stage and either completes or fails closed at CONNECTION stage', async () => {
     const { runMySQLIntegrationTests } = await import('./mysql-integration.js');
     const result = await runMySQLIntegrationTests();
 
-    expect(result.success).toBe(false);
-    expect(result.stage).toBe('CONNECTION');
     expect(result.report).toBeDefined();
     expect(result.report?.isHarmonized).toBe(true);
     expect(result.report?.columnDiscrepancies.length).toBe(0);
+    expect(['CONNECTION', 'COMPLETED']).toContain(result.stage);
+    if (result.stage === 'CONNECTION') {
+      expect(result.success).toBe(false);
+    } else {
+      expect(result.success).toBe(true);
+    }
   });
 });

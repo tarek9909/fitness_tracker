@@ -1,4 +1,4 @@
-# Proguard rules for Fitness Platform Mobile App
+# Proguard rules for Kinetic Wellness Mobile App
 
 # Keep flutter_secure_storage classes and hardware keystore encryption helpers
 -keep class androidx.security.crypto.** { *; }

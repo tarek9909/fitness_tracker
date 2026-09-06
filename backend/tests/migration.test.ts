@@ -4,10 +4,13 @@ import path from 'path';
 import fs from 'fs';
 import { runMigrations } from '../src/database/migrate.js';
 import { getDatabasePool, resetDatabasePool, closeDatabasePool } from '../src/database/pool.js';
+import { env } from '../src/config/env.js';
 
 describe('Legacy Schema Migration & Data Backfill Test Suite', () => {
   const testDbDir = path.resolve(process.cwd(), 'tests/.tmp');
   const testDbPath = path.resolve(testDbDir, `migration_legacy_test_${Date.now()}.db`);
+  const origDbClient = env.dbClient;
+  const origSqliteDbPath = env.sqliteDbPath;
 
   beforeEach(async () => {
     if (!fs.existsSync(testDbDir)) {
@@ -18,11 +21,15 @@ describe('Legacy Schema Migration & Data Backfill Test Suite', () => {
     }
     process.env.SQLITE_DB_PATH = testDbPath;
     process.env.DB_CLIENT = 'sqlite';
+    env.sqliteDbPath = testDbPath;
+    env.dbClient = 'sqlite';
     resetDatabasePool();
   });
 
   afterEach(async () => {
     await closeDatabasePool();
+    env.dbClient = origDbClient;
+    env.sqliteDbPath = origSqliteDbPath;
     resetDatabasePool();
     if (fs.existsSync(testDbPath)) {
       try {

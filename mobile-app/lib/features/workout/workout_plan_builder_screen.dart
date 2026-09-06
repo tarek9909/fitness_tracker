@@ -87,7 +87,9 @@ class _WorkoutPlanBuilderScreenState extends State<WorkoutPlanBuilderScreen> {
       final versionId = _asInt(version?['id']);
       if (versionId != null) {
         final detail = await widget.apiClient.get('/me/workout-plans/${widget.planId}/versions/$versionId');
-        if (detail is Map && detail['data'] is Map) version = Map<String, dynamic>.from(detail['data'] as Map);
+        if (detail is Map) {
+          version = Map<String, dynamic>.from(detail['data'] is Map ? detail['data'] as Map : detail);
+        }
       }
       plan['version'] = version;
       if (mounted) setState(() { _plan = plan; _loading = false; });
@@ -122,7 +124,6 @@ class _WorkoutPlanBuilderScreenState extends State<WorkoutPlanBuilderScreen> {
       'description': description.text.trim(),
       'goalCategory': goal.text.trim(),
     };
-    name.dispose(); description.dispose(); goal.dispose();
     if (saved != true) return;
     await _mutate(() async {
       await widget.apiClient.patch('/me/workout-plans/${widget.planId}', body: payload);
@@ -195,7 +196,6 @@ class _WorkoutPlanBuilderScreenState extends State<WorkoutPlanBuilderScreen> {
     );
     final dayId = _asInt(existing?['id']);
     final payload = {'name': name.text.trim(), 'isRestDay': rest, 'notes': notes.text.trim(), 'orderIndex': _asInt(existing?['order_index']) ?? weekday};
-    name.dispose(); notes.dispose();
     if (saved != true || payload['name'] == '') return;
     await _mutate(() async {
       if (dayId == null) {
@@ -231,6 +231,7 @@ class _WorkoutPlanBuilderScreenState extends State<WorkoutPlanBuilderScreen> {
       final response = await widget.apiClient.get('/exercises');
       library = response is Map && response['data'] is List ? response['data'] as List : response is List ? response : [];
     } catch (_) {}
+    if (!mounted) return;
     var selectedExercise = _asInt(existing?['exercise_id']) ?? (library.isNotEmpty ? _asInt(library.first['id']) : null);
     final sets = _asInt(existing?['target_sets']) ?? ((existing?['sets'] as List?)?.length ?? 3);
     final repsMin = TextEditingController(text: '${existing?['target_reps_min'] ?? existing?['reps_min'] ?? 8}');
@@ -262,8 +263,12 @@ class _WorkoutPlanBuilderScreenState extends State<WorkoutPlanBuilderScreen> {
         return StatefulBuilder(builder: (context, setState) {
           void resizeSets(int count) {
             count = count.clamp(1, 50);
-            while (drafts.length < count) drafts.add(_WorkoutSetDraft(repsMin: repsMin.text, repsMax: repsMax.text, rest: rest.text));
-            while (drafts.length > count) drafts.removeLast().dispose();
+            while (drafts.length < count) {
+              drafts.add(_WorkoutSetDraft(repsMin: repsMin.text, repsMax: repsMax.text, rest: rest.text));
+            }
+            while (drafts.length > count) {
+              drafts.removeLast().dispose();
+            }
             setState(() {});
           }
           return AlertDialog(
@@ -326,8 +331,6 @@ class _WorkoutPlanBuilderScreenState extends State<WorkoutPlanBuilderScreen> {
       }).toList(),
     };
     final exerciseId = _asInt(existing?['id']);
-    for (final draft in drafts) draft.dispose();
-    setsController.dispose(); repsMin.dispose(); repsMax.dispose(); duration.dispose(); distance.dispose(); rest.dispose(); notes.dispose();
     if (saved != true || selectedExercise == null) return;
     await _mutate(() async {
       if (exerciseId == null) {
@@ -369,6 +372,7 @@ class _WorkoutPlanBuilderScreenState extends State<WorkoutPlanBuilderScreen> {
       actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Activate'))],
     ));
     if (confirmed != true || version?['status'] != 'published') return;
+    if (!mounted) return;
     final date = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 1825)));
     if (date == null) return;
     final value = '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
@@ -412,7 +416,20 @@ class _WorkoutPlanBuilderScreenState extends State<WorkoutPlanBuilderScreen> {
               final setCount = exercise['target_sets'] ?? (exercise['sets'] as List?)?.length ?? 0;
               final reps = exercise['target_reps_min'] ?? exercise['reps_min'];
               final maxReps = exercise['target_reps_max'] ?? exercise['reps_max'];
-              return ListTile(contentPadding: EdgeInsets.zero, title: Text('${exercise['exercise_name'] ?? exercise['name'] ?? 'Exercise'}${exercise['is_optional'] == 1 ? ' (optional)' : ''}'), subtitle: Text('$setCount sets • ${reps ?? '-'}${maxReps != null ? '-$maxReps' : ''} reps${exercise['target_duration_seconds'] != null ? ' • ${exercise['target_duration_seconds']} sec' : ''}'), leading: Column(mainAxisAlignment: MainAxisAlignment.center, children: [IconButton(icon: const Icon(Icons.arrow_upward, size: 16), onPressed: () => _reorderExercise(day, index, -1)), IconButton(icon: const Icon(Icons.arrow_downward, size: 16), onPressed: () => _reorderExercise(day, index, 1))]), trailing: Wrap(children: [IconButton(onPressed: dayId == null ? null : () => _editExercise(dayId, existing: exercise), icon: const Icon(Icons.edit_outlined)), IconButton(onPressed: () => _deleteExercise(exercise), icon: Icon(Icons.delete_outline, color: colors.rose))]));
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text('${exercise['exercise_name'] ?? exercise['name'] ?? 'Exercise'}${exercise['is_optional'] == 1 ? ' (optional)' : ''}'),
+                subtitle: Text('$setCount sets • ${reps ?? '-'}${maxReps != null ? '-$maxReps' : ''} reps${exercise['target_duration_seconds'] != null ? ' • ${exercise['target_duration_seconds']} sec' : ''}'),
+                leading: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(visualDensity: VisualDensity.compact, padding: EdgeInsets.zero, constraints: const BoxConstraints(), icon: const Icon(Icons.arrow_upward, size: 16), onPressed: () => _reorderExercise(day, index, -1)),
+                    const SizedBox(width: 4),
+                    IconButton(visualDensity: VisualDensity.compact, padding: EdgeInsets.zero, constraints: const BoxConstraints(), icon: const Icon(Icons.arrow_downward, size: 16), onPressed: () => _reorderExercise(day, index, 1)),
+                  ],
+                ),
+                trailing: Wrap(children: [IconButton(onPressed: dayId == null ? null : () => _editExercise(dayId, existing: exercise), icon: const Icon(Icons.edit_outlined)), IconButton(onPressed: () => _deleteExercise(exercise), icon: Icon(Icons.delete_outline, color: colors.rose))]),
+              );
             }) else Padding(padding: const EdgeInsets.all(8), child: Text('Rest day — no exercises scheduled.', style: TextStyle(color: colors.textMuted))),
           ])));
         }),

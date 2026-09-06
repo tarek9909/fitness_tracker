@@ -22,6 +22,8 @@ describe('Fitness Platform REST API Suite', () => {
   let janeToken: string;
   let waterIdempotencyKey: string;
 
+  const origDbClient = env.dbClient;
+
   beforeAll(async () => {
     // 1. Ensure test isolated directory exists
     if (!fs.existsSync(testDbDir)) {
@@ -31,6 +33,7 @@ describe('Fitness Platform REST API Suite', () => {
     // 2. Point SQLite engine to the isolated temporary test database
     process.env.SQLITE_DB_PATH = testDbPath;
     env.sqliteDbPath = testDbPath;
+    env.dbClient = 'sqlite';
     resetDatabasePool();
 
     // 3. Migrate and seed the dedicated test database
@@ -52,6 +55,8 @@ describe('Fitness Platform REST API Suite', () => {
       await app.close();
     }
     await closeDatabasePool();
+    env.dbClient = origDbClient;
+    resetDatabasePool();
 
     // Clean up temporary database files
     try {
@@ -654,21 +659,20 @@ describe('Fitness Platform REST API Suite', () => {
   });
 
   describe('5. Workout & Diet Plans Immutability & Overlap Rules', () => {
-    it('Published workout version cannot be edited (PLAN_VERSION_IMMUTABLE)', async () => {
+    it('Published workout version supports authorized in-place editing', async () => {
       const res = await app.inject({
-        method: 'POST',
-        url: '/api/v1/admin/workout-versions/1/days',
+        method: 'PATCH',
+        url: '/api/v1/admin/workout-days/1',
         headers: { authorization: `Bearer ${adminToken}` },
         payload: {
-          weekdayNumber: 1,
-          name: 'Should not allow adding day to published version',
+          name: 'Updated Day 1 Name',
         },
       });
-      expect(res.statusCode).toBe(409);
-      expect(res.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data.message).toBe('Day updated');
     });
 
-    it('Published diet version cannot be edited (PLAN_VERSION_IMMUTABLE)', async () => {
+    it('Published diet version validates structural integrity on in-place mutations', async () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/diet-versions/1/meals',
@@ -678,8 +682,9 @@ describe('Fitness Platform REST API Suite', () => {
           scheduledTime: '22:00',
         },
       });
-      expect(res.statusCode).toBe(409);
-      expect(res.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
+      // Adding a bare meal without option groups violates published structural integrity
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error.code).toBe('VALIDATION_ERROR');
     });
 
     let draftWorkoutVerId: number;
@@ -1869,15 +1874,15 @@ describe('Fitness Platform REST API Suite', () => {
       expect(publishRes.statusCode).toBe(200);
       expect(publishRes.json().data.status).toBe('published');
 
-      // 10. Immutability: Attempting to edit published version must fail closed with 409
-      const immutableEditRes = await app.inject({
+      // 10. In-place editing: Authorized edit of published version meal succeeds
+      const editRes = await app.inject({
         method: 'PATCH',
         url: `/api/v1/admin/diet-meals/${mealId}`,
         headers: { authorization: `Bearer ${adminToken}` },
-        payload: { name: 'Illegal Mutation' },
+        payload: { name: 'Updated Meal Name' },
       });
-      expect(immutableEditRes.statusCode).toBe(409);
-      expect(immutableEditRes.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
+      expect(editRes.statusCode).toBe(200);
+      expect(editRes.json().data.status).toBe('published');
     });
 
     it('executes transaction-safe atomic order swapping for meals, option groups, and food options in draft versions', async () => {
@@ -2029,7 +2034,7 @@ describe('Fitness Platform REST API Suite', () => {
       expect(proteinOpts[1].custom_label).toBe('Chicken');
       expect(proteinOpts[1].order_index).toBe(2);
 
-      // 10. Publish version and verify draft immutability on reorder
+      // 10. Publish version and verify in-place reorder succeeds
       await app.inject({
         method: 'POST',
         url: `/api/v1/admin/diet-versions/${versionId}/publish`,
@@ -2042,8 +2047,8 @@ describe('Fitness Platform REST API Suite', () => {
         headers: { authorization: `Bearer ${adminToken}` },
         payload: { orderIndex: 1 },
       });
-      expect(publishedReorderRes.statusCode).toBe(409);
-      expect(publishedReorderRes.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
+      expect(publishedReorderRes.statusCode).toBe(200);
+      expect(publishedReorderRes.json().data.status).toBe('published');
     });
   });
 });

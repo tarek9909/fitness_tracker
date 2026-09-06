@@ -18,6 +18,7 @@ describe('Self-Service Configuration & Security Test Suite', () => {
   let janeToken: string;
   let userId: number;
   let janeId: number;
+  const origDbClient = env.dbClient;
 
   beforeAll(async () => {
     if (!fs.existsSync(testDbDir)) {
@@ -26,6 +27,7 @@ describe('Self-Service Configuration & Security Test Suite', () => {
 
     process.env.SQLITE_DB_PATH = testDbPath;
     env.sqliteDbPath = testDbPath;
+    env.dbClient = 'sqlite';
     resetDatabasePool();
 
     await runMigrations();
@@ -71,6 +73,8 @@ describe('Self-Service Configuration & Security Test Suite', () => {
   afterAll(async () => {
     if (app) await app.close();
     await closeDatabasePool();
+    env.dbClient = origDbClient;
+    resetDatabasePool();
     if (fs.existsSync(testDbPath)) {
       try { fs.unlinkSync(testDbPath); } catch {}
     }

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Kinetic Wellness app icon</title>
+  <desc id="desc">A white dumbbell inside a circle on a cyan and navy gradient.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#32B8E6"/>
+      <stop offset="1" stop-color="#0A4D8A"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#background)"/>
+  <circle cx="512" cy="512" r="312" fill="#FFFFFF"/>
+  <g fill="#0B315C">
+    <rect x="340" y="474" width="344" height="76" rx="38"/>
+    <rect x="255" y="374" width="76" height="276" rx="25"/>
+    <rect x="337" y="414" width="54" height="196" rx="19"/>
+    <rect x="693" y="374" width="76" height="276" rx="25"/>
+    <rect x="633" y="414" width="54" height="196" rx="19"/>
+  </g>
+  <circle cx="512" cy="512" r="21" fill="#32B8E6"/>
+</svg>

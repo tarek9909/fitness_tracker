@@ -1,16 +1,24 @@
 import crypto from 'node:crypto';
-import { describe, it, expect, beforeAll } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { encodeCBOR } from '@levischuck/tiny-cbor';
 import { buildApp } from '../src/app/app.js';
 import { runMigrations } from '../src/database/migrate.js';
-import { getDatabasePool } from '../src/database/pool.js';
+import { seedDatabase } from '../src/database/seed.js';
+import { getDatabasePool, closeDatabasePool, resetDatabasePool } from '../src/database/pool.js';
 import { FastifyInstance } from 'fastify';
+import { env } from '../src/config/env.js';
+
+const testDbDir = path.resolve(process.cwd(), 'tests', '.tmp');
+const testDbPath = path.resolve(testDbDir, `passkey_auth_${process.pid}_${Date.now()}.db`);
 
 describe('Passkey (FIDO2 / WebAuthn) Authentication Test Suite', () => {
   let app: FastifyInstance;
   let testUserToken: string;
   let testUserId: number;
   const testEmail = 'passkey_test_user@fitnessplatform.com';
+  const origDbClient = env.dbClient;
 
   // Generate an EC P-256 keypair and complete WebAuthn binary responses to
   // exercise the same standard contract used by browsers and native bridges.
@@ -70,16 +78,69 @@ describe('Passkey (FIDO2 / WebAuthn) Authentication Test Suite', () => {
     };
   };
 
+  const customWebAuthnResponse = (
+    challenge: string,
+    counter: number,
+    overrides?: {
+      origin?: string;
+      rpId?: string;
+      flags?: number;
+      corruptSig?: boolean;
+      credentialId?: string;
+    }
+  ) => {
+    const origin = overrides?.origin ?? 'http://localhost';
+    const clientDataJSON = Buffer.from(JSON.stringify({ type: 'webauthn.get', challenge, origin }));
+    const rpIdHash = crypto.createHash('sha256').update(overrides?.rpId ?? 'localhost').digest();
+    const authData = Buffer.alloc(37);
+    rpIdHash.copy(authData, 0);
+    authData[32] = overrides?.flags !== undefined ? overrides.flags : 0x01;
+    authData.writeUInt32BE(counter, 33);
+
+    const signedData = Buffer.concat([
+      authData,
+      crypto.createHash('sha256').update(clientDataJSON).digest(),
+    ]);
+    let signature = crypto.createSign('SHA256').update(signedData).sign(privateKey);
+    if (overrides?.corruptSig) {
+      const copy = Buffer.from(signature);
+      copy[copy.length - 1] ^= 0xff;
+      signature = copy;
+    }
+    const credId = overrides?.credentialId ?? testCredentialId;
+    return {
+      id: credId,
+      rawId: credId,
+      type: 'public-key',
+      clientExtensionResults: {},
+      response: {
+        clientDataJSON: clientDataJSON.toString('base64url'),
+        authenticatorData: authData.toString('base64url'),
+        signature: signature.toString('base64url'),
+      },
+    };
+  };
+
   beforeAll(async () => {
+    if (!fs.existsSync(testDbDir)) {
+      fs.mkdirSync(testDbDir, { recursive: true });
+    }
+
+    process.env.SQLITE_DB_PATH = testDbPath;
+    env.sqliteDbPath = testDbPath;
+    env.dbClient = 'sqlite';
+    resetDatabasePool();
+
     await runMigrations();
+    await seedDatabase();
     const db = getDatabasePool();
 
     // Ensure test user exists
+    const bcryptModule = await import('bcryptjs');
+    const bcrypt = bcryptModule.default || bcryptModule;
+    const passHash = await bcrypt.hash('Password123!', 10);
     const existing = await db.queryOne<any>('SELECT id FROM users WHERE email = ?', [testEmail]);
     if (!existing) {
-      const bcryptModule = await import('bcryptjs');
-      const bcrypt = bcryptModule.default || bcryptModule;
-      const passHash = await bcrypt.hash('Password123!', 10);
       const res = await db.execute(
         `INSERT INTO users (role_id, first_name, last_name, email, password_hash, status)
          VALUES (3, 'Passkey', 'Tester', ?, ?, 'active')`,
@@ -88,6 +149,7 @@ describe('Passkey (FIDO2 / WebAuthn) Authentication Test Suite', () => {
       testUserId = res.insertId;
     } else {
       testUserId = existing.id;
+      await db.execute('UPDATE users SET password_hash = ? WHERE id = ?', [passHash, testUserId]);
     }
 
     app = await buildApp();
@@ -245,7 +307,141 @@ describe('Passkey (FIDO2 / WebAuthn) Authentication Test Suite', () => {
     expect(replayRes.statusCode).toBe(401);
   });
 
-  it('5. Passkey Management: lists user passkeys and allows revocation', async () => {
+  it('5. Adversarial WebAuthn Security: verifies rejection of malformed payloads, wrong origins, wrong RP IDs, invalid flags, unknown credentials, invalid signatures, counter rollback, and expired challenges', async () => {
+    // A. Malformed payload rejected with 400
+    const malformedRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-verify',
+      payload: {
+        challengeId: 'some-challenge-id',
+        response: { id: testCredentialId },
+      },
+    });
+    expect(malformedRes.statusCode).toBe(400);
+
+    // B. Wrong origin rejected with 401 SIGNATURE_INVALID
+    const optOrigin = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-options',
+      payload: { email: testEmail },
+    });
+    const wrongOriginRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-verify',
+      payload: {
+        challengeId: optOrigin.json().data.challengeId,
+        response: customWebAuthnResponse(optOrigin.json().data.challenge, 2, { origin: 'https://phishing-attacker.com' }),
+      },
+    });
+    expect(wrongOriginRes.statusCode).toBe(401);
+    expect(wrongOriginRes.json().error.code).toBe('SIGNATURE_INVALID');
+
+    // C. Wrong RP ID rejected with 401 SIGNATURE_INVALID
+    const optRp = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-options',
+      payload: { email: testEmail },
+    });
+    const wrongRpRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-verify',
+      payload: {
+        challengeId: optRp.json().data.challengeId,
+        response: customWebAuthnResponse(optRp.json().data.challenge, 2, { rpId: 'attacker.example.com' }),
+      },
+    });
+    expect(wrongRpRes.statusCode).toBe(401);
+    expect(wrongRpRes.json().error.code).toBe('SIGNATURE_INVALID');
+
+    // D. Invalid flags (UP flag bit 0 cleared) rejected with 401 SIGNATURE_INVALID
+    const optFlags = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-options',
+      payload: { email: testEmail },
+    });
+    const invalidFlagsRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-verify',
+      payload: {
+        challengeId: optFlags.json().data.challengeId,
+        response: customWebAuthnResponse(optFlags.json().data.challenge, 2, { flags: 0x00 }),
+      },
+    });
+    expect(invalidFlagsRes.statusCode).toBe(401);
+    expect(invalidFlagsRes.json().error.code).toBe('SIGNATURE_INVALID');
+
+    // E. Unknown credential rejected with 401 UNKNOWN_CREDENTIAL
+    const optUnknown = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-options',
+      payload: { email: testEmail },
+    });
+    const unknownCredRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-verify',
+      payload: {
+        challengeId: optUnknown.json().data.challengeId,
+        response: customWebAuthnResponse(optUnknown.json().data.challenge, 2, { credentialId: 'unregistered-credential-id-999' }),
+      },
+    });
+    expect(unknownCredRes.statusCode).toBe(401);
+    expect(unknownCredRes.json().error.code).toBe('UNKNOWN_CREDENTIAL');
+
+    // F. Invalid signature rejected with 401 SIGNATURE_INVALID
+    const optSig = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-options',
+      payload: { email: testEmail },
+    });
+    const invalidSigRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-verify',
+      payload: {
+        challengeId: optSig.json().data.challengeId,
+        response: customWebAuthnResponse(optSig.json().data.challenge, 2, { corruptSig: true }),
+      },
+    });
+    expect(invalidSigRes.statusCode).toBe(401);
+    expect(invalidSigRes.json().error.code).toBe('SIGNATURE_INVALID');
+
+    // G. Counter rollback / clone detection: counter 1 <= stored counter 1 rejected with 401 SIGNATURE_INVALID
+    const optCounter = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-options',
+      payload: { email: testEmail },
+    });
+    const rollbackRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-verify',
+      payload: {
+        challengeId: optCounter.json().data.challengeId,
+        response: customWebAuthnResponse(optCounter.json().data.challenge, 1),
+      },
+    });
+    expect(rollbackRes.statusCode).toBe(401);
+    expect(rollbackRes.json().error.code).toBe('SIGNATURE_INVALID');
+
+    // H. Expired challenge rejected with 401 CHALLENGE_EXPIRED
+    const db = getDatabasePool();
+    const expiredId = crypto.randomUUID();
+    await db.execute(
+      `INSERT INTO auth_webauthn_challenges (id, user_id, challenge, ceremony_type, expires_at)
+       VALUES (?, ?, 'expired-challenge-token', 'authentication', ?)`,
+      [expiredId, testUserId, new Date(Date.now() - 300000)],
+    );
+    const expiredRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/passkey/login-verify',
+      payload: {
+        challengeId: expiredId,
+        response: customWebAuthnResponse('expired-challenge-token', 5),
+      },
+    });
+    expect(expiredRes.statusCode).toBe(401);
+    expect(expiredRes.json().error.code).toBe('CHALLENGE_EXPIRED');
+  });
+
+  it('6. Passkey Management: lists user passkeys and allows revocation', async () => {
     // Legacy HMAC records are retained for visibility but can never be used
     // as WebAuthn credentials after the cryptographic migration.
     const db = getDatabasePool();
@@ -273,7 +469,7 @@ describe('Passkey (FIDO2 / WebAuthn) Authentication Test Suite', () => {
           rawId: legacyCredentialId,
           type: 'public-key',
           clientExtensionResults: {},
-          response: { clientDataJSON: '', authenticatorData: '', signature: '' },
+          response: { clientDataJSON: 'dGVzdA', authenticatorData: 'dGVzdA', signature: 'dGVzdA' },
         },
       },
     });
@@ -309,5 +505,23 @@ describe('Passkey (FIDO2 / WebAuthn) Authentication Test Suite', () => {
       headers: { authorization: `Bearer ${testUserToken}` },
     });
     expect(listRes2.json().data.some((p: any) => p.credentialId === testCredentialId)).toBe(false);
+  });
+
+  afterAll(async () => {
+    if (app) {
+      await app.close();
+    }
+    await closeDatabasePool();
+    env.dbClient = origDbClient;
+    resetDatabasePool();
+
+    try {
+      const filesToDelete = [testDbPath, `${testDbPath}-wal`, `${testDbPath}-shm`];
+      for (const file of filesToDelete) {
+        if (fs.existsSync(file)) fs.unlinkSync(file);
+      }
+    } catch {
+      // Ignore cleanup error
+    }
   });
 });

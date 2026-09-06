@@ -428,6 +428,15 @@ export class WorkoutPlanService {
       const exerciseName = exercise?.name || 'Exercise';
       const trackingType = exercise?.tracking_type || 'weight_reps';
 
+      let orderIndex = data.orderIndex;
+      if (orderIndex === undefined || orderIndex === null) {
+        const maxRes = await conn.queryOne<{ max_order: number | null }>(
+          'SELECT MAX(exercise_order) as max_order FROM workout_plan_exercises WHERE workout_plan_day_id = ?',
+          [dayId]
+        );
+        orderIndex = (maxRes?.max_order ?? 0) + 1;
+      }
+
       const res = await conn.execute(
         `INSERT INTO workout_plan_exercises (
           workout_plan_day_id, exercise_id, exercise_order, exercise_name_snapshot, tracking_type_snapshot,
@@ -437,7 +446,7 @@ export class WorkoutPlanService {
         [
           dayId,
           data.exerciseId,
-          data.orderIndex ?? 1,
+          orderIndex,
           exerciseName,
           trackingType,
           data.targetSets,

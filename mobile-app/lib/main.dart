@@ -245,6 +245,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         now.difference(lastBackPressAt) <= const Duration(seconds: 2)) {
       _backExitTimer?.cancel();
       _backExitTimer = null;
+      _lastBackPressAt = null;
       SystemNavigator.pop();
       return;
     }
@@ -1046,7 +1047,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               context: context,
               title: 'Sign Out',
               content: Text(
-                'Are you sure you want to sign out of Fitness OS? Any unsynchronized offline mutations will be cleared.',
+                'Are you sure you want to sign out of Kinetic Wellness? Any unsynchronized offline mutations will be cleared.',
                 style: TextStyle(
                   fontSize: 14,
                   color: colors.textSecondary,

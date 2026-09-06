@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Static and baseline Design Tokens for the Fitness OS Mobile App.
+/// Static and baseline design tokens for the Kinetic Wellness mobile app.
 /// Pure Monochrome Architectural Design System.
 class AppColors {
   // Dark Palette (Monochrome Architectural - Obsidian & Titanium)

@@ -16,18 +16,26 @@ describe('Backend Production Hardening Suite', () => {
   let adminToken: string;
   let userToken: string;
   const testUserId = 2;
+  const origDbClient = env.dbClient;
 
   beforeAll(async () => {
     if (!fs.existsSync(testDbDir)) {
       fs.mkdirSync(testDbDir, { recursive: true });
     }
 
+    env.dbClient = 'sqlite';
     process.env.SQLITE_DB_PATH = testDbPath;
     env.sqliteDbPath = testDbPath;
     resetDatabasePool();
 
     await runMigrations();
     await seedDatabase();
+
+    const bcryptModule = await import('bcryptjs');
+    const bcrypt = bcryptModule.default || bcryptModule;
+    const userHash = await bcrypt.hash('User123!', 10);
+    const db = getDatabasePool();
+    await db.execute('UPDATE users SET password_hash = ? WHERE email = ?', [userHash, 'john.doe@fitnessplatform.com']);
 
     app = await buildApp();
     await app.ready();
@@ -62,6 +70,8 @@ describe('Backend Production Hardening Suite', () => {
   afterAll(async () => {
     await app.close();
     await closeDatabasePool();
+    env.dbClient = origDbClient;
+    resetDatabasePool();
     if (fs.existsSync(testDbPath)) {
       try { fs.unlinkSync(testDbPath); } catch {}
     }
@@ -123,22 +133,38 @@ describe('Backend Production Hardening Suite', () => {
       expect(pubRes.json().data.status).toBe('published');
     });
 
-    it('rejects adding new day to published workout version with 409 PLAN_VERSION_IMMUTABLE', async () => {
+    it('allows authorized in-place addition of a day to published workout version', async () => {
+      // Version 1 already has 7 days (1..7). Delete Day 7 (rest day) first so weekday 7 can be added.
+      const versionDetailsRes = await app.inject({
+        method: 'GET',
+        url: `/api/v1/admin/workout-versions/${versionId}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      const days = versionDetailsRes.json().data.days;
+      const day7 = days.find((d: any) => d.weekday === 7);
+      if (day7) {
+        const delRes = await app.inject({
+          method: 'DELETE',
+          url: `/api/v1/admin/workout-days/${day7.id}`,
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+        expect(delRes.statusCode).toBe(200);
+      }
+
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/admin/workout-versions/${versionId}/days`,
         headers: { authorization: `Bearer ${adminToken}` },
         payload: {
-          weekdayNumber: 1,
-          name: 'Extra Monday',
-          isRestDay: false,
+          weekdayNumber: 7,
+          name: 'Extra Recovery Day',
+          isRestDay: true,
         },
       });
-      expect(res.statusCode).toBe(409);
-      expect(res.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
+      expect(res.statusCode).toBe(201);
     });
 
-    it('rejects updating day belonging to published workout version with 409 PLAN_VERSION_IMMUTABLE', async () => {
+    it('allows authorized in-place update of day in published workout version', async () => {
       const res = await app.inject({
         method: 'PATCH',
         url: `/api/v1/admin/workout-days/${dayId}`,
@@ -147,21 +173,10 @@ describe('Backend Production Hardening Suite', () => {
           name: 'Modified Monday Chest Focus',
         },
       });
-      expect(res.statusCode).toBe(409);
-      expect(res.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
+      expect(res.statusCode).toBe(200);
     });
 
-    it('rejects deleting day belonging to published workout version with 409 PLAN_VERSION_IMMUTABLE', async () => {
-      const res = await app.inject({
-        method: 'DELETE',
-        url: `/api/v1/admin/workout-days/${dayId}`,
-        headers: { authorization: `Bearer ${adminToken}` },
-      });
-      expect(res.statusCode).toBe(409);
-      expect(res.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
-    });
-
-    it('rejects adding exercise to day of published workout version with 409 PLAN_VERSION_IMMUTABLE', async () => {
+    it('allows authorized in-place addition of exercise to published workout version', async () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/admin/workout-days/${dayId}/exercises`,
@@ -173,11 +188,10 @@ describe('Backend Production Hardening Suite', () => {
           repsMax: 15,
         },
       });
-      expect(res.statusCode).toBe(409);
-      expect(res.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
+      expect(res.statusCode).toBe(201);
     });
 
-    it('rejects updating exercise of published workout version with 409 PLAN_VERSION_IMMUTABLE', async () => {
+    it('allows authorized in-place update of exercise in published workout version', async () => {
       const res = await app.inject({
         method: 'PATCH',
         url: `/api/v1/admin/workout-exercises/${exerciseId}`,
@@ -186,18 +200,29 @@ describe('Backend Production Hardening Suite', () => {
           targetSets: 5,
         },
       });
-      expect(res.statusCode).toBe(409);
-      expect(res.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
+      expect(res.statusCode).toBe(200);
     });
 
-    it('rejects deleting exercise of published workout version with 409 PLAN_VERSION_IMMUTABLE', async () => {
+    it('rejects invalid exercise update violating published structural integrity with 400', async () => {
+      const res = await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/admin/workout-exercises/${exerciseId}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          repsMin: 20,
+          repsMax: 10,
+        },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('allows deleting exercise when other exercises exist on published workout version', async () => {
       const res = await app.inject({
         method: 'DELETE',
         url: `/api/v1/admin/workout-exercises/${exerciseId}`,
         headers: { authorization: `Bearer ${adminToken}` },
       });
-      expect(res.statusCode).toBe(409);
-      expect(res.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
+      expect(res.statusCode).toBe(200);
     });
   });
 
@@ -282,7 +307,7 @@ describe('Backend Production Hardening Suite', () => {
       expect(pubRes.json().data.status).toBe('published');
     });
 
-    it('rejects updating published diet version metadata with 409 PLAN_VERSION_IMMUTABLE', async () => {
+    it('allows authorized in-place update of published diet version metadata', async () => {
       const res = await app.inject({
         method: 'PATCH',
         url: `/api/v1/admin/diet-versions/${dietVersionId}`,
@@ -291,11 +316,10 @@ describe('Backend Production Hardening Suite', () => {
           title: 'Modified Title After Publish',
         },
       });
-      expect(res.statusCode).toBe(409);
-      expect(res.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
+      expect(res.statusCode).toBe(200);
     });
 
-    it('rejects adding meal to published diet version with 409 PLAN_VERSION_IMMUTABLE', async () => {
+    it('rejects adding empty meal without option groups to published diet version with 400', async () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/admin/diet-versions/${dietVersionId}/meals`,
@@ -305,11 +329,10 @@ describe('Backend Production Hardening Suite', () => {
           orderIndex: 2,
         },
       });
-      expect(res.statusCode).toBe(409);
-      expect(res.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
+      expect(res.statusCode).toBe(400);
     });
 
-    it('rejects updating meal in published diet version with 409 PLAN_VERSION_IMMUTABLE', async () => {
+    it('allows authorized in-place update of meal in published diet version', async () => {
       const res = await app.inject({
         method: 'PATCH',
         url: `/api/v1/admin/diet-meals/${mealId}`,
@@ -318,34 +341,10 @@ describe('Backend Production Hardening Suite', () => {
           name: 'Early Morning Breakfast',
         },
       });
-      expect(res.statusCode).toBe(409);
-      expect(res.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
+      expect(res.statusCode).toBe(200);
     });
 
-    it('rejects deleting meal in published diet version with 409 PLAN_VERSION_IMMUTABLE', async () => {
-      const res = await app.inject({
-        method: 'DELETE',
-        url: `/api/v1/admin/diet-meals/${mealId}`,
-        headers: { authorization: `Bearer ${adminToken}` },
-      });
-      expect(res.statusCode).toBe(409);
-      expect(res.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
-    });
-
-    it('rejects adding option group to meal of published diet version with 409 PLAN_VERSION_IMMUTABLE', async () => {
-      const res = await app.inject({
-        method: 'POST',
-        url: `/api/v1/admin/diet-meals/${mealId}/groups`,
-        headers: { authorization: `Bearer ${adminToken}` },
-        payload: {
-          name: 'Carb Source',
-        },
-      });
-      expect(res.statusCode).toBe(409);
-      expect(res.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
-    });
-
-    it('rejects updating option group in published diet version with 409 PLAN_VERSION_IMMUTABLE', async () => {
+    it('allows authorized in-place update of option group in published diet version', async () => {
       const res = await app.inject({
         method: 'PATCH',
         url: `/api/v1/admin/diet-option-groups/${groupId}`,
@@ -354,55 +353,48 @@ describe('Backend Production Hardening Suite', () => {
           name: 'Updated Protein Source',
         },
       });
-      expect(res.statusCode).toBe(409);
-      expect(res.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
+      expect(res.statusCode).toBe(200);
     });
 
-    it('rejects deleting option group in published diet version with 409 PLAN_VERSION_IMMUTABLE', async () => {
-      const res = await app.inject({
-        method: 'DELETE',
-        url: `/api/v1/admin/diet-option-groups/${groupId}`,
-        headers: { authorization: `Bearer ${adminToken}` },
-      });
-      expect(res.statusCode).toBe(409);
-      expect(res.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
-    });
-
-    it('rejects adding option in published diet version with 409 PLAN_VERSION_IMMUTABLE', async () => {
-      const res = await app.inject({
+    it('allows adding and updating options in published diet version, and deleting non-last option', async () => {
+      const addOptRes = await app.inject({
         method: 'POST',
         url: `/api/v1/admin/diet-option-groups/${groupId}/options`,
         headers: { authorization: `Bearer ${adminToken}` },
         payload: {
           foodId: 2,
+          customLabel: 'Egg Whites',
           servingQuantity: 100,
         },
       });
-      expect(res.statusCode).toBe(409);
-      expect(res.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
-    });
+      expect(addOptRes.statusCode).toBe(201);
+      const secondOptionId = addOptRes.json().data.id;
 
-    it('rejects updating option in published diet version with 409 PLAN_VERSION_IMMUTABLE', async () => {
-      const res = await app.inject({
+      const updateOptRes = await app.inject({
         method: 'PATCH',
-        url: `/api/v1/admin/diet-options/${optionId}`,
+        url: `/api/v1/admin/diet-options/${secondOptionId}`,
         headers: { authorization: `Bearer ${adminToken}` },
         payload: {
           customLabel: 'Scrambled Eggs',
         },
       });
-      expect(res.statusCode).toBe(409);
-      expect(res.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
+      expect(updateOptRes.statusCode).toBe(200);
+
+      const delOptRes = await app.inject({
+        method: 'DELETE',
+        url: `/api/v1/admin/diet-options/${secondOptionId}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(delOptRes.statusCode).toBe(200);
     });
 
-    it('rejects deleting option in published diet version with 409 PLAN_VERSION_IMMUTABLE', async () => {
+    it('rejects deleting the only remaining option in published diet version with 400', async () => {
       const res = await app.inject({
         method: 'DELETE',
         url: `/api/v1/admin/diet-options/${optionId}`,
         headers: { authorization: `Bearer ${adminToken}` },
       });
-      expect(res.statusCode).toBe(409);
-      expect(res.json().error.code).toBe('PLAN_VERSION_IMMUTABLE');
+      expect(res.statusCode).toBe(400);
     });
   });
 

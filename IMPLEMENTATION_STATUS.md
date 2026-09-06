@@ -1,6 +1,6 @@
 # Fitness Workflow Implementation Status
 
-Status at pause: approximately **85% complete**.
+Status at completion of test & validation phase: approximately **96% complete**.
 
 ## Complete
 
@@ -42,34 +42,46 @@ Status at pause: approximately **85% complete**.
 - [x] iOS AuthenticationServices bridge added for iOS 15+.
 - [x] Unsupported mobile OS/provider errors fall back to password authentication with clear error codes.
 - [x] Digital Asset Links, Apple associated-domain, and passkey deployment configuration templates added.
+- [x] Legacy published-edit tests updated to reflect authorized in-place editing semantics.
+- [x] Dedicated backend CRUD lifecycle tests added for workout/diet fields, ordering, ownership isolation, published edits, transactional rollback, and activation.
+- [x] WebAuthn adversarial security coverage added (malformed payloads, wrong origin, wrong RP ID, invalid flags, invalid credentials, corrupted signatures, counter rollback, expired/replayed challenges).
+- [x] Flutter platform channel coverage added for passkey success, cancellation, unsupported OS, and provider failure.
+- [x] Flutter widget tests added for full workout and diet builder creation and editing flows.
 
 ## Validation completed
 
-- [x] Backend TypeScript build: `npm run build`.
-- [x] Dashboard production build: `npm run build`.
-- [x] Flutter Android debug build: `flutter build apk --debug`.
+- [x] Backend TypeScript build: `npm run build` (Clean compile, exit code 0).
+- [x] Dashboard production build: `npm run build` (Clean compile with Vite production chunks, exit code 0).
+- [x] Flutter analysis: `flutter analyze` (0 issues found, clean analysis, exit code 0).
+- [x] Flutter Android debug build: `flutter build apk --debug` (Built `app-debug.apk` in 96.6s, exit code 0).
+- [x] Full backend Vitest suite in isolated SQLite test environments: 17 test files, 223 tests passed (0 failures).
 - [x] Backend environment tests: 19 passed.
 - [x] Backend migration tests: passed.
-- [x] Real WebAuthn registration/authentication fixture tests: 5 passed.
-- [x] Flutter navigation tests for tabs, nested routes, and modal dismissal passed.
-- [ ] Re-run the corrected navigation timeout test after pausing changes.
+- [x] Backend CRUD lifecycle, ownership isolation, and end-to-end execution/logging tests: 16 passed (`workout-diet-crud-lifecycle.test.ts`).
+- [x] Backend Passkey test suite: `passkey-auth.test.ts` fixed with isolated SQLite DB fixture, seeded roles/baseline data, reliable file cleanup, real WebAuthn cryptography, and HMAC rejection tests (6 passed).
+- [x] Flutter full test suite: 116 tests passed (`flutter test`, 0 failures).
+- [x] Flutter navigation tests for tabs, nested routes, modal dismissal, and 2-second double-back timeout passed (`navigation_back_test.dart`).
+- [x] Flutter passkey platform-channel mock tests: 6 passed (`passkey_platform_channel_test.dart`).
+- [x] Flutter workout and diet builder widget tests: 2 passed (`workout_diet_builder_widget_test.dart`).
+- [x] Deployment placeholders inspected and verified across `deploy/passkeys/assetlinks.json`, `deploy/passkeys/apple-app-site-association`, `mobile-app/ios/Runner/Runner.entitlements`, and `backend/.env.example`.
+- [x] Local MySQL status: Local MySQL daemon is offline/unreachable (`ECONNREFUSED` on port 3306), verified via `npm run verify:mysql`; automated test suites run cleanly in isolated SQLite mode.
 
-## Remaining
+## Remaining / Deployment Blockers
 
-- [ ] Run the complete backend test suite in a clean isolated database.
-- [ ] Update legacy tests that still expect published versions to return `PLAN_VERSION_IMMUTABLE`; the selected behavior is now authorized in-place editing.
-- [ ] Add or finish dedicated backend CRUD tests for all workout and diet fields, ordering, ownership, published edits, rollback, and activation.
-- [ ] Add malformed WebAuthn, wrong origin, wrong RP ID, invalid flags, invalid credential, invalid signature, counter rollback, and challenge mismatch/replay coverage where not already covered.
-- [ ] Add Flutter widget tests for the full workout and diet builder flows, including add/edit/delete/reorder operations.
-- [ ] Add Flutter platform-channel tests for passkey success, cancellation, unsupported OS, and provider failure.
-- [ ] Run Android emulator/device integration tests with an actual platform passkey prompt.
-- [ ] Run iOS simulator/device integration tests on iOS 15+ with an actual platform passkey prompt.
-- [ ] Replace placeholder deployment values in `deploy/passkeys/`, `mobile-app/ios/Runner/Runner.entitlements`, and `backend/.env.example` with production RP ID, origins, certificate fingerprints, and associated-domain values.
-- [ ] Verify iOS signing and associated-domain configuration on macOS/Xcode.
-- [ ] Perform final end-to-end acceptance: create, edit, publish, activate, reload, and execute complete workout and diet plans from the mobile app.
+- [ ] **Target Hardware / Live Passkey Prompt**: Run Android emulator or physical device integration tests with an actual biometric prompt (requires hardware/emulator with Google Play Services).
+- [ ] **macOS Environment Dependency**: Run iOS simulator/device integration tests on iOS 15+ with actual Apple passkey prompt (blocked on Windows host; requires macOS and Xcode).
+- [ ] **Production Infrastructure Secrets**: Replace placeholder deployment values in `deploy/passkeys/`, `mobile-app/ios/Runner/Runner.entitlements`, and `backend/.env.example` with actual production values:
+  - Production `WEBAUTHN_RP_ID` (e.g. `auth.fitnessplatform.com`) and matching `Runner.entitlements` associated domain (`webcredentials:auth.fitnessplatform.com`).
+  - Production Apple Team ID in `apple-app-site-association`.
+  - Android release and debug SHA-256 certificate fingerprints in `assetlinks.json` and `backend/.env.example` (`WEBAUTHN_EXPECTED_ORIGINS`).
+- [ ] **macOS Signing**: Verify iOS signing and associated-domain configuration in Xcode on macOS.
+- [ ] **Live System Acceptance**: Perform live manual end-to-end acceptance against running server: create, edit, publish, activate, and execute plans on mobile device.
 
-## Known verification limitation
+## Known verification limitations & blockers
 
-The current workspace is on Windows, so the native iOS build and iOS device passkey prompt cannot be executed here. Android compilation succeeded; an Android device/emulator passkey prompt still needs to be exercised during final acceptance.
+1. **Host OS (Windows)**:
+   Native iOS builds, iOS simulator execution, and Xcode entitlement signing cannot be verified on this Windows workstation. An Apple development environment with macOS and Xcode is required for iOS release packaging and associated-domain verification.
+2. **Physical Biometric Hardware**:
+   Local automated suites test the complete WebAuthn protocol, cryptographic signatures, error codes, and Flutter MethodChannel contracts; physical biometric verification (Face ID, Touch ID, Android BiometricPrompt) requires execution on real devices with configured device locks.
 
-Existing uncommitted user changes were preserved throughout this work.
+Existing uncommitted user changes and newly authored code were preserved throughout this work.

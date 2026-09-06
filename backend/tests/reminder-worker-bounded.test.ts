@@ -11,6 +11,8 @@ const testDbDir = path.resolve(process.cwd(), 'tests', '.tmp');
 const testDbPath = path.resolve(testDbDir, `fitness_test_reminder_bounded_${process.pid}_${Date.now()}.db`);
 
 describe('ReminderWorker Bounded & Chunked Query Strategy Suite', () => {
+  const origDbClient = env.dbClient;
+
   beforeAll(async () => {
     if (!fs.existsSync(testDbDir)) {
       fs.mkdirSync(testDbDir, { recursive: true });
@@ -18,6 +20,7 @@ describe('ReminderWorker Bounded & Chunked Query Strategy Suite', () => {
 
     process.env.SQLITE_DB_PATH = testDbPath;
     env.sqliteDbPath = testDbPath;
+    env.dbClient = 'sqlite';
     resetDatabasePool();
 
     await runMigrations();
@@ -26,6 +29,8 @@ describe('ReminderWorker Bounded & Chunked Query Strategy Suite', () => {
 
   afterAll(async () => {
     await closeDatabasePool();
+    env.dbClient = origDbClient;
+    resetDatabasePool();
     if (fs.existsSync(testDbPath)) {
       try {
         fs.unlinkSync(testDbPath);

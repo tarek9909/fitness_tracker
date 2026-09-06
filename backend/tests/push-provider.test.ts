@@ -23,6 +23,8 @@ describe('Push Provider & Push Delivery Abstraction Suite', () => {
   let app: FastifyInstance;
   let adminToken: string;
 
+  const origDbClient = env.dbClient;
+
   beforeAll(async () => {
     if (!fs.existsSync(testDbDir)) {
       fs.mkdirSync(testDbDir, { recursive: true });
@@ -30,6 +32,7 @@ describe('Push Provider & Push Delivery Abstraction Suite', () => {
 
     process.env.SQLITE_DB_PATH = testDbPath;
     env.sqliteDbPath = testDbPath;
+    env.dbClient = 'sqlite';
     resetDatabasePool();
 
     await runMigrations();
@@ -56,6 +59,8 @@ describe('Push Provider & Push Delivery Abstraction Suite', () => {
   afterAll(async () => {
     if (app) await app.close();
     await closeDatabasePool();
+    env.dbClient = origDbClient;
+    resetDatabasePool();
     if (fs.existsSync(testDbPath)) {
       try {
         fs.unlinkSync(testDbPath);

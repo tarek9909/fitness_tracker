@@ -19,6 +19,8 @@ describe('Daily Plan Batch Querying & Set-Based Diet Resolution', () => {
   let userId: number;
   let planVersionId: number;
 
+  const origDbClient = env.dbClient;
+
   beforeAll(async () => {
     if (!fs.existsSync(testDbDir)) {
       fs.mkdirSync(testDbDir, { recursive: true });
@@ -26,6 +28,7 @@ describe('Daily Plan Batch Querying & Set-Based Diet Resolution', () => {
 
     process.env.SQLITE_DB_PATH = testDbPath;
     env.sqliteDbPath = testDbPath;
+    env.dbClient = 'sqlite';
     resetDatabasePool();
 
     await runMigrations();
@@ -76,6 +79,8 @@ describe('Daily Plan Batch Querying & Set-Based Diet Resolution', () => {
       await app.close();
     }
     await closeDatabasePool();
+    env.dbClient = origDbClient;
+    resetDatabasePool();
 
     try {
       const filesToDelete = [

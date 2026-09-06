@@ -41,7 +41,7 @@ class _DietPlanBuilderScreenState extends State<DietPlanBuilderScreen> {
       final versionId = _id(version?['id']);
       if (versionId != null) {
         final detail = await widget.apiClient.get('/me/diet-plans/${widget.planId}/versions/$versionId');
-        if (detail is Map && detail['data'] is Map) version = Map<String, dynamic>.from(detail['data'] as Map);
+        if (detail is Map) version = Map<String, dynamic>.from(detail['data'] is Map ? detail['data'] as Map : detail);
       }
       plan['version'] = version;
       if (mounted) setState(() { _plan = plan; _loading = false; });
@@ -73,7 +73,6 @@ class _DietPlanBuilderScreenState extends State<DietPlanBuilderScreen> {
     final description = TextEditingController(text: _plan?['description']?.toString() ?? '');
     final saved = await _dialog('Edit diet plan', [PremiumTextField(label: 'Plan name', controller: name), const SizedBox(height: 12), PremiumTextField(label: 'Description', controller: description, maxLines: 2)]);
     final payload = {'name': name.text.trim(), 'description': description.text.trim()};
-    name.dispose(); description.dispose();
     if (saved != true || payload['name'] == '') return;
     await _mutate(() => widget.apiClient.patch('/me/diet-plans/${widget.planId}', body: payload).then((_) {}), 'Diet plan updated');
   }
@@ -94,11 +93,13 @@ class _DietPlanBuilderScreenState extends State<DietPlanBuilderScreen> {
     });
     final mealId = _id(existing?['id']);
     final payload = {'name': name.text.trim(), 'scheduledTime': time.text.trim(), 'notes': notes.text.trim(), 'isRequired': required};
-    name.dispose(); time.dispose(); notes.dispose();
     if (saved != true || payload['name'] == '') return;
     await _mutate(() async {
-      if (mealId == null) await widget.apiClient.post('/me/diet-plans/${widget.planId}/versions/$versionId/meals', body: payload);
-      else await widget.apiClient.patch('/me/diet-plans/${widget.planId}/meals/$mealId', body: payload);
+      if (mealId == null) {
+        await widget.apiClient.post('/me/diet-plans/${widget.planId}/versions/$versionId/meals', body: payload);
+      } else {
+        await widget.apiClient.patch('/me/diet-plans/${widget.planId}/meals/$mealId', body: payload);
+      }
     }, existing == null ? 'Meal added' : 'Meal updated');
   }
 
@@ -126,9 +127,14 @@ class _DietPlanBuilderScreenState extends State<DietPlanBuilderScreen> {
     )));
     final groupId = _id(existing?['id']);
     final payload = {'name': name.text.trim(), 'isRequired': required, 'minSelections': int.tryParse(min.text) ?? 0, 'maxSelections': int.tryParse(max.text) ?? 1, 'notes': notes.text.trim()};
-    name.dispose(); min.dispose(); max.dispose(); notes.dispose();
     if (saved != true || payload['name'] == '') return;
-    await _mutate(() async { if (groupId == null) await widget.apiClient.post('/me/diet-plans/${widget.planId}/meals/$mealId/groups', body: payload); else await widget.apiClient.put('/me/diet-plans/${widget.planId}/option-groups/$groupId', body: payload); }, existing == null ? 'Option group added' : 'Option group updated');
+    await _mutate(() async {
+      if (groupId == null) {
+        await widget.apiClient.post('/me/diet-plans/${widget.planId}/meals/$mealId/groups', body: payload);
+      } else {
+        await widget.apiClient.put('/me/diet-plans/${widget.planId}/option-groups/$groupId', body: payload);
+      }
+    }, existing == null ? 'Option group added' : 'Option group updated');
   }
 
   Future<void> _deleteGroup(Map<String, dynamic> group) async { final id = _id(group['id']); if (id == null) return; await _mutate(() => widget.apiClient.delete('/me/diet-plans/${widget.planId}/option-groups/$id').then((_) {}), 'Option group deleted'); }
@@ -148,6 +154,7 @@ class _DietPlanBuilderScreenState extends State<DietPlanBuilderScreen> {
   Future<void> _editOption(int groupId, {Map<String, dynamic>? existing}) async {
     List<dynamic> foods = [];
     try { final response = await widget.apiClient.get('/foods'); foods = response is Map && response['data'] is List ? response['data'] as List : response is List ? response : []; } catch (_) {}
+    if (!mounted) return;
     var foodId = _id(existing?['food_id']) ?? (foods.isNotEmpty ? _id(foods.first['id']) : null);
     final quantity = TextEditingController(text: '${existing?['serving_quantity'] ?? existing?['quantity'] ?? 100}');
     final label = TextEditingController(text: existing?['custom_label']?.toString() ?? existing?['label']?.toString() ?? '');
@@ -160,9 +167,14 @@ class _DietPlanBuilderScreenState extends State<DietPlanBuilderScreen> {
     ]);
     final optionId = _id(existing?['id']);
     final payload = {'foodId': foodId, 'customLabel': label.text.trim(), 'servingQuantity': double.tryParse(quantity.text) ?? 100, 'notes': notes.text.trim()};
-    quantity.dispose(); label.dispose(); notes.dispose();
     if (saved != true || foodId == null) return;
-    await _mutate(() async { if (optionId == null) await widget.apiClient.post('/me/diet-plans/${widget.planId}/option-groups/$groupId/options', body: payload); else await widget.apiClient.put('/me/diet-plans/${widget.planId}/options/$optionId', body: payload); }, existing == null ? 'Food option added' : 'Food option updated');
+    await _mutate(() async {
+      if (optionId == null) {
+        await widget.apiClient.post('/me/diet-plans/${widget.planId}/option-groups/$groupId/options', body: payload);
+      } else {
+        await widget.apiClient.put('/me/diet-plans/${widget.planId}/options/$optionId', body: payload);
+      }
+    }, existing == null ? 'Food option added' : 'Food option updated');
   }
 
   Future<bool?> _dialogWithState(String title, List<Widget> Function(void Function(void Function())) children) => showPremiumDialog<bool>(context: context, builder: (dialogContext) {
@@ -185,6 +197,7 @@ class _DietPlanBuilderScreenState extends State<DietPlanBuilderScreen> {
     });
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(title: const Text('Review and activate'), content: Text('${_meals.length} meals and $groups option groups are saved in the API. Activate this published version?'), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Activate'))]));
     if (confirmed != true || _version?['status'] != 'published') return;
+    if (!mounted) return;
     final date = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 1825))); if (date == null) return;
     final value = '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     await _mutate(() => widget.apiClient.post('/me/diet-plans/${widget.planId}/activate', body: {'effectiveFrom': value}).then((_) {}), 'Diet plan activated');
@@ -216,7 +229,23 @@ class _DietPlanBuilderScreenState extends State<DietPlanBuilderScreen> {
               Row(children: [Expanded(child: Text('${group['name'] ?? 'Option group'}${group['is_required'] == 1 ? ' • REQUIRED' : ''}', style: TextStyle(color: colors.cyan, fontWeight: FontWeight.w700))), IconButton(onPressed: groupId == null ? null : () => _editGroup(mealId!, existing: group), icon: const Icon(Icons.edit_outlined)), IconButton(onPressed: () => _deleteGroup(group), icon: Icon(Icons.delete_outline, color: colors.rose))]),
               if ((group['notes']?.toString() ?? '').isNotEmpty) Text(group['notes'].toString(), style: TextStyle(color: colors.textSecondary)),
               Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: groupId == null ? null : () => _editOption(groupId), icon: const Icon(Icons.add, size: 16), label: const Text('Add food option'))),
-              ...options.asMap().entries.map((optionEntry) { final option = optionEntry.value; return ListTile(contentPadding: EdgeInsets.zero, title: Text('${option['food_name'] ?? option['custom_label'] ?? option['label'] ?? 'Food'}'), subtitle: Text('${option['serving_quantity'] ?? option['quantity'] ?? '-'} • ${option['calories'] ?? '-'} kcal • ${option['protein_g'] ?? '-'}g protein'), leading: Column(mainAxisAlignment: MainAxisAlignment.center, children: [IconButton(onPressed: () => _reorderOptions(options, optionEntry.key, -1), icon: const Icon(Icons.arrow_upward, size: 16)), IconButton(onPressed: () => _reorderOptions(options, optionEntry.key, 1), icon: const Icon(Icons.arrow_downward, size: 16))]), trailing: Wrap(children: [IconButton(onPressed: groupId == null ? null : () => _editOption(groupId, existing: option), icon: const Icon(Icons.edit_outlined)), IconButton(onPressed: () => _deleteOption(option), icon: Icon(Icons.delete_outline, color: colors.rose))])); }),
+              ...options.asMap().entries.map((optionEntry) {
+                final option = optionEntry.value;
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('${option['food_name'] ?? option['custom_label'] ?? option['label'] ?? 'Food'}'),
+                  subtitle: Text('${option['serving_quantity'] ?? option['quantity'] ?? '-'} • ${option['calories'] ?? '-'} kcal • ${option['protein_g'] ?? '-'}g protein'),
+                  leading: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(visualDensity: VisualDensity.compact, padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: () => _reorderOptions(options, optionEntry.key, -1), icon: const Icon(Icons.arrow_upward, size: 16)),
+                      const SizedBox(width: 4),
+                      IconButton(visualDensity: VisualDensity.compact, padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: () => _reorderOptions(options, optionEntry.key, 1), icon: const Icon(Icons.arrow_downward, size: 16)),
+                    ],
+                  ),
+                  trailing: Wrap(children: [IconButton(onPressed: groupId == null ? null : () => _editOption(groupId, existing: option), icon: const Icon(Icons.edit_outlined)), IconButton(onPressed: () => _deleteOption(option), icon: Icon(Icons.delete_outline, color: colors.rose))]),
+                );
+              }),
             ]));
           }),
         ])));
