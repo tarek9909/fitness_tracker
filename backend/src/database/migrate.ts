@@ -913,6 +913,95 @@ const migrations: Migration[] = [
       await ensureColumnExists(db, 'system_settings', 'category', "VARCHAR(50) NOT NULL DEFAULT 'general'");
     },
   },
+  {
+    version: '010-realign-runtime-tables',
+    up: async (db) => {
+      logger.info('Running migration 010: ensuring runtime columns on workout_sessions, cardio_logs, and daily_tasks');
+
+      // 1. workout_sessions
+      await ensureColumnExists(db, 'workout_sessions', 'status', "VARCHAR(20) NOT NULL DEFAULT 'completed'");
+      await ensureColumnExists(db, 'workout_sessions', 'source_type', "VARCHAR(20) NOT NULL DEFAULT 'assigned'");
+
+      // 2. workout_session_exercises
+      await ensureColumnExists(db, 'workout_session_exercises', 'status', "VARCHAR(20) NOT NULL DEFAULT 'pending'");
+      await ensureColumnExists(db, 'workout_session_exercises', 'started_at', 'DATETIME NULL');
+      await ensureColumnExists(db, 'workout_session_exercises', 'completed_at', 'DATETIME NULL');
+
+      // 3. cardio_logs
+      await ensureColumnExists(db, 'cardio_logs', 'cardio_date', 'DATE NULL');
+      await ensureColumnExists(db, 'cardio_logs', 'cardio_activity_id', 'BIGINT UNSIGNED NULL');
+      await ensureColumnExists(db, 'cardio_logs', 'speed_kmh', 'DECIMAL(6,2) NULL');
+      await ensureColumnExists(db, 'cardio_logs', 'incline', 'DECIMAL(5,2) NULL');
+      await ensureColumnExists(db, 'cardio_logs', 'started_at', 'DATETIME NULL');
+
+      if (configuredDbClient() === 'mysql') {
+        try {
+          await db.execute('UPDATE cardio_logs SET cardio_date = target_date WHERE cardio_date IS NULL AND target_date IS NOT NULL');
+        } catch {
+          // target_date might not exist; safe to ignore
+        }
+      }
+
+      // 4. Clean recreate of daily_tasks if running MySQL to eliminate any legacy NOT NULL constraints
+      if (configuredDbClient() === 'mysql') {
+        try {
+          await db.execute('SET FOREIGN_KEY_CHECKS = 0');
+          await db.execute('DROP TABLE IF EXISTS daily_tasks');
+          await db.execute(`
+            CREATE TABLE daily_tasks (
+              id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+              user_id BIGINT UNSIGNED NOT NULL,
+              task_date DATE NOT NULL,
+              task_key VARCHAR(191) NOT NULL,
+              task_type VARCHAR(20) NOT NULL DEFAULT 'custom',
+              user_diet_assignment_id BIGINT UNSIGNED NULL,
+              user_workout_assignment_id BIGINT UNSIGNED NULL,
+              diet_meal_id BIGINT UNSIGNED NULL,
+              workout_plan_day_id BIGINT UNSIGNED NULL,
+              user_cardio_target_id BIGINT UNSIGNED NULL,
+              user_water_target_id BIGINT UNSIGNED NULL,
+              user_weight_goal_id BIGINT UNSIGNED NULL,
+              title_snapshot VARCHAR(255) NOT NULL DEFAULT '',
+              description_snapshot TEXT NULL,
+              target_snapshot TEXT NULL,
+              scheduled_at DATETIME NULL,
+              due_at DATETIME NULL,
+              status VARCHAR(20) NOT NULL DEFAULT 'pending',
+              completed_at DATETIME NULL,
+              created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+              updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+              UNIQUE KEY uq_user_task_key (user_id, task_date, task_key),
+              INDEX idx_daily_tasks_user_date (user_id, task_date),
+              CONSTRAINT fk_daily_tasks_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB
+          `);
+          await db.execute('SET FOREIGN_KEY_CHECKS = 1');
+        } catch (err) {
+          logger.warn({ err }, 'Could not recreate daily_tasks table in migration 010; continuing with column checks');
+        }
+      }
+
+      // 5. Ensure all other columns exist
+      await ensureColumnExists(db, 'daily_tasks', 'task_type', "VARCHAR(20) NOT NULL DEFAULT 'custom'");
+      await ensureColumnExists(db, 'daily_tasks', 'status', "VARCHAR(20) NOT NULL DEFAULT 'pending'");
+      await ensureColumnExists(db, 'daily_tasks', 'user_diet_assignment_id', 'BIGINT UNSIGNED NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'user_workout_assignment_id', 'BIGINT UNSIGNED NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'diet_meal_id', 'BIGINT UNSIGNED NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'workout_plan_day_id', 'BIGINT UNSIGNED NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'user_cardio_target_id', 'BIGINT UNSIGNED NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'user_water_target_id', 'BIGINT UNSIGNED NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'user_weight_goal_id', 'BIGINT UNSIGNED NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'title_snapshot', "VARCHAR(255) NOT NULL DEFAULT ''");
+      await ensureColumnExists(db, 'daily_tasks', 'description_snapshot', 'TEXT NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'target_snapshot', 'TEXT NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'scheduled_at', 'DATETIME NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'due_at', 'DATETIME NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'completed_at', 'DATETIME NULL');
+
+      await ensureColumnExists(db, 'meal_logs', 'updated_at', 'DATETIME NULL');
+      await ensureColumnExists(db, 'meal_log_selections', 'fiber_g_snapshot', 'DECIMAL(10,2) NULL');
+    },
+  },
 ];
 
 export async function runMigrations(customDb?: DatabasePool) {
