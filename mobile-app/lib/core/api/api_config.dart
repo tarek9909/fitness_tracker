@@ -32,12 +32,16 @@ class ApiConfig {
 
   static String? getActiveWorkingBaseUrl() => _activeWorkingBaseUrl;
 
+  static const String onlineProductionBaseUrl =
+      'https://fitnesstrack9909.duckdns.org/api/v1';
+
   static List<String> getCandidateBaseUrls() {
     if (kReleaseMode || _dartDefinedBaseUrl.trim().isNotEmpty) {
       return [resolveBaseUrl()];
     }
     final allCandidates = !kIsWeb && Platform.isAndroid
         ? [
+            onlineProductionBaseUrl,             // Online Production HTTPS Endpoint
             'http://127.0.0.1:3000/api/v1',      // ADB reverse port-forwarding for USB physical devices (port 3000)
             'http://127.0.0.1:4000/api/v1',      // ADB reverse port-forwarding for USB physical devices (port 4000)
             'http://192.168.10.210:3000/api/v1', // Active LAN host IP (port 3000)
@@ -48,6 +52,7 @@ class ApiConfig {
             'http://10.0.2.2:4000/api/v1',       // Android Emulator host loopback (port 4000)
           ]
         : [
+            onlineProductionBaseUrl,             // Online Production HTTPS Endpoint
             'http://localhost:3000/api/v1',
             'http://localhost:4000/api/v1',
             'http://127.0.0.1:3000/api/v1',
