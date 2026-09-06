@@ -865,7 +865,7 @@ class PremiumListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Material(
       color: tileColor ?? Colors.transparent,
       child: ListTile(
         leading: leading,

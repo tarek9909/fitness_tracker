@@ -1,7 +1,27 @@
 import 'package:flutter/material.dart';
 
 /// Static and baseline design tokens for the Kinetic Wellness mobile app.
-/// Pure Monochrome Architectural Design System.
+///
+/// Design Direction:
+/// "Dark monochrome architectural with restrained neon accents."
+///
+/// Principles:
+/// 1. Monochrome foundation dominates the interface (Obsidian, Charcoal, Zinc, Titanium).
+/// 2. White / Titanium for primary actions and important values.
+/// 3. Zinc / Graphite for secondary text, borders, dividers, and inactive states.
+/// 4. Soft emerald, cyan, violet, amber, and rose ONLY as functional accent colors.
+/// 5. Minimal glow, sharp compact geometry, strong typography, high information density.
+/// 6. Large, highly readable numbers and architectural 1px gridline borders.
+/// 7. Colors guide attention and communicate meaning, never used to decorate.
+///
+/// Strict Prohibitions:
+/// - No large neon backgrounds
+/// - Never make every card colorful
+/// - No excessive gradients
+/// - No RGB / gaming aesthetics or heavy outer glows
+/// - No colorful illustrations
+///
+/// High-end athletic performance system aesthetic.
 class AppColors {
   // Dark Palette (Monochrome Architectural - Obsidian & Titanium)
   static const Color background = Color(0xFF0A0A0B); // Deep Obsidian Canvas

@@ -1716,15 +1716,6 @@ class _WorkoutExecutionScreenState extends State<WorkoutExecutionScreen> {
                   color: isDone ? colors.emerald : colors.border,
                   width: 1.5,
                 ),
-                boxShadow: isDone
-                    ? [
-                        BoxShadow(
-                          color: colors.emerald.withValues(alpha: 0.35),
-                          blurRadius: 6,
-                          spreadRadius: 1,
-                        ),
-                      ]
-                    : null,
               ),
               child: Center(
                 child: Icon(

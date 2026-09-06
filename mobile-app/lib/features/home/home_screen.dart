@@ -1131,12 +1131,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 : Matrix4.identity(),
             decoration: isHovered
                 ? BoxDecoration(
-                    borderRadius: BorderRadius.circular(AppRadii.md),
+                    borderRadius: BorderRadius.circular(AppRadii.sm),
                     boxShadow: [
                       BoxShadow(
-                        color: item.color.withValues(alpha: 0.4),
-                        blurRadius: 10,
-                        spreadRadius: 1,
+                        color: colors.isDark
+                            ? const Color(0x33000000)
+                            : const Color(0x14000000),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   )
