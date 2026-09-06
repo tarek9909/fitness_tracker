@@ -875,6 +875,44 @@ const migrations: Migration[] = [
       await backfillColumnData(db, 'workout_plan_exercise_sets', 'rest_seconds', 'rest_seconds_target', 'rest_seconds_target');
     },
   },
+  {
+    version: '009-daily-tasks-and-runtime-columns',
+    up: async (db) => {
+      logger.info('Running migration 009: reconciling daily_tasks and runtime columns');
+      await ensureColumnExists(db, 'daily_tasks', 'task_type', "VARCHAR(20) NOT NULL DEFAULT 'custom'");
+      await ensureColumnExists(db, 'daily_tasks', 'status', "VARCHAR(20) NOT NULL DEFAULT 'pending'");
+      await ensureColumnExists(db, 'daily_tasks', 'user_diet_assignment_id', 'BIGINT UNSIGNED NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'user_workout_assignment_id', 'BIGINT UNSIGNED NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'diet_meal_id', 'BIGINT UNSIGNED NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'workout_plan_day_id', 'BIGINT UNSIGNED NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'user_cardio_target_id', 'BIGINT UNSIGNED NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'user_water_target_id', 'BIGINT UNSIGNED NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'user_weight_goal_id', 'BIGINT UNSIGNED NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'title_snapshot', "VARCHAR(255) NOT NULL DEFAULT ''");
+      await ensureColumnExists(db, 'daily_tasks', 'description_snapshot', 'TEXT NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'target_snapshot', 'TEXT NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'scheduled_at', 'DATETIME NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'due_at', 'DATETIME NULL');
+      await ensureColumnExists(db, 'daily_tasks', 'completed_at', 'DATETIME NULL');
+
+      await ensureColumnExists(db, 'exercises', 'primary_muscle_group_id', 'BIGINT UNSIGNED NULL');
+      await ensureColumnExists(db, 'exercises', 'secondary_muscle_group_id', 'BIGINT UNSIGNED NULL');
+      await ensureColumnExists(db, 'exercises', 'is_custom', 'INTEGER NOT NULL DEFAULT 0');
+      await ensureColumnExists(db, 'exercises', 'is_archived', 'INTEGER NOT NULL DEFAULT 0');
+
+      await ensureColumnExists(db, 'measurement_units', 'base_unit', 'INTEGER NOT NULL DEFAULT 0');
+      await ensureColumnExists(db, 'foods', 'serving_unit', 'VARCHAR(50) NULL');
+      await ensureColumnExists(db, 'cardio_activities', 'met_value', 'DECIMAL(4,1) NULL');
+      await ensureColumnExists(db, 'user_notification_settings', 'quiet_hours_enabled', 'INTEGER NOT NULL DEFAULT 0');
+      await ensureColumnExists(db, 'workout_plans', 'is_archived', 'INTEGER NOT NULL DEFAULT 0');
+      await ensureColumnExists(db, 'workout_plan_versions', 'published_at', 'DATETIME NULL');
+      await ensureColumnExists(db, 'diet_plans', 'is_archived', 'INTEGER NOT NULL DEFAULT 0');
+      await ensureColumnExists(db, 'diet_plan_versions', 'published_at', 'DATETIME NULL');
+      await ensureColumnExists(db, 'meal_logs', 'meal_date', 'DATE NULL');
+      await ensureColumnExists(db, 'meal_logs', 'status', "VARCHAR(20) NOT NULL DEFAULT 'pending'");
+      await ensureColumnExists(db, 'system_settings', 'category', "VARCHAR(50) NOT NULL DEFAULT 'general'");
+    },
+  },
 ];
 
 export async function runMigrations(customDb?: DatabasePool) {
