@@ -121,6 +121,22 @@ async function run() {
   await addCol('meal_logs', 'updated_at', 'TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)');
   await addCol('meal_log_selections', 'fiber_g_snapshot', 'DECIMAL(10,2) NULL');
 
+  // 6. workout_plan_days & workout_plan_exercises
+  await addCol('workout_plan_days', 'notes', 'TEXT NULL');
+  await addCol('workout_plan_days', 'description', 'TEXT NULL');
+
+  await addCol('workout_plan_exercises', 'exercise_order', 'INT UNSIGNED NOT NULL DEFAULT 1');
+  await addCol('workout_plan_exercises', 'exercise_name_snapshot', 'VARCHAR(191) NULL');
+  await addCol('workout_plan_exercises', 'tracking_type_snapshot', "VARCHAR(30) NOT NULL DEFAULT 'weight_reps'");
+  await addCol('workout_plan_exercises', 'target_sets', 'INT UNSIGNED NOT NULL DEFAULT 3');
+  await addCol('workout_plan_exercises', 'target_reps_min', 'INT UNSIGNED NULL');
+  await addCol('workout_plan_exercises', 'target_reps_max', 'INT UNSIGNED NULL');
+  await addCol('workout_plan_exercises', 'target_duration_seconds', 'INT UNSIGNED NULL');
+  await addCol('workout_plan_exercises', 'target_distance_meters', 'DECIMAL(10,2) NULL');
+  await addCol('workout_plan_exercises', 'rest_seconds', 'INT UNSIGNED NULL');
+  await addCol('workout_plan_exercises', 'notes', 'TEXT NULL');
+  await addCol('workout_plan_exercises', 'is_optional', 'BOOLEAN NOT NULL DEFAULT FALSE');
+
   await conn.query('SET FOREIGN_KEY_CHECKS = 1');
   await conn.end();
   console.log('Realignment completed successfully! All tables match application runtime.');

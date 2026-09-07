@@ -507,6 +507,13 @@ export class WorkoutPlanService {
 
       const set: string[] = [];
       const values: any[] = [];
+      if (updatePayload.exerciseId !== undefined && updatePayload.exerciseId !== ex.exercise_id) {
+        const exerciseLib = await conn.queryOne<any>('SELECT name, tracking_type FROM exercises WHERE id = ?', [updatePayload.exerciseId]);
+        if (!exerciseLib) throw new NotFoundError('Exercise not found in library');
+        set.push('exercise_id = ?'); values.push(updatePayload.exerciseId);
+        set.push('exercise_name_snapshot = ?'); values.push(exerciseLib.name);
+        set.push('tracking_type_snapshot = ?'); values.push(exerciseLib.tracking_type || 'weight_reps');
+      }
       if (updatePayload.orderIndex !== undefined) { set.push('exercise_order = ?'); values.push(updatePayload.orderIndex); }
       if (updatePayload.targetSets !== undefined) { set.push('target_sets = ?'); values.push(updatePayload.targetSets); }
       if (updatePayload.repsMin !== undefined) { set.push('target_reps_min = ?'); values.push(updatePayload.repsMin); }

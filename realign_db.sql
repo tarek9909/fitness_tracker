@@ -97,6 +97,24 @@ ALTER TABLE meal_logs
 ALTER TABLE meal_log_selections
   ADD COLUMN IF NOT EXISTS fiber_g_snapshot DECIMAL(10,2) NULL;
 
+-- 6. workout_plan_days & workout_plan_exercises
+ALTER TABLE workout_plan_days 
+  ADD COLUMN IF NOT EXISTS notes TEXT NULL,
+  ADD COLUMN IF NOT EXISTS description TEXT NULL;
+
+ALTER TABLE workout_plan_exercises
+  ADD COLUMN IF NOT EXISTS exercise_order INT UNSIGNED NOT NULL DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS exercise_name_snapshot VARCHAR(191) NULL,
+  ADD COLUMN IF NOT EXISTS tracking_type_snapshot VARCHAR(30) NOT NULL DEFAULT 'weight_reps',
+  ADD COLUMN IF NOT EXISTS target_sets INT UNSIGNED NOT NULL DEFAULT 3,
+  ADD COLUMN IF NOT EXISTS target_reps_min INT UNSIGNED NULL,
+  ADD COLUMN IF NOT EXISTS target_reps_max INT UNSIGNED NULL,
+  ADD COLUMN IF NOT EXISTS target_duration_seconds INT UNSIGNED NULL,
+  ADD COLUMN IF NOT EXISTS target_distance_meters DECIMAL(10,2) NULL,
+  ADD COLUMN IF NOT EXISTS rest_seconds INT UNSIGNED NULL,
+  ADD COLUMN IF NOT EXISTS notes TEXT NULL,
+  ADD COLUMN IF NOT EXISTS is_optional BOOLEAN NOT NULL DEFAULT FALSE;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- Pre-seed daily tasks for Tarek for today (2026-09-06)

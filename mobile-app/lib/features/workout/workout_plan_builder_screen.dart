@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/premium_widgets.dart';
+import 'workout_exercise_editor_modal.dart';
 
 class WorkoutPlanBuilderScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -14,41 +15,6 @@ class WorkoutPlanBuilderScreen extends StatefulWidget {
   State<WorkoutPlanBuilderScreen> createState() => _WorkoutPlanBuilderScreenState();
 }
 
-class _WorkoutSetDraft {
-  final TextEditingController repsMin;
-  final TextEditingController repsMax;
-  final TextEditingController weight;
-  final TextEditingController duration;
-  final TextEditingController distance;
-  final TextEditingController rest;
-  final TextEditingController notes;
-
-  _WorkoutSetDraft({
-    String? repsMin,
-    String? repsMax,
-    String? weight,
-    String? duration,
-    String? distance,
-    String? rest,
-    String? notes,
-  })  : repsMin = TextEditingController(text: repsMin ?? ''),
-        repsMax = TextEditingController(text: repsMax ?? ''),
-        weight = TextEditingController(text: weight ?? ''),
-        duration = TextEditingController(text: duration ?? ''),
-        distance = TextEditingController(text: distance ?? ''),
-        rest = TextEditingController(text: rest ?? ''),
-        notes = TextEditingController(text: notes ?? '');
-
-  void dispose() {
-    repsMin.dispose();
-    repsMax.dispose();
-    weight.dispose();
-    duration.dispose();
-    distance.dispose();
-    rest.dispose();
-    notes.dispose();
-  }
-}
 
 class _WorkoutPlanBuilderScreenState extends State<WorkoutPlanBuilderScreen> {
   Map<String, dynamic>? _plan;
@@ -225,120 +191,18 @@ class _WorkoutPlanBuilderScreenState extends State<WorkoutPlanBuilderScreen> {
     }, 'Day order updated');
   }
 
-  Future<void> _editExercise(int dayId, {Map<String, dynamic>? existing}) async {
-    List<dynamic> library = [];
-    try {
-      final response = await widget.apiClient.get('/exercises');
-      library = response is Map && response['data'] is List ? response['data'] as List : response is List ? response : [];
-    } catch (_) {}
-    if (!mounted) return;
-    var selectedExercise = _asInt(existing?['exercise_id']) ?? (library.isNotEmpty ? _asInt(library.first['id']) : null);
-    final sets = _asInt(existing?['target_sets']) ?? ((existing?['sets'] as List?)?.length ?? 3);
-    final repsMin = TextEditingController(text: '${existing?['target_reps_min'] ?? existing?['reps_min'] ?? 8}');
-    final repsMax = TextEditingController(text: '${existing?['target_reps_max'] ?? existing?['reps_max'] ?? 12}');
-    final duration = TextEditingController(text: existing?['target_duration_seconds']?.toString() ?? '');
-    final distance = TextEditingController(text: existing?['target_distance_meters']?.toString() ?? '');
-    final rest = TextEditingController(text: existing?['rest_seconds']?.toString() ?? '90');
-    final notes = TextEditingController(text: existing?['notes']?.toString() ?? '');
-    var optional = existing?['is_optional'] == 1 || existing?['isOptional'] == true;
-    final drafts = <_WorkoutSetDraft>[];
-    final rawSets = (existing?['sets'] as List?)?.whereType<Map>().toList() ?? const [];
-    for (var index = 0; index < sets; index++) {
-      final raw = index < rawSets.length ? rawSets[index] : const <String, dynamic>{};
-      drafts.add(_WorkoutSetDraft(
-        repsMin: '${raw['target_reps_min'] ?? existing?['target_reps_min'] ?? 8}',
-        repsMax: '${raw['target_reps_max'] ?? existing?['target_reps_max'] ?? 12}',
-        weight: raw['target_weight_kg']?.toString(),
-        duration: raw['target_duration_seconds']?.toString(),
-        distance: raw['target_distance_meters']?.toString(),
-        rest: '${raw['rest_seconds'] ?? existing?['rest_seconds'] ?? 90}',
-        notes: raw['notes']?.toString(),
-      ));
-    }
-    final setsController = TextEditingController(text: '$sets');
-    final saved = await showPremiumDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        final colors = AppThemeColors.of(dialogContext);
-        return StatefulBuilder(builder: (context, setState) {
-          void resizeSets(int count) {
-            count = count.clamp(1, 50);
-            while (drafts.length < count) {
-              drafts.add(_WorkoutSetDraft(repsMin: repsMin.text, repsMax: repsMax.text, rest: rest.text));
-            }
-            while (drafts.length > count) {
-              drafts.removeLast().dispose();
-            }
-            setState(() {});
-          }
-          return AlertDialog(
-            backgroundColor: colors.card,
-            title: Text(existing == null ? 'Add exercise' : 'Edit exercise', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w800)),
-            content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-              if (library.isEmpty) const Text('No exercises are available in the exercise library.') else DropdownButtonFormField<int>(
-                initialValue: selectedExercise,
-                isExpanded: true,
-                items: library.map((item) => DropdownMenuItem<int>(value: _asInt(item['id']), child: Text('${item['name'] ?? 'Exercise'}'))).toList(),
-                onChanged: (value) => setState(() => selectedExercise = value),
-                decoration: const InputDecoration(labelText: 'Exercise'),
-              ),
-              const SizedBox(height: 10),
-              Row(children: [Expanded(child: PremiumTextField(label: 'Sets', controller: setsController, keyboardType: TextInputType.number, onChanged: (value) => resizeSets(int.tryParse(value) ?? 1))), const SizedBox(width: 8), Expanded(child: PremiumTextField(label: 'Rest (sec)', controller: rest, keyboardType: TextInputType.number))]),
-              Row(children: [Expanded(child: PremiumTextField(label: 'Default min reps', controller: repsMin, keyboardType: TextInputType.number)), const SizedBox(width: 8), Expanded(child: PremiumTextField(label: 'Default max reps', controller: repsMax, keyboardType: TextInputType.number))]),
-              Row(children: [Expanded(child: PremiumTextField(label: 'Duration (sec)', controller: duration, keyboardType: TextInputType.number)), const SizedBox(width: 8), Expanded(child: PremiumTextField(label: 'Distance (m)', controller: distance, keyboardType: TextInputType.number))]),
-              SwitchListTile(title: const Text('Optional exercise'), value: optional, onChanged: (value) => setState(() => optional = value)),
-              PremiumTextField(label: 'Exercise notes', controller: notes, maxLines: 2),
-              const SizedBox(height: 12),
-              Align(alignment: Alignment.centerLeft, child: Text('Per-set prescription', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700))),
-              ...drafts.asMap().entries.map((entry) {
-                final index = entry.key;
-                final draft = entry.value;
-                return Card(color: colors.surfaceElevated, child: Padding(padding: const EdgeInsets.all(8), child: Column(children: [
-                  Align(alignment: Alignment.centerLeft, child: Text('Set ${index + 1}', style: TextStyle(color: colors.cyan, fontWeight: FontWeight.w700))),
-                  Row(children: [Expanded(child: PremiumTextField(label: 'Min reps', controller: draft.repsMin, keyboardType: TextInputType.number)), const SizedBox(width: 6), Expanded(child: PremiumTextField(label: 'Max reps', controller: draft.repsMax, keyboardType: TextInputType.number)), const SizedBox(width: 6), Expanded(child: PremiumTextField(label: 'Weight kg', controller: draft.weight, keyboardType: TextInputType.number))]),
-                  Row(children: [Expanded(child: PremiumTextField(label: 'Duration sec', controller: draft.duration, keyboardType: TextInputType.number)), const SizedBox(width: 6), Expanded(child: PremiumTextField(label: 'Distance m', controller: draft.distance, keyboardType: TextInputType.number)), const SizedBox(width: 6), Expanded(child: PremiumTextField(label: 'Rest sec', controller: draft.rest, keyboardType: TextInputType.number))]),
-                  PremiumTextField(label: 'Set notes', controller: draft.notes),
-                ])));
-              }),
-            ])),
-            actions: [PremiumButton(text: 'Cancel', isSecondary: true, onPressed: () => Navigator.pop(dialogContext, false)), PremiumButton(text: 'Save', onPressed: () => Navigator.pop(dialogContext, true))],
-          );
-        });
-      },
+  Future<void> _editExercise(int dayId, {Map<String, dynamic>? existing, String? dayName}) async {
+    final updated = await WorkoutExerciseEditorModal.show(
+      context,
+      apiClient: widget.apiClient,
+      planId: widget.planId,
+      dayId: dayId,
+      dayName: dayName,
+      existing: existing,
     );
-    final payload = <String, dynamic>{
-      if (selectedExercise != null && existing == null) 'exerciseId': selectedExercise,
-      'targetSets': drafts.length,
-      'repsMin': int.tryParse(repsMin.text),
-      if (int.tryParse(repsMax.text) != null) 'repsMax': int.tryParse(repsMax.text),
-      if (int.tryParse(duration.text) != null) 'targetDurationSeconds': int.tryParse(duration.text),
-      if (double.tryParse(distance.text) != null) 'targetDistanceMeters': double.tryParse(distance.text),
-      'restSeconds': int.tryParse(rest.text) ?? 0,
-      'isOptional': optional,
-      'notes': notes.text.trim(),
-      'sets': drafts.asMap().entries.map((entry) {
-        final set = entry.value;
-        return <String, dynamic>{
-          'setNumber': entry.key + 1,
-          if (int.tryParse(set.repsMin.text) != null) 'targetRepsMin': int.tryParse(set.repsMin.text),
-          if (int.tryParse(set.repsMax.text) != null) 'targetRepsMax': int.tryParse(set.repsMax.text),
-          if (double.tryParse(set.weight.text) != null) 'targetWeightKg': double.tryParse(set.weight.text),
-          if (int.tryParse(set.duration.text) != null) 'targetDurationSeconds': int.tryParse(set.duration.text),
-          if (double.tryParse(set.distance.text) != null) 'targetDistanceMeters': double.tryParse(set.distance.text),
-          if (int.tryParse(set.rest.text) != null) 'restSeconds': int.tryParse(set.rest.text),
-          'notes': set.notes.text.trim(),
-        };
-      }).toList(),
-    };
-    final exerciseId = _asInt(existing?['id']);
-    if (saved != true || selectedExercise == null) return;
-    await _mutate(() async {
-      if (exerciseId == null) {
-        await widget.apiClient.post('/me/workout-plans/${widget.planId}/days/$dayId/exercises', body: payload);
-      } else {
-        await widget.apiClient.patch('/me/workout-plans/${widget.planId}/exercises/$exerciseId', body: payload);
-      }
-    }, existing == null ? 'Exercise added' : 'Exercise updated');
+    if (updated == true) {
+      await _reload();
+    }
   }
 
   Future<void> _deleteExercise(Map<String, dynamic> exercise) async {
@@ -409,7 +273,7 @@ class _WorkoutPlanBuilderScreenState extends State<WorkoutPlanBuilderScreen> {
           return Padding(padding: const EdgeInsets.only(bottom: 12), child: PremiumCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [Expanded(child: Text('${day['name'] ?? 'Day'}${restDay ? ' • REST' : ''}', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w800, fontSize: 16))), IconButton(onPressed: () => _reorderDay(dayIndex, -1), icon: const Icon(Icons.keyboard_arrow_up)), IconButton(onPressed: () => _reorderDay(dayIndex, 1), icon: const Icon(Icons.keyboard_arrow_down)), IconButton(onPressed: () => _editDay(existing: day), icon: const Icon(Icons.edit_outlined)), IconButton(onPressed: () => _deleteDay(day), icon: Icon(Icons.delete_outline, color: colors.rose))]),
             if ((day['notes']?.toString() ?? '').isNotEmpty) Text(day['notes'].toString(), style: TextStyle(color: colors.textSecondary)),
-            Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: dayId == null ? null : () => _editExercise(dayId), icon: const Icon(Icons.add, size: 16), label: const Text('Add exercise'))),
+            Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: dayId == null ? null : () => _editExercise(dayId, dayName: day['name']?.toString()), icon: const Icon(Icons.add, size: 16), label: const Text('Add exercise'))),
             if (!restDay) ...exercises.asMap().entries.map((exerciseEntry) {
               final index = exerciseEntry.key;
               final exercise = exerciseEntry.value;
@@ -428,7 +292,7 @@ class _WorkoutPlanBuilderScreenState extends State<WorkoutPlanBuilderScreen> {
                     IconButton(visualDensity: VisualDensity.compact, padding: EdgeInsets.zero, constraints: const BoxConstraints(), icon: const Icon(Icons.arrow_downward, size: 16), onPressed: () => _reorderExercise(day, index, 1)),
                   ],
                 ),
-                trailing: Wrap(children: [IconButton(onPressed: dayId == null ? null : () => _editExercise(dayId, existing: exercise), icon: const Icon(Icons.edit_outlined)), IconButton(onPressed: () => _deleteExercise(exercise), icon: Icon(Icons.delete_outline, color: colors.rose))]),
+                trailing: Wrap(children: [IconButton(onPressed: dayId == null ? null : () => _editExercise(dayId, existing: exercise, dayName: day['name']?.toString()), icon: const Icon(Icons.edit_outlined)), IconButton(onPressed: () => _deleteExercise(exercise), icon: Icon(Icons.delete_outline, color: colors.rose))]),
               );
             }) else Padding(padding: const EdgeInsets.all(8), child: Text('Rest day — no exercises scheduled.', style: TextStyle(color: colors.textMuted))),
           ])));

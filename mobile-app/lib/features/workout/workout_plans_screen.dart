@@ -3,6 +3,7 @@ import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/premium_widgets.dart';
 import 'workout_plan_builder_screen.dart';
+import 'workout_exercise_editor_modal.dart';
 
 class WorkoutPlansScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -704,196 +705,19 @@ class _WorkoutPlanDetailScreenState extends State<WorkoutPlanDetailScreen> {
     );
   }
 
-  Future<void> _showAddExerciseDialog(int dayId) async {
-    List<dynamic> exerciseLibrary = [];
-    bool loadingLib = true;
-    int? selectedExId;
-    final setsCtrl = TextEditingController(text: '3');
-    final repsMinCtrl = TextEditingController(text: '8');
-    final repsMaxCtrl = TextEditingController(text: '12');
-    final restCtrl = TextEditingController(text: '90');
-    final notesCtrl = TextEditingController();
-
-    // Fetch exercise library
-    try {
-      final res = await widget.apiClient.get('/exercises');
-      if (res is Map<String, dynamic> && res['data'] is List) {
-        exerciseLibrary = res['data'] as List<dynamic>;
-      } else if (res is List) {
-        exerciseLibrary = res;
-      }
-      loadingLib = false;
-      if (exerciseLibrary.isNotEmpty) {
-        selectedExId = exerciseLibrary.first['id'] as int;
-      }
-    } catch (_) {
-      loadingLib = false;
-    }
-
-    if (!mounted) return;
-
-    await showPremiumDialog(
-      context: context,
-      builder: (ctx) {
-        final colors = AppThemeColors.of(ctx);
-        return StatefulBuilder(
-          builder: (dialogCtx, setDialogState) {
-            return AlertDialog(
-              backgroundColor: colors.card,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadii.xl),
-                side: BorderSide(color: colors.border),
-              ),
-              title: Text(
-                'Add Exercise to Day',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18,
-                  color: colors.textPrimary,
-                ),
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (loadingLib)
-                      const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: CircularProgressIndicator(),
-                      )
-                    else if (exerciseLibrary.isEmpty)
-                      Text(
-                        'No exercises found in catalog.',
-                        style: TextStyle(color: colors.textSecondary),
-                      )
-                    else
-                      DropdownButtonFormField<int>(
-                        initialValue: selectedExId,
-                        dropdownColor: colors.surfaceElevated,
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          labelText: 'Exercise Movement',
-                          labelStyle: TextStyle(color: colors.textSecondary),
-                          filled: true,
-                          fillColor: colors.surfaceElevated,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.lg),
-                            borderSide: BorderSide(color: colors.border),
-                          ),
-                        ),
-                        items: exerciseLibrary.map((ex) {
-                          return DropdownMenuItem<int>(
-                            value: ex['id'] as int,
-                            child: Text(
-                              ex['name'] as String? ?? 'Exercise',
-                              style: TextStyle(color: colors.textPrimary),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          setDialogState(() => selectedExId = val);
-                        },
-                      ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: PremiumTextField(
-                            label: 'Sets',
-                            controller: setsCtrl,
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: PremiumTextField(
-                            label: 'Rest (sec)',
-                            controller: restCtrl,
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: PremiumTextField(
-                            label: 'Min Reps',
-                            controller: repsMinCtrl,
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: PremiumTextField(
-                            label: 'Max Reps',
-                            controller: repsMaxCtrl,
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    PremiumTextField(
-                      label: 'Form / Cue Notes (optional)',
-                      hint: 'e.g. Pause at the bottom',
-                      controller: notesCtrl,
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                PremiumButton(
-                  text: 'Cancel',
-                  isSecondary: true,
-                  onPressed: () => Navigator.pop(ctx),
-                ),
-                PremiumButton(
-                  text: 'Add',
-                  onPressed: () async {
-                    if (selectedExId == null) return;
-                    final sets = int.tryParse(setsCtrl.text.trim()) ?? 3;
-                    final repsMin = int.tryParse(repsMinCtrl.text.trim()) ?? 8;
-                    final repsMax = int.tryParse(repsMaxCtrl.text.trim());
-                    final rest = int.tryParse(restCtrl.text.trim()) ?? 90;
-
-                    Navigator.pop(ctx);
-                    try {
-                      final payload = <String, dynamic>{
-                        'exerciseId': selectedExId,
-                        'targetSets': sets,
-                        'repsMin': repsMin,
-                        if (repsMax != null) 'repsMax': repsMax,
-                        'restSeconds': rest,
-                        if (notesCtrl.text.trim().isNotEmpty)
-                          'notes': notesCtrl.text.trim(),
-                      };
-                      await widget.apiClient.post(
-                        '/me/workout-plans/${widget.planId}/days/$dayId/exercises',
-                        body: payload,
-                      );
-                      if (mounted) {
-                        showPremiumSnackBar(context, 'Exercise added');
-                        _loadPlanDetails();
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        showPremiumSnackBar(
-                          context,
-                          'Failed to add exercise: ${e.toString().replaceAll("Exception: ", "")}',
-                          isError: true,
-                        );
-                      }
-                    }
-                  },
-                ),
-              ],
-            );
-          },
-        );
-      },
+  Future<void> _showAddExerciseDialog(int dayId, {Map<String, dynamic>? existing, String? dayName}) async {
+    final changed = await WorkoutExerciseEditorModal.show(
+      context,
+      apiClient: widget.apiClient,
+      planId: widget.planId,
+      dayId: dayId,
+      dayName: dayName,
+      existing: existing,
     );
+    if (changed == true && mounted) {
+      showPremiumSnackBar(context, existing == null ? 'Exercise added to workout' : 'Exercise updated');
+      _loadPlanDetails();
+    }
   }
 
   @override
@@ -1096,7 +920,7 @@ class _WorkoutPlanDetailScreenState extends State<WorkoutPlanDetailScreen> {
                             TextButton.icon(
                               icon: const Icon(Icons.add, size: 14),
                               label: const Text('Add Exercise'),
-                              onPressed: () => _showAddExerciseDialog(dayId),
+                              onPressed: () => _showAddExerciseDialog(dayId, dayName: dayName),
                             ),
                         ],
                       ),
@@ -1157,7 +981,11 @@ class _WorkoutPlanDetailScreenState extends State<WorkoutPlanDetailScreen> {
                                     ],
                                   ),
                                 ),
-                                if (isDraft)
+                                if (isDraft) ...[
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_outlined, size: 18),
+                                    onPressed: () => _showAddExerciseDialog(dayId, existing: exMap, dayName: dayName),
+                                  ),
                                   IconButton(
                                     icon: Icon(Icons.delete_outline,
                                         size: 18, color: colors.rose),
@@ -1170,6 +998,7 @@ class _WorkoutPlanDetailScreenState extends State<WorkoutPlanDetailScreen> {
                                       } catch (_) {}
                                     },
                                   ),
+                                ],
                               ],
                             ),
                           );

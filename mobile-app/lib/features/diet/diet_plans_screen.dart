@@ -3,6 +3,7 @@ import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/premium_widgets.dart';
 import 'diet_plan_builder_screen.dart';
+import 'diet_meal_editor_modal.dart';
 
 class DietPlansScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -621,87 +622,22 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
     }
   }
 
-  Future<void> _showAddMealDialog() async {
-    final nameCtrl = TextEditingController();
-    final timeCtrl = TextEditingController(text: '08:00');
-
-    await showPremiumDialog(
-      context: context,
-      builder: (ctx) {
-        final colors = AppThemeColors.of(ctx);
-        return AlertDialog(
-          backgroundColor: colors.card,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadii.xl),
-            side: BorderSide(color: colors.border),
-          ),
-          title: Text(
-            'Add Meal to Plan',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 18,
-              color: colors.textPrimary,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              PremiumTextField(
-                label: 'Meal Name',
-                hint: 'e.g. Breakfast, Post-Workout',
-                controller: nameCtrl,
-              ),
-              const SizedBox(height: 12),
-              PremiumTextField(
-                label: 'Suggested Time (HH:MM)',
-                controller: timeCtrl,
-              ),
-            ],
-          ),
-          actions: [
-            PremiumButton(
-              text: 'Cancel',
-              isSecondary: true,
-              onPressed: () => Navigator.pop(ctx),
-            ),
-            PremiumButton(
-              text: 'Add Meal',
-              onPressed: () async {
-                final name = nameCtrl.text.trim();
-                if (name.isEmpty) return;
-                Navigator.pop(ctx);
-                try {
-                  final versionId = _currentVersionId;
-                  if (versionId == null) return;
-                  final payload = <String, dynamic>{
-                    'name': name,
-                    if (timeCtrl.text.trim().isNotEmpty)
-                      'scheduledTime': timeCtrl.text.trim(),
-                  };
-                  await widget.apiClient.post(
-                    '/me/diet-plans/${widget.planId}/versions/$versionId/meals',
-                    body: payload,
-                  );
-                  if (mounted) {
-                    showPremiumSnackBar(context, 'Meal added to diet plan');
-                    _loadPlanDetails();
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    showPremiumSnackBar(
-                      context,
-                      'Failed to add meal: ${e.toString().replaceAll("Exception: ", "")}',
-                      isError: true,
-                    );
-                  }
-                }
-              },
-            ),
-          ],
-        );
-      },
+  Future<void> _showAddMealDialog({Map<String, dynamic>? existing}) async {
+    final versionId = _currentVersionId;
+    if (versionId == null) return;
+    final changed = await DietMealEditorModal.show(
+      context,
+      apiClient: widget.apiClient,
+      planId: widget.planId,
+      versionId: versionId,
+      existing: existing,
     );
+    if (changed == true && mounted) {
+      showPremiumSnackBar(context, existing == null ? 'Meal added to diet plan' : 'Meal updated');
+      _loadPlanDetails();
+    }
   }
+
 
   Future<void> _showAddOptionGroupDialog(int mealId) async {
     final nameCtrl = TextEditingController(text: 'Primary Food Option');
@@ -1136,13 +1072,23 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
                             ],
                           ),
                           if (isDraft)
-                            TextButton.icon(
-                              icon: const Icon(Icons.add, size: 14),
-                              label: const Text('Add Group'),
-                              onPressed: () => _showAddOptionGroupDialog(mealId),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined, size: 18),
+                                  onPressed: () => _showAddMealDialog(existing: mealMap),
+                                ),
+                                TextButton.icon(
+                                  icon: const Icon(Icons.add, size: 14),
+                                  label: const Text('Add Group'),
+                                  onPressed: () => _showAddOptionGroupDialog(mealId),
+                                ),
+                              ],
                             ),
                         ],
                       ),
+
                       const SizedBox(height: 8),
                       if (optionGroups.isEmpty)
                         Text(

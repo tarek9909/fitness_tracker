@@ -319,6 +319,7 @@ CREATE TABLE IF NOT EXISTS workout_plan_days (
     day_order INT UNSIGNED NOT NULL,
     description TEXT NULL,
     is_rest_day BOOLEAN NOT NULL DEFAULT FALSE,
+    notes TEXT NULL,
     created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     CONSTRAINT uq_workout_plan_day_weekday UNIQUE (workout_plan_version_id, weekday),

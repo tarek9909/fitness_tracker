@@ -405,6 +405,11 @@ export class DietPlanService {
       if (data.dailyCarbsTargetG !== undefined) { set.push('daily_carbs_target_g = ?'); values.push(data.dailyCarbsTargetG); }
       if (data.dailyFatTargetG !== undefined) { set.push('daily_fat_target_g = ?'); values.push(data.dailyFatTargetG); }
       if (data.changeSummary !== undefined) { set.push('change_notes = ?'); values.push(data.changeSummary); }
+      if (data.dailyCaloriesTarget !== undefined) { set.push('daily_calorie_target = ?'); values.push(data.dailyCaloriesTarget); }
+      if (data.dailyProteinTargetG !== undefined) { set.push('daily_protein_target_g = ?'); values.push(data.dailyProteinTargetG); }
+      if (data.dailyCarbsTargetG !== undefined) { set.push('daily_carbs_target_g = ?'); values.push(data.dailyCarbsTargetG); }
+      if (data.dailyFatTargetG !== undefined) { set.push('daily_fat_target_g = ?'); values.push(data.dailyFatTargetG); }
+      if (data.changeSummary !== undefined) { set.push('change_notes = ?'); values.push(data.changeSummary); }
 
       if (set.length > 0) {
         await conn.execute(`UPDATE diet_plan_versions SET ${set.join(', ')} WHERE id = ?`, [...values, versionId]);
@@ -414,7 +419,7 @@ export class DietPlanService {
     return this.getVersionDetails(versionId);
   }
 
-  async addMeal(versionId: number, data: { name: string; scheduledTime?: string | null; orderIndex?: number | null; notes?: string | null; isRequired?: boolean | null }) {
+  async addMeal(versionId: number, data: { name: string; scheduledTime?: string | null; orderIndex?: number | null; notes?: string | null; isRequired?: boolean | null; defaultGraceMinutes?: number | null }) {
     await this.db.withTransaction(async (conn) => {
       const version = await conn.queryOne<any>('SELECT status FROM diet_plan_versions WHERE id = ?', [versionId]);
       if (!version) throw new NotFoundError('Diet plan version not found');
@@ -428,8 +433,8 @@ export class DietPlanService {
       }
 
       await conn.execute(
-        `INSERT INTO diet_meals (diet_plan_version_id, name, scheduled_time, meal_order, description, is_required)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO diet_meals (diet_plan_version_id, name, scheduled_time, meal_order, description, is_required, default_grace_minutes)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           versionId,
           data.name,
@@ -437,6 +442,7 @@ export class DietPlanService {
           orderIndex,
           data.notes || null,
           data.isRequired !== false ? 1 : 0,
+          data.defaultGraceMinutes ?? 60,
         ]
       );
       if (version.status === 'published') await this.validatePublishedStructure(versionId, conn);
@@ -444,7 +450,7 @@ export class DietPlanService {
     return this.getVersionDetails(versionId);
   }
 
-  async updateMeal(mealId: number, data: { name?: string | null; scheduledTime?: string | null; orderIndex?: number | null; notes?: string | null; isRequired?: boolean | null }) {
+  async updateMeal(mealId: number, data: { name?: string | null; scheduledTime?: string | null; orderIndex?: number | null; notes?: string | null; isRequired?: boolean | null; defaultGraceMinutes?: number | null }) {
     let versionId: number = 0;
     await this.db.withTransaction(async (conn) => {
       const meal = await conn.queryOne<any>(
@@ -478,6 +484,7 @@ export class DietPlanService {
       if (updatePayload.orderIndex !== undefined) { set.push('meal_order = ?'); values.push(updatePayload.orderIndex); }
       if (updatePayload.notes !== undefined) { set.push('description = ?'); values.push(updatePayload.notes); }
       if (updatePayload.isRequired !== undefined) { set.push('is_required = ?'); values.push(updatePayload.isRequired ? 1 : 0); }
+      if (updatePayload.defaultGraceMinutes !== undefined) { set.push('default_grace_minutes = ?'); values.push(updatePayload.defaultGraceMinutes); }
 
       if (set.length > 0) {
         await conn.execute(`UPDATE diet_meals SET ${set.join(', ')} WHERE id = ?`, [...values, mealId]);
@@ -821,6 +828,7 @@ const addMealSchema = z.object({
   orderIndex: z.number().int().min(1).nullish(),
   notes: z.string().max(2000).nullish(),
   isRequired: z.boolean().nullish(),
+  defaultGraceMinutes: z.number().int().min(0).max(720).nullish(),
 });
 
 const updateMealSchema = addMealSchema.partial();

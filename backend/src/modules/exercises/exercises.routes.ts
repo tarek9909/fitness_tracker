@@ -9,6 +9,7 @@ export async function exercisesRoutes(fastify: FastifyInstance) {
   // Admin and user access for library read
   fastify.get('/exercises/metadata', { preHandler: [authenticate] }, (req, res) => controller.getMetadata(req, res));
   fastify.get('/exercises', { preHandler: [authenticate] }, (req, res) => controller.listExercises(req, res));
+  fastify.post('/exercises', { preHandler: [authenticate] }, (req, res) => controller.createExercise(req, res));
   fastify.get('/admin/exercises/metadata', { preHandler: [authenticate, requireAdmin] }, (req, res) => controller.getMetadata(req, res));
   fastify.get('/admin/exercises', { preHandler: [authenticate, requireAdmin] }, (req, res) => controller.listExercises(req, res));
   fastify.post('/admin/exercises', { preHandler: [authenticate, requireAdmin] }, (req, res) => controller.createExercise(req, res));

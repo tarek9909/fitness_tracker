@@ -1002,6 +1002,45 @@ const migrations: Migration[] = [
       await ensureColumnExists(db, 'meal_log_selections', 'fiber_g_snapshot', 'DECIMAL(10,2) NULL');
     },
   },
+  {
+    version: '011-workout-plan-days-and-exercises',
+    up: async (db) => {
+      logger.info('Running migration 011: ensuring notes and runtime columns on workout_plan_days and workout_plan_exercises');
+
+      // 1. workout_plan_days
+      await ensureColumnExists(db, 'workout_plan_days', 'notes', 'TEXT NULL');
+      await ensureColumnExists(db, 'workout_plan_days', 'description', 'TEXT NULL');
+      await ensureColumnExists(db, 'workout_plan_days', 'day_order', 'INTEGER NOT NULL DEFAULT 1');
+      await ensureColumnExists(db, 'workout_plan_days', 'weekday', 'INTEGER NOT NULL DEFAULT 1');
+      await ensureColumnExists(db, 'workout_plan_days', 'is_rest_day', 'INTEGER NOT NULL DEFAULT 0');
+
+      // 2. workout_plan_exercises
+      await ensureColumnExists(db, 'workout_plan_exercises', 'notes', 'TEXT NULL');
+      await ensureColumnExists(db, 'workout_plan_exercises', 'is_optional', 'INTEGER NOT NULL DEFAULT 0');
+      await ensureColumnExists(db, 'workout_plan_exercises', 'target_sets', 'INTEGER NOT NULL DEFAULT 3');
+      await ensureColumnExists(db, 'workout_plan_exercises', 'target_reps_min', 'INTEGER NULL');
+      await ensureColumnExists(db, 'workout_plan_exercises', 'target_reps_max', 'INTEGER NULL');
+      await ensureColumnExists(db, 'workout_plan_exercises', 'target_duration_seconds', 'INTEGER NULL');
+      await ensureColumnExists(db, 'workout_plan_exercises', 'target_distance_meters', 'DECIMAL(10,2) NULL');
+      await ensureColumnExists(db, 'workout_plan_exercises', 'rest_seconds', 'INTEGER NULL');
+      await ensureColumnExists(db, 'workout_plan_exercises', 'exercise_order', 'INTEGER NOT NULL DEFAULT 1');
+      await ensureColumnExists(db, 'workout_plan_exercises', 'exercise_name_snapshot', 'VARCHAR(191) NULL');
+      await ensureColumnExists(db, 'workout_plan_exercises', 'tracking_type_snapshot', "VARCHAR(30) NOT NULL DEFAULT 'weight_reps'");
+
+      // 3. Backfill from legacy columns if present
+      await backfillColumnData(db, 'workout_plan_days', 'day_order', 'order_index', 'order_index');
+      await backfillColumnData(db, 'workout_plan_days', 'weekday', 'weekday_number', 'weekday_number');
+      await backfillColumnData(db, 'workout_plan_exercises', 'exercise_order', 'order_index', 'order_index');
+      await backfillColumnData(db, 'workout_plan_exercises', 'target_reps_min', 'reps_min', 'reps_min');
+      await backfillColumnData(db, 'workout_plan_exercises', 'target_reps_max', 'reps_max', 'reps_max');
+
+      // 4. diet_meals
+      await ensureColumnExists(db, 'diet_meals', 'default_grace_minutes', 'INTEGER NOT NULL DEFAULT 60');
+      await ensureColumnExists(db, 'diet_meals', 'description', 'TEXT NULL');
+      await ensureColumnExists(db, 'diet_meals', 'scheduled_time', 'TIME NULL');
+      await ensureColumnExists(db, 'diet_meals', 'is_required', 'INTEGER NOT NULL DEFAULT 1');
+    },
+  },
 ];
 
 export async function runMigrations(customDb?: DatabasePool) {

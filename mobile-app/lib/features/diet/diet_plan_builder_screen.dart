@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/premium_widgets.dart';
+import 'diet_meal_editor_modal.dart';
 
 class DietPlanBuilderScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -80,27 +81,17 @@ class _DietPlanBuilderScreenState extends State<DietPlanBuilderScreen> {
   Future<void> _editMeal({Map<String, dynamic>? existing}) async {
     final versionId = _id(_version?['id']);
     if (versionId == null) return;
-    final name = TextEditingController(text: existing?['name']?.toString() ?? '');
-    final time = TextEditingController(text: existing?['scheduled_time']?.toString() ?? existing?['meal_time']?.toString() ?? '08:00');
-    final notes = TextEditingController(text: existing?['notes']?.toString() ?? '');
-    var required = existing?['is_required'] != 0 && existing?['isRequired'] != false;
-    final saved = await showPremiumDialog<bool>(context: context, builder: (dialogContext) {
-      return StatefulBuilder(builder: (context, setState) => AlertDialog(
-        title: Text(existing == null ? 'Add meal' : 'Edit meal'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [PremiumTextField(label: 'Meal name', controller: name), PremiumTextField(label: 'Time', controller: time), SwitchListTile(title: const Text('Required meal'), value: required, onChanged: (value) => setState(() => required = value)), PremiumTextField(label: 'Meal notes', controller: notes, maxLines: 2)]),
-        actions: [PremiumButton(text: 'Cancel', isSecondary: true, onPressed: () => Navigator.pop(dialogContext, false)), PremiumButton(text: 'Save', onPressed: () => Navigator.pop(dialogContext, true))],
-      ));
-    });
-    final mealId = _id(existing?['id']);
-    final payload = {'name': name.text.trim(), 'scheduledTime': time.text.trim(), 'notes': notes.text.trim(), 'isRequired': required};
-    if (saved != true || payload['name'] == '') return;
-    await _mutate(() async {
-      if (mealId == null) {
-        await widget.apiClient.post('/me/diet-plans/${widget.planId}/versions/$versionId/meals', body: payload);
-      } else {
-        await widget.apiClient.patch('/me/diet-plans/${widget.planId}/meals/$mealId', body: payload);
-      }
-    }, existing == null ? 'Meal added' : 'Meal updated');
+    final updated = await DietMealEditorModal.show(
+      context,
+      apiClient: widget.apiClient,
+      planId: widget.planId,
+      versionId: versionId,
+      planName: _plan?['name']?.toString(),
+      existing: existing,
+    );
+    if (updated == true) {
+      await _reload();
+    }
   }
 
   Future<void> _deleteMeal(Map<String, dynamic> meal) async {
