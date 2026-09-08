@@ -335,10 +335,34 @@ export class UsersRepository {
           `SELECT uct.*, ca.name as activity_name FROM user_cardio_targets uct LEFT JOIN cardio_activities ca ON ca.id = uct.cardio_activity_id WHERE uct.user_id = ? AND uct.status = 'active' ORDER BY uct.id ASC`,
           [userId]
         ),
-        this.db.query(
-          `SELECT *, name as title, trigger_mode as mode FROM reminder_rules WHERE user_id = ? OR (rule_scope = 'system' AND user_id IS NULL AND is_active = 1) ORDER BY id ASC`,
-          [userId]
-        ),
+        (async () => {
+          try {
+            return await this.db.query(
+              `SELECT *, name as title, trigger_mode as mode FROM reminder_rules WHERE user_id = ? OR (rule_scope = 'system' AND user_id IS NULL AND is_active = 1) ORDER BY id ASC`,
+              [userId]
+            );
+          } catch (err: any) {
+            if (
+              err.code === 'ER_BAD_FIELD_ERROR' ||
+              err.message?.includes('trigger_mode') ||
+              err.message?.includes('Unknown column')
+            ) {
+              const rows = await this.db.query(
+                `SELECT * FROM reminder_rules WHERE user_id = ? OR (user_id IS NULL AND is_active = 1) ORDER BY id ASC`,
+                [userId]
+              );
+              return rows.map((r: any) => ({
+                ...r,
+                title: r.title ?? r.name ?? 'Reminder',
+                name: r.name ?? r.title ?? 'Reminder',
+                mode: r.mode ?? r.trigger_mode ?? 'fixed_time',
+                trigger_mode: r.trigger_mode ?? r.mode ?? 'fixed_time',
+                rule_scope: r.rule_scope ?? (r.user_id ? 'user' : 'system'),
+              }));
+            }
+            return [];
+          }
+        })(),
         this.db.queryOne(
           `SELECT uwa.*, wp.id as workout_plan_id, wp.name as plan_name, wp.visibility as plan_visibility, wp.owner_user_id as plan_owner_user_id, wpv.version_number
            FROM user_workout_assignments uwa
