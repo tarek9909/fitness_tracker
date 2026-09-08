@@ -1273,6 +1273,34 @@ const migrations: Migration[] = [
       }
     },
   },
+  {
+    version: '019-cardio-logs-canonical-columns',
+    up: async (db) => {
+      logger.info('Running migration 019: ensuring target_date and canonical columns on cardio_logs');
+      await ensureColumnExists(db, 'cardio_logs', 'cardio_date', 'DATE NULL');
+      await ensureColumnExists(db, 'cardio_logs', 'target_date', 'DATE NULL');
+      await ensureColumnExists(db, 'cardio_logs', 'speed_kmh', 'DECIMAL(6,2) NULL');
+      await ensureColumnExists(db, 'cardio_logs', 'average_speed_kmh', 'DECIMAL(6,2) NULL');
+      await ensureColumnExists(db, 'cardio_logs', 'incline', 'DECIMAL(5,2) NULL');
+      await ensureColumnExists(db, 'cardio_logs', 'incline_pct', 'DECIMAL(5,2) NULL');
+      await ensureColumnExists(db, 'cardio_logs', 'started_at', 'DATETIME NULL');
+
+      if (configuredDbClient() === 'mysql') {
+        try {
+          await db.execute('ALTER TABLE cardio_logs MODIFY COLUMN target_date DATE NULL');
+        } catch {
+          // Continue if target_date is already nullable or alter not supported
+        }
+      }
+
+      await backfillColumnData(db, 'cardio_logs', 'cardio_date', 'target_date', 'target_date');
+      await backfillColumnData(db, 'cardio_logs', 'target_date', 'cardio_date', 'cardio_date');
+      await backfillColumnData(db, 'cardio_logs', 'speed_kmh', 'average_speed_kmh', 'average_speed_kmh');
+      await backfillColumnData(db, 'cardio_logs', 'average_speed_kmh', 'speed_kmh', 'speed_kmh');
+      await backfillColumnData(db, 'cardio_logs', 'incline', 'incline_pct', 'incline_pct');
+      await backfillColumnData(db, 'cardio_logs', 'incline_pct', 'incline', 'incline');
+    },
+  },
 ];
 
 export async function runMigrations(customDb?: DatabasePool) {

@@ -1300,6 +1300,43 @@ describe('Fitness Platform REST API Suite', () => {
       expect(json.success).toBe(true);
       expect(json.data.length).toBeGreaterThanOrEqual(1);
     });
+
+    it('POST /api/v1/me/cardio should record cardio session with speed and incline and return normalized history', async () => {
+      const payload = {
+        cardioActivityId: 1,
+        durationMinutes: 25,
+        speedKmh: 5.5,
+        inclinePct: 3.0,
+      };
+
+      const postRes = await app.inject({
+        method: 'POST',
+        url: '/api/v1/me/cardio',
+        headers: { authorization: `Bearer ${userToken}` },
+        payload,
+      });
+
+      expect(postRes.statusCode).toBe(201);
+      const postJson = postRes.json();
+      expect(postJson.success).toBe(true);
+      expect(postJson.data.durationMinutes).toBe(25);
+
+      const histRes = await app.inject({
+        method: 'GET',
+        url: '/api/v1/me/cardio/history',
+        headers: { authorization: `Bearer ${userToken}` },
+      });
+
+      expect(histRes.statusCode).toBe(200);
+      const histJson = histRes.json();
+      expect(histJson.success).toBe(true);
+      expect(Array.isArray(histJson.data)).toBe(true);
+      const latest = histJson.data[0];
+      expect(latest).toBeDefined();
+      expect(latest.cardio_date).toBeDefined();
+      expect(latest.target_date).toBeDefined();
+      expect(latest.incline_pct).toBeDefined();
+    });
   });
 
   describe('8. Progress, Admin Analytics & Background Reminders', () => {
