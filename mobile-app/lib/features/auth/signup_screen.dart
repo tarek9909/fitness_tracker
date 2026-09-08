@@ -5,6 +5,7 @@ import '../../core/push/push_registration_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../core/widgets/premium_widgets.dart';
+import '../../core/widgets/pulse_forge_logo.dart';
 
 class SignUpScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -241,38 +242,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Atmospheric Brand Icon
-                    Center(
-                      child: Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: colors.surfaceElevated,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.08),
-                            width: 1,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: colors.isDark
-                                  ? const Color(0x20FFFFFF)
-                                  : const Color(0x0A000000),
-                              blurRadius: 20,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Icon(
-                            Icons.fitness_center,
-                            size: 28,
-                            color: colors.primary,
-                          ),
-                        ),
+                    // Atmospheric Brand Icon & Logo
+                    const Center(
+                      child: PulseForgeLogo(
+                        size: 72,
+                        showGlow: true,
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 18),
 
                     // Title & Subtitle
                     Text(

@@ -93,46 +93,43 @@ class ApiConfig {
     final trimmed = definedUrl.trim();
 
     if (isReleaseMode) {
-      if (trimmed.isEmpty) {
-        throw ReleaseConfigurationError(
-          'API_BASE_URL must be explicitly defined for release builds via --dart-define=API_BASE_URL=https://...',
-        );
-      }
+      // In release mode, default to onlineProductionBaseUrl if not explicitly overridden
+      final effectiveUrl = trimmed.isNotEmpty ? trimmed : onlineProductionBaseUrl;
 
       final Uri uri;
       try {
-        uri = Uri.parse(trimmed);
+        uri = Uri.parse(effectiveUrl);
       } catch (e) {
         throw ReleaseConfigurationError(
-          'API_BASE_URL is not a valid URI (received: "$trimmed").',
+          'API_BASE_URL is not a valid URI (received: "$effectiveUrl").',
         );
       }
 
       if (uri.scheme != 'https') {
         throw ReleaseConfigurationError(
-          'API_BASE_URL in release builds must use encrypted HTTPS (received: "$trimmed").',
+          'API_BASE_URL in release builds must use encrypted HTTPS (received: "$effectiveUrl").',
         );
       }
 
       if (uri.host.trim().isEmpty) {
         throw ReleaseConfigurationError(
-          'API_BASE_URL in release builds must include a valid host (received: "$trimmed").',
+          'API_BASE_URL in release builds must include a valid host (received: "$effectiveUrl").',
         );
       }
 
       if (uri.userInfo.isNotEmpty) {
         throw ReleaseConfigurationError(
-          'API_BASE_URL in release builds must not contain embedded user credentials (received: "$trimmed").',
+          'API_BASE_URL in release builds must not contain embedded user credentials (received: "$effectiveUrl").',
         );
       }
 
       if (uri.hasPort && (uri.port <= 0 || uri.port > 65535)) {
         throw ReleaseConfigurationError(
-          'API_BASE_URL in release builds has an invalid port (received: "$trimmed").',
+          'API_BASE_URL in release builds has an invalid port (received: "$effectiveUrl").',
         );
       }
 
-      var sanitized = trimmed;
+      var sanitized = effectiveUrl;
       while (sanitized.endsWith('/')) {
         sanitized = sanitized.substring(0, sanitized.length - 1);
       }

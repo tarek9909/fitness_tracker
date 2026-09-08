@@ -3,22 +3,18 @@ import 'package:fitness_mobile_app/core/api/api_config.dart';
 
 void main() {
   group('ApiConfig & Release URL Validation Suite', () {
-    test('Release mode rejects empty or whitespace API_BASE_URL', () {
-      expect(
-        () => ApiConfig.validateAndResolveBaseUrl(
-          definedUrl: '',
-          isReleaseMode: true,
-        ),
-        throwsA(isA<ReleaseConfigurationError>()),
+    test('Release mode defaults to onlineProductionBaseUrl when API_BASE_URL is empty or whitespace', () {
+      final emptyResult = ApiConfig.validateAndResolveBaseUrl(
+        definedUrl: '',
+        isReleaseMode: true,
       );
+      expect(emptyResult, ApiConfig.onlineProductionBaseUrl);
 
-      expect(
-        () => ApiConfig.validateAndResolveBaseUrl(
-          definedUrl: '   ',
-          isReleaseMode: true,
-        ),
-        throwsA(isA<ReleaseConfigurationError>()),
+      final whitespaceResult = ApiConfig.validateAndResolveBaseUrl(
+        definedUrl: '   ',
+        isReleaseMode: true,
       );
+      expect(whitespaceResult, ApiConfig.onlineProductionBaseUrl);
     });
 
     test('Release mode rejects unencrypted http:// URLs', () {
