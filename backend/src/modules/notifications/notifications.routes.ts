@@ -78,21 +78,58 @@ export class NotificationsController {
       });
     }
 
-    const notifications = await this.db.query(
-      `SELECT n.*, 
-              n.message as body, 
-              (CASE WHEN n.status = 'read' THEN 1 ELSE 0 END) as is_read 
-       FROM notifications n 
-       WHERE n.user_id = ? 
-         AND n.status != 'dismissed'
-         AND (
-           EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = n.id AND nd.channel = 'in_app')
-           OR NOT EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = n.id)
-         )
-       ORDER BY n.created_at DESC 
-       LIMIT 50`,
-      [auth.userId]
-    );
+    let notifications: any[];
+    try {
+      notifications = await this.db.query(
+        `SELECT n.*, 
+                n.message as body, 
+                (CASE WHEN n.status = 'read' THEN 1 ELSE 0 END) as is_read 
+         FROM notifications n 
+         WHERE n.user_id = ? 
+           AND n.status != 'dismissed'
+           AND (
+             EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = n.id AND nd.channel = 'in_app')
+             OR NOT EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = n.id)
+           )
+         ORDER BY n.created_at DESC 
+         LIMIT 50`,
+        [auth.userId]
+      );
+    } catch {
+      try {
+        const rows = await this.db.query(
+          `SELECT n.*, 
+                  n.message as body, 
+                  (CASE WHEN (n.is_read = 1 OR n.read_at IS NOT NULL) THEN 1 ELSE 0 END) as is_read,
+                  (CASE 
+                    WHEN n.dismissed_at IS NOT NULL THEN 'dismissed'
+                    WHEN (n.is_read = 1 OR n.read_at IS NOT NULL) THEN 'read'
+                    ELSE 'unread'
+                  END) as status
+           FROM notifications n 
+           WHERE n.user_id = ? 
+             AND n.dismissed_at IS NULL
+             AND (
+               EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = n.id AND nd.channel = 'in_app')
+               OR NOT EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = n.id)
+             )
+           ORDER BY n.created_at DESC 
+           LIMIT 50`,
+          [auth.userId]
+        );
+        notifications = rows;
+      } catch {
+        const rows = await this.db.query(
+          `SELECT n.*, n.message as body FROM notifications n WHERE n.user_id = ? ORDER BY n.created_at DESC LIMIT 50`,
+          [auth.userId]
+        );
+        notifications = rows.map((r: any) => ({
+          ...r,
+          is_read: r.is_read ? 1 : 0,
+          status: r.status || (r.is_read ? 'read' : 'unread'),
+        }));
+      }
+    }
     return reply.status(200).send({
       success: true,
       data: notifications,
@@ -112,17 +149,32 @@ export class NotificationsController {
       });
     }
 
-    const result = await this.db.execute(
-      `UPDATE notifications 
-       SET status = 'read', read_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = ? 
-         AND user_id = ?
-         AND (
-           EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = ? AND nd.channel = 'in_app')
-           OR NOT EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = ?)
-         )`,
-      [notificationId, auth.userId, notificationId, notificationId]
-    );
+    let result: any;
+    try {
+      result = await this.db.execute(
+        `UPDATE notifications 
+         SET status = 'read', read_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+         WHERE id = ? 
+           AND user_id = ?
+           AND (
+             EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = ? AND nd.channel = 'in_app')
+             OR NOT EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = ?)
+           )`,
+        [notificationId, auth.userId, notificationId, notificationId]
+      );
+    } catch {
+      result = await this.db.execute(
+        `UPDATE notifications 
+         SET is_read = 1, read_at = CURRENT_TIMESTAMP 
+         WHERE id = ? 
+           AND user_id = ?
+           AND (
+             EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = ? AND nd.channel = 'in_app')
+             OR NOT EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = ?)
+           )`,
+        [notificationId, auth.userId, notificationId, notificationId]
+      );
+    }
     if (result.affectedRows === 0) {
       return reply.status(404).send({
         success: false,
@@ -146,17 +198,31 @@ export class NotificationsController {
       });
     }
 
-    await this.db.execute(
-      `UPDATE notifications 
-       SET status = 'read', read_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
-       WHERE user_id = ? 
-         AND status = 'unread'
-         AND (
-           EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = notifications.id AND nd.channel = 'in_app')
-           OR NOT EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = notifications.id)
-         )`,
-      [auth.userId]
-    );
+    try {
+      await this.db.execute(
+        `UPDATE notifications 
+         SET status = 'read', read_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+         WHERE user_id = ? 
+           AND status = 'unread'
+           AND (
+             EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = notifications.id AND nd.channel = 'in_app')
+             OR NOT EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = notifications.id)
+           )`,
+        [auth.userId]
+      );
+    } catch {
+      await this.db.execute(
+        `UPDATE notifications 
+         SET is_read = 1, read_at = CURRENT_TIMESTAMP 
+         WHERE user_id = ? 
+           AND (is_read = 0 OR is_read IS NULL)
+           AND (
+             EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = notifications.id AND nd.channel = 'in_app')
+             OR NOT EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = notifications.id)
+           )`,
+        [auth.userId]
+      );
+    }
     return reply.status(200).send({
       success: true,
       data: { message: 'All notifications marked as read' },
@@ -176,17 +242,32 @@ export class NotificationsController {
       });
     }
 
-    const result = await this.db.execute(
-      `UPDATE notifications 
-       SET status = 'dismissed', dismissed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = ? 
-         AND user_id = ?
-         AND (
-           EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = ? AND nd.channel = 'in_app')
-           OR NOT EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = ?)
-         )`,
-      [notificationId, auth.userId, notificationId, notificationId]
-    );
+    let result: any;
+    try {
+      result = await this.db.execute(
+        `UPDATE notifications 
+         SET status = 'dismissed', dismissed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+         WHERE id = ? 
+           AND user_id = ?
+           AND (
+             EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = ? AND nd.channel = 'in_app')
+             OR NOT EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = ?)
+           )`,
+        [notificationId, auth.userId, notificationId, notificationId]
+      );
+    } catch {
+      result = await this.db.execute(
+        `UPDATE notifications 
+         SET dismissed_at = CURRENT_TIMESTAMP 
+         WHERE id = ? 
+           AND user_id = ?
+           AND (
+             EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = ? AND nd.channel = 'in_app')
+             OR NOT EXISTS (SELECT 1 FROM notification_deliveries nd WHERE nd.notification_id = ?)
+           )`,
+        [notificationId, auth.userId, notificationId, notificationId]
+      );
+    }
     if (result.affectedRows === 0) {
       return reply.status(404).send({
         success: false,

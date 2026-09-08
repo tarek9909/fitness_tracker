@@ -1229,6 +1229,50 @@ const migrations: Migration[] = [
       }
     },
   },
+  {
+    version: '018-notifications-canonical-columns',
+    up: async (db) => {
+      logger.info('Running migration 018: ensuring status and canonical columns on notifications');
+      await ensureColumnExists(db, 'notifications', 'status', "VARCHAR(20) NOT NULL DEFAULT 'unread'");
+      await ensureColumnExists(db, 'notifications', 'category', "VARCHAR(30) NOT NULL DEFAULT 'system'");
+      await ensureColumnExists(db, 'notifications', 'notification_type', "VARCHAR(100) NOT NULL DEFAULT 'system'");
+      await ensureColumnExists(db, 'notifications', 'is_read', 'BOOLEAN NOT NULL DEFAULT FALSE');
+      await ensureColumnExists(db, 'notifications', 'read_at', 'DATETIME NULL');
+      await ensureColumnExists(db, 'notifications', 'dismissed_at', 'DATETIME NULL');
+      await ensureColumnExists(db, 'notifications', 'scheduled_at', 'DATETIME NULL');
+      await ensureColumnExists(db, 'notifications', 'updated_at', 'DATETIME NULL');
+
+      await ensureColumnExists(db, 'notification_deliveries', 'attempt_count', 'INTEGER NOT NULL DEFAULT 0');
+      await ensureColumnExists(db, 'notification_deliveries', 'last_error', 'TEXT NULL');
+      await ensureColumnExists(db, 'notification_deliveries', 'delivered_at', 'DATETIME NULL');
+      await ensureColumnExists(db, 'notification_deliveries', 'sent_at', 'DATETIME NULL');
+      await ensureColumnExists(db, 'notification_deliveries', 'failed_at', 'DATETIME NULL');
+
+      try {
+        await db.execute(`
+          UPDATE notifications 
+          SET status = CASE 
+            WHEN dismissed_at IS NOT NULL THEN 'dismissed'
+            WHEN (is_read = 1 OR read_at IS NOT NULL) THEN 'read'
+            ELSE 'unread'
+          END
+          WHERE status IS NULL OR status = 'unread'
+        `);
+      } catch {
+        // Continue if backfill cannot execute
+      }
+
+      try {
+        await db.execute(`
+          UPDATE notifications
+          SET is_read = CASE WHEN status = 'read' THEN 1 ELSE 0 END
+          WHERE is_read IS NULL OR (status = 'read' AND is_read = 0)
+        `);
+      } catch {
+        // Continue if backfill cannot execute
+      }
+    },
+  },
 ];
 
 export async function runMigrations(customDb?: DatabasePool) {
