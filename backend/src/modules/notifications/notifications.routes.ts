@@ -229,13 +229,26 @@ export class NotificationsController {
   // --- Admin Reminder Endpoints ---
 
   async listReminders(request: FastifyRequest, reply: FastifyReply) {
-    const reminders = await this.db.query(`
-      SELECT *, 
-             name as title, 
-             trigger_mode as mode 
-      FROM reminder_rules 
-      ORDER BY id ASC
-    `);
+    let reminders: any[];
+    try {
+      reminders = await this.db.query(`
+        SELECT *, 
+               name as title, 
+               trigger_mode as mode 
+        FROM reminder_rules 
+        ORDER BY id ASC
+      `);
+    } catch {
+      const rows = await this.db.query(`SELECT * FROM reminder_rules ORDER BY id ASC`);
+      reminders = rows.map((r: any) => ({
+        ...r,
+        title: r.title ?? r.name ?? 'Reminder',
+        name: r.name ?? r.title ?? 'Reminder',
+        mode: r.mode ?? r.trigger_mode ?? 'fixed_time',
+        trigger_mode: r.trigger_mode ?? r.mode ?? 'fixed_time',
+        category: r.category ?? r.target_category ?? 'custom',
+      }));
+    }
     return reply.status(200).send({
       success: true,
       data: reminders,
@@ -245,10 +258,28 @@ export class NotificationsController {
   async getReminder(request: FastifyRequest, reply: FastifyReply) {
     const params = request.params as { id: string };
     const reminderId = parsePositiveInt(params.id, 'reminderId');
-    const reminder = await this.db.queryOne(
-      `SELECT *, name as title, trigger_mode as mode FROM reminder_rules WHERE id = ?`,
-      [reminderId]
-    );
+    let reminder: any;
+    try {
+      reminder = await this.db.queryOne(
+        `SELECT *, name as title, trigger_mode as mode FROM reminder_rules WHERE id = ?`,
+        [reminderId]
+      );
+    } catch {
+      const row = await this.db.queryOne(
+        `SELECT * FROM reminder_rules WHERE id = ?`,
+        [reminderId]
+      );
+      if (row) {
+        reminder = {
+          ...row,
+          title: row.title ?? row.name ?? 'Reminder',
+          name: row.name ?? row.title ?? 'Reminder',
+          mode: row.mode ?? row.trigger_mode ?? 'fixed_time',
+          trigger_mode: row.trigger_mode ?? row.mode ?? 'fixed_time',
+          category: row.category ?? row.target_category ?? 'custom',
+        };
+      }
+    }
     if (!reminder) throw new NotFoundError('Reminder rule not found');
     return reply.status(200).send({
       success: true,
@@ -362,13 +393,34 @@ export class NotificationsController {
 
   async getMyReminders(request: FastifyRequest, reply: FastifyReply) {
     const auth = (request as AuthenticatedRequest).user;
-    const reminders = await this.db.query(
-      `SELECT *, name as title, trigger_mode as mode
-       FROM reminder_rules
-       WHERE user_id = ? OR (rule_scope = 'system' AND user_id IS NULL AND is_active = 1)
-       ORDER BY id ASC`,
-      [auth.userId]
-    );
+    let reminders: any[];
+    try {
+      reminders = await this.db.query(
+        `SELECT *, name as title, trigger_mode as mode
+         FROM reminder_rules
+         WHERE user_id = ? OR (rule_scope = 'system' AND user_id IS NULL AND is_active = 1)
+         ORDER BY id ASC`,
+        [auth.userId]
+      );
+    } catch {
+      try {
+        const rows = await this.db.query(
+          `SELECT * FROM reminder_rules WHERE user_id = ? OR (user_id IS NULL AND is_active = 1) ORDER BY id ASC`,
+          [auth.userId]
+        );
+        reminders = rows.map((r: any) => ({
+          ...r,
+          title: r.title ?? r.name ?? 'Reminder',
+          name: r.name ?? r.title ?? 'Reminder',
+          mode: r.mode ?? r.trigger_mode ?? 'fixed_time',
+          trigger_mode: r.trigger_mode ?? r.mode ?? 'fixed_time',
+          category: r.category ?? r.target_category ?? 'custom',
+          rule_scope: r.rule_scope ?? (r.user_id ? 'user' : 'system'),
+        }));
+      } catch {
+        reminders = [];
+      }
+    }
     return reply.status(200).send({ success: true, data: reminders });
   }
 

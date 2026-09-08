@@ -342,11 +342,7 @@ export class UsersRepository {
               [userId]
             );
           } catch (err: any) {
-            if (
-              err.code === 'ER_BAD_FIELD_ERROR' ||
-              err.message?.includes('trigger_mode') ||
-              err.message?.includes('Unknown column')
-            ) {
+            try {
               const rows = await this.db.query(
                 `SELECT * FROM reminder_rules WHERE user_id = ? OR (user_id IS NULL AND is_active = 1) ORDER BY id ASC`,
                 [userId]
@@ -357,10 +353,30 @@ export class UsersRepository {
                 name: r.name ?? r.title ?? 'Reminder',
                 mode: r.mode ?? r.trigger_mode ?? 'fixed_time',
                 trigger_mode: r.trigger_mode ?? r.mode ?? 'fixed_time',
+                category: r.category ?? r.target_category ?? 'custom',
+                target_category: r.target_category ?? r.category ?? 'custom',
                 rule_scope: r.rule_scope ?? (r.user_id ? 'user' : 'system'),
               }));
+            } catch (innerErr: any) {
+              try {
+                const rows = await this.db.query(
+                  `SELECT * FROM reminder_rules WHERE user_id = ? ORDER BY id ASC`,
+                  [userId]
+                );
+                return rows.map((r: any) => ({
+                  ...r,
+                  title: r.title ?? r.name ?? 'Reminder',
+                  name: r.name ?? r.title ?? 'Reminder',
+                  mode: r.mode ?? r.trigger_mode ?? 'fixed_time',
+                  trigger_mode: r.trigger_mode ?? r.mode ?? 'fixed_time',
+                  category: r.category ?? r.target_category ?? 'custom',
+                  target_category: r.target_category ?? r.category ?? 'custom',
+                  rule_scope: r.rule_scope ?? (r.user_id ? 'user' : 'system'),
+                }));
+              } catch {
+                return [];
+              }
             }
-            return [];
           }
         })(),
         this.db.queryOne(

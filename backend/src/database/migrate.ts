@@ -1166,9 +1166,12 @@ const migrations: Migration[] = [
       logger.info('Running migration 016: ensuring trigger_mode and canonical columns on reminder_rules');
       await ensureColumnExists(db, 'reminder_rules', 'name', "VARCHAR(191) NOT NULL DEFAULT ''");
       await ensureColumnExists(db, 'reminder_rules', 'title', 'VARCHAR(191) NULL');
+      await ensureColumnExists(db, 'reminder_rules', 'category', "VARCHAR(30) NOT NULL DEFAULT 'custom'");
+      await ensureColumnExists(db, 'reminder_rules', 'target_category', 'VARCHAR(30) NULL');
       await ensureColumnExists(db, 'reminder_rules', 'rule_scope', "VARCHAR(20) NOT NULL DEFAULT 'user'");
       await ensureColumnExists(db, 'reminder_rules', 'trigger_mode', "VARCHAR(20) NOT NULL DEFAULT 'fixed_time'");
       await ensureColumnExists(db, 'reminder_rules', 'mode', 'VARCHAR(20) NULL');
+      await ensureColumnExists(db, 'reminder_rules', 'fixed_time', 'TIME NULL');
       await ensureColumnExists(db, 'reminder_rules', 'offset_minutes', 'INTEGER NULL');
       await ensureColumnExists(db, 'reminder_rules', 'grace_period_minutes', 'INTEGER NOT NULL DEFAULT 0');
       await ensureColumnExists(db, 'reminder_rules', 'repeat_interval_minutes', 'INTEGER NULL');
@@ -1179,6 +1182,8 @@ const migrations: Migration[] = [
 
       await backfillColumnData(db, 'reminder_rules', 'name', 'title', 'title');
       await backfillColumnData(db, 'reminder_rules', 'title', 'name', 'name');
+      await backfillColumnData(db, 'reminder_rules', 'category', 'target_category', 'target_category');
+      await backfillColumnData(db, 'reminder_rules', 'target_category', 'category', 'category');
       await backfillColumnData(db, 'reminder_rules', 'trigger_mode', 'mode', 'mode');
       await backfillColumnData(db, 'reminder_rules', 'mode', 'trigger_mode', 'trigger_mode');
     },
