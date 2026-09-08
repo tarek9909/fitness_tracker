@@ -23,6 +23,34 @@ const logCardioSchema = z.object({
   clientOperationId: z.string().optional(),
 });
 
+async function ensureCardioActivitiesSeeded(db: any): Promise<void> {
+  try {
+    const countRes = await db.queryOne('SELECT COUNT(*) as count FROM cardio_activities WHERE is_active = 1');
+    if (!countRes || Number(countRes.count) === 0) {
+      const activities = [
+        [1, 'Treadmill Incline Walking', 1, 1, 1, 1, 1, 4.8],
+        [2, 'Stationary Cycling', 1, 0, 1, 1, 1, 7.0],
+        [3, 'Rowing Machine', 1, 0, 1, 1, 1, 7.0],
+        [4, 'Outdoor Running', 1, 0, 1, 1, 1, 9.8],
+        [5, 'Stair Climber', 1, 0, 0, 1, 1, 9.0],
+        [6, 'Walking', 1, 1, 1, 1, 1, 3.5],
+      ];
+      for (const a of activities) {
+        const existing = await db.queryOne('SELECT id FROM cardio_activities WHERE id = ?', [a[0]]);
+        if (!existing) {
+          await db.execute(
+            `INSERT INTO cardio_activities (id, name, supports_speed, supports_incline, supports_distance, is_active, is_system, met_value)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            a,
+          );
+        }
+      }
+    }
+  } catch {
+    // Ignore seeding failures
+  }
+}
+
 export class CardioController {
   private db = getDatabasePool();
   private usersRepo = new UsersRepository();
@@ -41,10 +69,20 @@ export class CardioController {
 
     const dateStr = body.cardioDate || getUserLocalDate(user?.timezone || 'UTC');
 
-    const activity = await this.db.queryOne<{ name: string }>(
+    let activity = await this.db.queryOne<{ name: string }>(
       'SELECT name FROM cardio_activities WHERE id = ?',
       [body.cardioActivityId],
     );
+    if (!activity) {
+      const countRes = await this.db.queryOne<{ count: number }>('SELECT COUNT(*) as count FROM cardio_activities');
+      if (!countRes || Number(countRes.count) === 0) {
+        await ensureCardioActivitiesSeeded(this.db);
+        activity = await this.db.queryOne<{ name: string }>(
+          'SELECT name FROM cardio_activities WHERE id = ?',
+          [body.cardioActivityId],
+        );
+      }
+    }
     if (!activity) throw new NotFoundError('Cardio activity not found');
     const activityName = activity.name;
 
@@ -146,7 +184,11 @@ export class CardioController {
   }
 
   async getCardioActivities(request: FastifyRequest, reply: FastifyReply) {
-    const activities = await this.db.query('SELECT * FROM cardio_activities ORDER BY id ASC');
+    let activities = await this.db.query('SELECT * FROM cardio_activities ORDER BY id ASC');
+    if (activities.length === 0) {
+      await ensureCardioActivitiesSeeded(this.db);
+      activities = await this.db.query('SELECT * FROM cardio_activities ORDER BY id ASC');
+    }
     return reply.status(200).send({
       success: true,
       data: activities,
