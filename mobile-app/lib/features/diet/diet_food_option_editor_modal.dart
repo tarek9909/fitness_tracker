@@ -6,8 +6,8 @@ import '../../core/widgets/premium_widgets.dart';
 
 /// Editor for a food option inside a meal option group.
 ///
-/// Food records are selected from the authenticated catalog. The server copies
-/// nutrition into the plan option snapshot so an activated plan stays stable.
+/// Supports selecting from the authenticated food catalog OR directly entering
+/// custom food items with customizable portions, measurement units, and macro snapshots.
 class DietFoodOptionEditorModal extends StatefulWidget {
   final ApiClient apiClient;
   final int planId;
@@ -63,6 +63,8 @@ class _DietFoodOptionEditorModalState
   List<Map<String, dynamic>> _foods = [];
   Map<String, dynamic>? _selectedFood;
   int? _selectedFoodId;
+  int _selectedUnitId = 1;
+  String _selectedUnitName = 'g';
   bool _loadingFoods = true;
   bool _saving = false;
   String? _errorMessage;
@@ -77,6 +79,10 @@ class _DietFoodOptionEditorModalState
           existing?['label']?.toString() ??
           '',
     );
+    _labelCtrl.addListener(() {
+      if (mounted) setState(() {});
+    });
+
     _quantityCtrl = TextEditingController(
       text: '${existing?['serving_quantity'] ?? existing?['quantity'] ?? ''}',
     );
@@ -99,6 +105,8 @@ class _DietFoodOptionEditorModalState
       text: existing?['notes']?.toString() ?? '',
     );
     _selectedFoodId = _asInt(existing?['food_id'] ?? existing?['foodId']);
+    _selectedUnitId = _asInt(existing?['unit_id'] ?? existing?['serving_unit_id']) ?? 1;
+
     _loadFoods();
   }
 
@@ -134,6 +142,11 @@ class _DietFoodOptionEditorModalState
       error.toString().replaceAll('Exception: ', '').trim();
 
   Future<void> _loadFoods() async {
+    setState(() {
+      _loadingFoods = true;
+      _errorMessage = null;
+    });
+
     try {
       final response = await widget.apiClient.get('/foods?limit=100');
       final raw = response is Map && response['data'] is List
@@ -161,10 +174,23 @@ class _DietFoodOptionEditorModalState
           'id': _selectedFoodId,
           'name': widget.existing?['food_name']?.toString() ??
               widget.existing?['custom_label']?.toString() ??
+              widget.existing?['label']?.toString() ??
               'Saved food',
-          'unit_code': widget.existing?['unit_code']?.toString(),
+          'unit_code': widget.existing?['unit_code']?.toString() ?? 'g',
         };
         foods.insert(0, selected);
+      }
+
+      if (selected != null) {
+        final unitId = _asInt(selected['measurement_unit_id'] ??
+            selected['reference_unit_id'] ??
+            selected['measurementUnitId']);
+        if (unitId != null) {
+          _selectedUnitId = unitId;
+        }
+        _selectedUnitName = selected['unit_code']?.toString() ??
+            selected['unit_name']?.toString() ??
+            'g';
       }
 
       if (!mounted) return;
@@ -199,14 +225,21 @@ class _DietFoodOptionEditorModalState
     final foodId = _asInt(food['id']);
     if (foodId == null) return;
     final previousFoodId = _selectedFoodId;
+    final unitId = _asInt(food['measurement_unit_id'] ??
+        food['reference_unit_id'] ??
+        food['measurementUnitId']) ?? 1;
+    final unitCode = food['unit_code']?.toString() ??
+        food['unit_name']?.toString() ??
+        'g';
+
     setState(() {
       _selectedFood = food;
       _selectedFoodId = foodId;
+      _selectedUnitId = unitId;
+      _selectedUnitName = unitCode;
       _errorMessage = null;
     });
 
-    // New options start at the catalog reference serving. Existing snapshots
-    // remain untouched when the editor is opened in edit mode.
     if (widget.existing == null || previousFoodId != foodId) {
       final referenceQuantity = _asDouble(
             food['reference_quantity'] ??
@@ -216,6 +249,27 @@ class _DietFoodOptionEditorModalState
           100;
       _quantityCtrl.text = _formatNumber(referenceQuantity);
       _updateNutritionFields();
+    }
+  }
+
+  void _clearSelectedFood() {
+    setState(() {
+      _selectedFood = null;
+      _selectedFoodId = null;
+    });
+  }
+
+  void _useSearchAsCustomFood() {
+    final query = _searchCtrl.text.trim();
+    if (query.isNotEmpty) {
+      setState(() {
+        _selectedFood = null;
+        _selectedFoodId = null;
+        _labelCtrl.text = query;
+        if (_quantityCtrl.text.trim().isEmpty) {
+          _quantityCtrl.text = '100';
+        }
+      });
     }
   }
 
@@ -253,9 +307,12 @@ class _DietFoodOptionEditorModalState
 
   Future<void> _handleSave() async {
     final foodId = _selectedFoodId;
+    final customLabel = _labelCtrl.text.trim();
     final quantity = _asDouble(_quantityCtrl.text.trim());
-    if (foodId == null) {
-      setState(() => _errorMessage = 'Select a food before adding the option.');
+
+    if (foodId == null && customLabel.isEmpty) {
+      setState(() => _errorMessage =
+          'Please select a food from the catalog or enter a food name/label.');
       return;
     }
     if (quantity == null || quantity <= 0 || quantity > 10000) {
@@ -289,19 +346,21 @@ class _DietFoodOptionEditorModalState
       return _asDouble(text);
     }
 
-    final unitId = _asInt(_selectedFood?['measurement_unit_id'] ??
-        _selectedFood?['reference_unit_id'] ??
-        _selectedFood?['measurementUnitId']);
     final calories = number(_caloriesCtrl);
     final protein = number(_proteinCtrl);
     final carbs = number(_carbsCtrl);
     final fat = number(_fatCtrl);
     final fiber = number(_fiberCtrl);
+
+    final resolvedLabel = customLabel.isNotEmpty
+        ? customLabel
+        : (_selectedFood?['name']?.toString() ?? 'Food Option');
+
     final payload = <String, dynamic>{
-      'foodId': foodId,
+      if (foodId != null) 'foodId': foodId,
+      'customLabel': resolvedLabel,
       'servingQuantity': quantity,
-      'customLabel': _labelCtrl.text.trim(),
-      if (unitId != null) 'servingUnitId': unitId,
+      'servingUnitId': _selectedUnitId,
       if (calories != null) 'calories': calories,
       if (protein != null) 'proteinG': protein,
       if (carbs != null) 'carbsG': carbs,
@@ -350,7 +409,7 @@ class _DietFoodOptionEditorModalState
       label: label,
       hint: hint,
       keyboardType: keyboardType,
-      onChanged: label == 'Quantity' ? (_) => _updateNutritionFields() : null,
+      onChanged: label.startsWith('Quantity') ? (_) => _updateNutritionFields() : null,
     );
   }
 
@@ -359,11 +418,11 @@ class _DietFoodOptionEditorModalState
     final colors = AppThemeColors.of(context);
     final isEditing = widget.existing != null;
     final filtered = _filteredFoods;
-    final selectedName =
-        _selectedFood?['name']?.toString() ?? 'No food selected';
+    final hasCatalogSelection = _selectedFood != null;
+    final hasCustomName = _labelCtrl.text.trim().isNotEmpty;
     final unitName = _selectedFood?['unit_code']?.toString() ??
         _selectedFood?['unit_name']?.toString() ??
-        'catalog unit';
+        _selectedUnitName;
 
     return Container(
       constraints: BoxConstraints(
@@ -469,22 +528,35 @@ class _DietFoodOptionEditorModalState
                     decoration: BoxDecoration(
                       color: colors.surfaceElevated,
                       borderRadius: BorderRadius.circular(AppRadii.md),
+                      border: Border.all(color: colors.border),
                     ),
                     child: Column(
                       children: [
                         Text(
                           _foods.isEmpty
-                              ? 'No active foods are available.'
-                              : 'No foods match your search.',
+                              ? 'No catalog foods loaded. You can directly enter your custom food below.'
+                              : 'No catalog foods match "${_searchCtrl.text.trim()}".',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: colors.textSecondary),
+                          style: TextStyle(color: colors.textSecondary, fontSize: 13),
                         ),
-                        if (_foods.isEmpty) ...[
+                        if (_searchCtrl.text.trim().isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          ElevatedButton.icon(
+                            onPressed: _useSearchAsCustomFood,
+                            icon: const Icon(Icons.add_circle_outline, size: 16),
+                            label: Text('Use "${_searchCtrl.text.trim()}" as custom food'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: colors.primary,
+                              foregroundColor: colors.onPrimary,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            ),
+                          ),
+                        ] else if (_foods.isEmpty) ...[
                           const SizedBox(height: 8),
                           TextButton.icon(
                             onPressed: _loadFoods,
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Try again'),
+                            icon: const Icon(Icons.refresh, size: 16),
+                            label: const Text('Try reloading catalog'),
                           ),
                         ],
                       ],
@@ -536,38 +608,131 @@ class _DietFoodOptionEditorModalState
                       },
                     ),
                   ),
+
                 const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: colors.primaryMuted,
-                    borderRadius: BorderRadius.circular(AppRadii.md),
-                    border: Border.all(
-                        color: colors.primary.withValues(alpha: 0.35)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.check_circle_outline, color: colors.primary),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '$selectedName • $unitName',
-                          style: TextStyle(
-                            color: colors.textPrimary,
-                            fontWeight: FontWeight.w700,
+
+                // Selected / Custom Food Indicator Card
+                if (hasCatalogSelection)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: colors.primaryMuted,
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                      border: Border.all(
+                          color: colors.primary.withValues(alpha: 0.35)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle_rounded, color: colors.primary, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${_selectedFood!['name']}',
+                                style: TextStyle(
+                                  color: colors.textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              Text(
+                                'Catalog item • $unitName',
+                                style: TextStyle(color: colors.textSecondary, fontSize: 11),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                    ],
+                        InkWell(
+                          onTap: _clearSelectedFood,
+                          borderRadius: BorderRadius.circular(4),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                            child: Text(
+                              'Use Custom',
+                              style: TextStyle(
+                                color: colors.primary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else if (hasCustomName)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: colors.primaryMuted,
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                      border: Border.all(
+                          color: colors.primary.withValues(alpha: 0.35)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.restaurant, color: colors.primary, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Custom Food: "${_labelCtrl.text.trim()}"',
+                                style: TextStyle(
+                                  color: colors.textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              Text(
+                                'Direct plan item • Unit: $_selectedUnitName',
+                                style: TextStyle(color: colors.textSecondary, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceElevated,
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                      border: Border.all(color: colors.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: colors.textMuted, size: 18),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Pick from catalog above or enter a custom food below.',
+                            style: TextStyle(color: colors.textMuted, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+
                 const SizedBox(height: 14),
+
                 _field(
-                  label: 'Custom label (optional)',
+                  label: hasCatalogSelection
+                      ? 'Custom label override (optional)'
+                      : 'Food Name / Custom Label *',
                   controller: _labelCtrl,
-                  hint: 'e.g. Grilled chicken breast',
+                  hint: hasCatalogSelection
+                      ? 'e.g. Extra seasoned, Half portion'
+                      : 'e.g. Chicken breast, Protein shake, ujumji',
                 ),
+
                 const SizedBox(height: 12),
+
                 _field(
                   label: 'Quantity',
                   controller: _quantityCtrl,
@@ -575,7 +740,63 @@ class _DietFoodOptionEditorModalState
                       const TextInputType.numberWithOptions(decimal: true),
                   hint: 'e.g. 150',
                 ),
+
+                const SizedBox(height: 12),
+
+                // Serving Unit Selection
+                Row(
+                  children: [
+                    Text(
+                      'Unit:',
+                      style: TextStyle(
+                        color: colors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          {'id': 1, 'name': 'g'},
+                          {'id': 2, 'name': 'kg'},
+                          {'id': 3, 'name': 'ml'},
+                          {'id': 5, 'name': 'serving'},
+                          {'id': 6, 'name': 'piece'},
+                        ].map((u) {
+                          final isSel = _selectedUnitId == u['id'];
+                          return ChoiceChip(
+                            label: Text(u['name'] as String),
+                            selected: isSel,
+                            selectedColor: colors.primary,
+                            backgroundColor: colors.card,
+                            labelStyle: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: isSel ? colors.onPrimary : colors.textPrimary,
+                            ),
+                            side: BorderSide(
+                              color: isSel ? colors.primary : colors.border,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            onSelected: (_) => setState(() {
+                              _selectedUnitId = u['id'] as int;
+                              _selectedUnitName = u['name'] as String;
+                            }),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+
                 const SizedBox(height: 14),
+
                 Text(
                   'NUTRITION SNAPSHOT',
                   style: TextStyle(

@@ -660,8 +660,9 @@ export class DietPlanService {
       let fiberG = data.fiberG ?? null;
       let servingUnitId = data.servingUnitId ?? null;
 
-      if (data.foodId && (calories === null || proteinG === null || carbsG === null || fatG === null || fiberG === null)) {
-        const food = await conn.queryOne<any>('SELECT * FROM foods WHERE id = ?', [data.foodId]);
+      let food: any = null;
+      if (data.foodId) {
+        food = await conn.queryOne<any>('SELECT * FROM foods WHERE id = ?', [data.foodId]);
         if (food) {
           const referenceQuantity = Number(food.reference_quantity || 100);
           const ratio = (data.servingQuantity || referenceQuantity) / referenceQuantity;
@@ -674,6 +675,9 @@ export class DietPlanService {
         }
       }
 
+      const rawLabel = (data.customLabel || '').trim();
+      const finalLabel = rawLabel.length > 0 ? rawLabel : (food?.name || 'Food Option');
+
       const res = await conn.execute(
         `INSERT INTO diet_meal_options (
           diet_meal_option_group_id, food_id, option_order, label, quantity, unit_id,
@@ -683,7 +687,7 @@ export class DietPlanService {
           groupId,
           data.foodId || null,
           orderIndex,
-          data.customLabel || null,
+          finalLabel,
           data.servingQuantity,
           servingUnitId,
           calories,
@@ -758,7 +762,7 @@ export class DietPlanService {
       const set: string[] = [];
       const values: any[] = [];
       if (updatePayload.foodId !== undefined) { set.push('food_id = ?'); values.push(updatePayload.foodId); }
-      if (updatePayload.customLabel !== undefined) { set.push('label = ?'); values.push(updatePayload.customLabel); }
+      if (updatePayload.customLabel !== undefined && updatePayload.customLabel !== null) { set.push('label = ?'); values.push(updatePayload.customLabel.trim().length > 0 ? updatePayload.customLabel.trim() : 'Food Option'); }
       if (updatePayload.servingQuantity !== undefined) { set.push('quantity = ?'); values.push(updatePayload.servingQuantity); }
       if (updatePayload.servingUnitId !== undefined) { set.push('unit_id = ?'); values.push(updatePayload.servingUnitId); }
       if (updatePayload.calories !== undefined) { set.push('calories_snapshot = ?'); values.push(updatePayload.calories); }

@@ -166,4 +166,61 @@ void main() {
     expect(payload?['calories'], 247.5);
     expect(payload?['proteinG'], 46.5);
   });
+
+  testWidgets('custom food option can be entered directly when catalog is empty and saved',
+      (tester) async {
+    Map<String, dynamic>? payload;
+    final api = await _client((request) async {
+      if (request.method == 'GET' && request.url.path == '/api/v1/foods') {
+        return http.Response(
+          jsonEncode({'success': true, 'data': []}),
+          200,
+        );
+      }
+      if (request.method == 'POST' &&
+          request.url.path ==
+              '/api/v1/me/diet-plans/10/option-groups/30/options') {
+        payload = jsonDecode(request.body) as Map<String, dynamic>;
+        return http.Response(jsonEncode({'success': true, 'data': {'id': 99}}), 201);
+      }
+      return http.Response('{}', 404);
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () => DietFoodOptionEditorModal.show(
+                context,
+                apiClient: api,
+                planId: 10,
+                groupId: 30,
+              ),
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No catalog foods loaded. You can directly enter your custom food below.'), findsOneWidget);
+
+    final nameField = find.widgetWithText(TextField, 'Food Name / Custom Label *');
+    await tester.ensureVisible(nameField);
+    await tester.enterText(nameField, 'ujumji');
+
+    final quantityField = find.widgetWithText(TextField, 'Quantity');
+    await tester.ensureVisible(quantityField);
+    await tester.enterText(quantityField, '150');
+
+    await tester.tap(find.text('Add food'));
+    await tester.pumpAndSettle();
+
+    expect(payload?['customLabel'], 'ujumji');
+    expect(payload?['servingQuantity'], 150.0);
+    expect(payload?.containsKey('foodId'), isFalse);
+  });
 }

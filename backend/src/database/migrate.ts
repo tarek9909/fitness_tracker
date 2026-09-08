@@ -1057,6 +1057,49 @@ const migrations: Migration[] = [
       }
     },
   },
+  {
+    version: '013-seed-baseline-foods-if-empty',
+    up: async (db) => {
+      logger.info('Running migration 013: ensuring baseline foods exist');
+      try {
+        const countRes = await db.queryOne<{ count: number }>('SELECT COUNT(*) as count FROM foods WHERE is_active = 1');
+        if (!countRes || Number(countRes.count) === 0) {
+          const foods = [
+            [1, 'Skinless Chicken Breast (Cooked)', 1, 100, 165, 31.0, 0.0, 3.6, 0.0],
+            [2, 'Brown Rice (Cooked)', 1, 100, 111, 2.6, 23.0, 0.9, 1.8],
+            [3, 'Rolled Oats (Dry)', 1, 100, 389, 16.9, 66.3, 6.9, 10.6],
+            [4, 'Whole Large Egg', 6, 1, 72, 6.3, 0.4, 4.8, 0.0],
+            [5, 'Liquid Egg Whites', 1, 100, 52, 10.9, 0.7, 0.2, 0.0],
+            [6, 'Whey Protein Isolate Powder', 5, 1, 120, 24.0, 2.0, 1.0, 0.0],
+            [7, 'Greek Yogurt 0% Fat', 1, 100, 59, 10.0, 3.6, 0.4, 0.0],
+            [8, 'Raw Whole Almonds', 1, 30, 170, 6.0, 6.0, 15.0, 3.5],
+            [9, 'Medium Banana', 6, 1, 105, 1.3, 27.0, 0.3, 3.1],
+            [10, 'Extra Virgin Olive Oil', 1, 10, 88, 0.0, 0.0, 10.0, 0.0],
+            [11, 'Lean Ground Beef 93/7', 1, 100, 152, 21.4, 0.0, 7.3, 0.0],
+            [12, 'Sweet Potato (Baked)', 1, 100, 90, 2.0, 20.7, 0.1, 3.3],
+          ];
+          for (const f of foods) {
+            try {
+              await db.execute(
+                `INSERT INTO foods (id, name, reference_unit_id, reference_quantity, calories, protein_g, carbs_g, fat_g, fiber_g, is_active)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                 ON DUPLICATE KEY UPDATE name = VALUES(name), is_active = 1`,
+                f
+              );
+            } catch {
+              await db.execute(
+                `INSERT OR IGNORE INTO foods (id, name, reference_unit_id, reference_quantity, calories, protein_g, carbs_g, fat_g, fiber_g, is_active)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+                f
+              );
+            }
+          }
+        }
+      } catch (err) {
+        logger.warn({ err }, 'Could not run migration 013 baseline foods seeding');
+      }
+    },
+  },
 ];
 
 export async function runMigrations(customDb?: DatabasePool) {
