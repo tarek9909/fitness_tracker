@@ -12,6 +12,7 @@ import 'core/sync/sync_coordinator.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/widgets/premium_widgets.dart';
+import 'core/widgets/pulse_forge_logo.dart';
 import 'features/auth/login_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/cardio/cardio_screen.dart';
@@ -109,7 +110,7 @@ class FitnessApp extends StatelessWidget {
       listenable: Listenable.merge([authSession, effectiveThemeController]),
       builder: (context, _) {
         return MaterialApp(
-          title: 'Kinetic Wellness',
+          title: 'PulseForge',
           debugShowCheckedModeBanner: false,
           navigatorObservers: [navigationObserver],
           theme: AppTheme.lightTheme,
@@ -309,8 +310,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                       behavior: HitTestBehavior.opaque,
                       onTap: () => setState(() => _currentIndex = 4),
                       child: Container(
-                        width: 36,
-                        height: 36,
+                        width: 34,
+                        height: 34,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: colors.surfaceElevated,
@@ -321,20 +322,25 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                         ),
                         child: ClipOval(
                           child: Icon(Icons.person,
-                              size: 20, color: colors.textSecondary),
+                              size: 18, color: colors.textSecondary),
                         ),
                       ),
                     ),
                     const SizedBox(width: 10),
+                    const PulseForgeLogo(
+                      size: 26,
+                      showGlow: false,
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Kinetic Wellness',
+                        'PulseForge',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w900,
                           fontSize: 18,
-                          letterSpacing: -0.3,
+                          letterSpacing: -0.4,
                           color: colors.textPrimary,
                         ),
                       ),
@@ -1047,7 +1053,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               context: context,
               title: 'Sign Out',
               content: Text(
-                'Are you sure you want to sign out of Kinetic Wellness? Any unsynchronized offline mutations will be cleared.',
+                'Are you sure you want to sign out of PulseForge? Any unsynchronized offline mutations will be cleared.',
                 style: TextStyle(
                   fontSize: 14,
                   color: colors.textSecondary,

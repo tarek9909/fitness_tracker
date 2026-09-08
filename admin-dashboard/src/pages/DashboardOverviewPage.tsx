@@ -95,7 +95,7 @@ export const DashboardOverviewPage: React.FC<{ onNavigate: (tab: any) => void }>
             <span>Platform State: Operational & Healthy</span>
           </div>
           <h1 style={{ fontSize: '1.65rem', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
-            Fitness Platform Command Center
+            PulseForge Command Center
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.25rem', maxWidth: '650px', lineHeight: 1.5 }}>
             Central operations for authoring workout and nutrition protocols, managing client assignments, and auditing compliance in real-time.

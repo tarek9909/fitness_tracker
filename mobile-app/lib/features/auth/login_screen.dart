@@ -6,6 +6,7 @@ import '../../core/push/push_registration_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../core/widgets/premium_widgets.dart';
+import '../../core/widgets/pulse_forge_logo.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -373,58 +374,36 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 12),
                   ],
 
-                  // Atmospheric Brand Icon
-                  Center(
-                    child: Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: colors.surfaceElevated,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.08),
-                          width: 1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: colors.isDark
-                                ? const Color(0x20FFFFFF)
-                                : const Color(0x0A000000),
-                            blurRadius: 20,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Icon(
-                          Icons.fitness_center,
-                          size: 32,
-                          color: colors.primary,
-                        ),
-                      ),
+                  // Atmospheric Brand Icon & Logo
+                  const Center(
+                    child: PulseForgeLogo(
+                      size: 76,
+                      showGlow: true,
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
                   Text(
-                    'Kinetic Wellness',
+                    'PulseForge',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 26,
+                      fontSize: 28,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
+                      letterSpacing: -0.6,
                       color: colors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
-                    'Sign in to your account',
+                    'Forge Strength • Master Performance',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 14,
-                      color: colors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: colors.primary,
+                      letterSpacing: 0.2,
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
 
                   // Structured Login Form Card
                   PremiumCard(

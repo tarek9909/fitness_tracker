@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Static and baseline design tokens for the Kinetic Wellness mobile app.
+/// Static and baseline design tokens for the PulseForge mobile app.
 ///
 /// Design Direction:
 /// "Dark monochrome architectural with restrained neon accents."

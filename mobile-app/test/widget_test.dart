@@ -29,7 +29,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Kinetic Wellness'), findsOneWidget);
+    expect(find.text('PulseForge'), findsOneWidget);
     expect(find.text('Email'), findsOneWidget);
     expect(find.text('Log In'), findsOneWidget);
   });

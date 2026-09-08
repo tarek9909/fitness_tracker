@@ -175,7 +175,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       if (mounted) {
         showPremiumSnackBar(
           context,
-          'Welcome to Kinetic Wellness, $firstName! Account created.',
+          'Welcome to PulseForge, $firstName! Account created.',
         );
         // Dismiss signup screen if it was pushed onto the navigator
         Navigator.of(context).popUntil((route) => route.isFirst);

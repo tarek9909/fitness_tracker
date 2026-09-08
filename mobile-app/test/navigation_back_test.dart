@@ -65,7 +65,7 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pump();
 
-    expect(find.text('Kinetic Wellness'), findsOneWidget);
+    expect(find.text('PulseForge'), findsOneWidget);
   });
 
   testWidgets('back from a pushed page returns to Home', (tester) async {
@@ -88,7 +88,7 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
-    expect(find.text('Kinetic Wellness'), findsOneWidget);
+    expect(find.text('PulseForge'), findsOneWidget);
   });
 
   testWidgets('home first back confirms, second back exits, and timeout resets', (tester) async {
@@ -137,6 +137,6 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.text('Modal route'), findsNothing);
-    expect(find.text('Kinetic Wellness'), findsOneWidget);
+    expect(find.text('PulseForge'), findsOneWidget);
   });
 }

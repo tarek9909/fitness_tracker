@@ -73,7 +73,7 @@ export const LoginPage: React.FC = () => {
             <Activity size={24} color="var(--text-primary)" strokeWidth={2} />
           </div>
           <h1 style={{ fontSize: '1.45rem', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
-            Fitness Platform
+            PulseForge Control Center
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', marginTop: '0.25rem' }}>
             Administrative Operations & Client Governance

@@ -79,7 +79,7 @@ export const SettingsPage: React.FC = () => {
         'default_water_target_ml': '3000',
         'allow_client_registration': '1',
         'session_timeout_minutes': '60',
-        'app_name': 'Fitness Platform',
+        'app_name': 'PulseForge',
       };
       Object.keys(defaults).forEach((k) => {
         if (initialForm[k] === undefined) initialForm[k] = defaults[k];

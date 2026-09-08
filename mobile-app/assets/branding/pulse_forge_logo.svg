@@ -2,21 +2,28 @@
   <title id="title">PulseForge App Icon</title>
   <desc id="desc">Hexagonal obsidian badge with molten solar orange chevron, anvil, and biometric heartbeat pulse.</desc>
   <defs>
+    <!-- Background Radial Gradient -->
     <radialGradient id="bgGlow" cx="50%" cy="50%" r="50%" fx="50%" fy="45%">
       <stop offset="0%" stop-color="#1F130E"/>
       <stop offset="60%" stop-color="#121013"/>
       <stop offset="100%" stop-color="#080709"/>
     </radialGradient>
+
+    <!-- Molten Solar Linear Gradient -->
     <linearGradient id="moltenOrange" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#FF7A00"/>
       <stop offset="50%" stop-color="#FF5500"/>
       <stop offset="100%" stop-color="#D63A00"/>
     </linearGradient>
+
+    <!-- Glowing Rim Gradient -->
     <linearGradient id="rimGlow" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#FFA040" stop-opacity="0.9"/>
       <stop offset="50%" stop-color="#FF5500" stop-opacity="0.6"/>
       <stop offset="100%" stop-color="#802000" stop-opacity="0.3"/>
     </linearGradient>
+
+    <!-- Drop Shadow Filter for Glow -->
     <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
       <feGaussianBlur stdDeviation="16" result="blur"/>
       <feMerge>
@@ -25,29 +32,64 @@
       </feMerge>
     </filter>
   </defs>
+
+  <!-- Background Base Canvas -->
   <rect width="1024" height="1024" rx="224" fill="url(#bgGlow)"/>
+
+  <!-- Outer Hexagonal Frame with Glow -->
   <path d="M 512,112 L 872,320 L 872,704 L 512,912 L 152,704 L 152,320 Z"
         fill="#141318"
         stroke="url(#rimGlow)"
         stroke-width="12"
         stroke-linejoin="round"
         filter="url(#neonGlow)"/>
+
+  <!-- Inner Hexagon Accent Border -->
   <path d="M 512,132 L 852,330 L 852,694 L 512,892 L 172,694 L 172,330 Z"
         fill="none"
         stroke="#FF5500"
         stroke-opacity="0.25"
         stroke-width="3"
         stroke-linejoin="round"/>
+
+  <!-- Upward Chevron (Apex / Peak) -->
   <path d="M 512,240 L 720,440 L 664,484 L 512,336 L 360,484 L 304,440 Z"
         fill="url(#moltenOrange)"/>
+
   <path d="M 512,320 L 640,440 L 600,470 L 512,384 L 424,470 L 384,440 Z"
         fill="#FFA040"
         opacity="0.85"/>
-  <path d="M 270,490 L 410,490 L 440,460 L 460,540 L 500,400 L 535,590 L 560,490 L 754,490 L 754,534 L 575,534 L 545,640 L 512,470 L 485,600 L 450,534 L 300,534 C 280,534 260,515 270,490 Z"
+
+  <!-- Athletic Anvil & Biometric Pulse Wave Assembly -->
+  <!-- Anvil Top Bar / Horns -->
+  <path d="M 270,490 
+           L 410,490 
+           L 440,460 
+           L 460,540 
+           L 500,400 
+           L 535,590 
+           L 560,490 
+           L 754,490 
+           L 754,534 
+           L 575,534 
+           L 545,640 
+           L 512,470 
+           L 485,600 
+           L 450,534 
+           L 300,534 
+           C 280,534 260,515 270,490 Z"
         fill="url(#moltenOrange)"
         filter="url(#neonGlow)"/>
-  <path d="M 430,550 L 594,550 C 575,640 590,700 640,730 L 384,730 C 434,700 449,640 430,550 Z"
+
+  <!-- Anvil Waist & Base (Forge Foundation) -->
+  <path d="M 430,550 
+           L 594,550 
+           C 575,640 590,700 640,730 
+           L 384,730 
+           C 434,700 449,640 430,550 Z"
         fill="url(#moltenOrange)"/>
+
+  <!-- Anvil Base Plinth Blocks -->
   <rect x="360" y="746" width="80" height="32" rx="6" fill="url(#moltenOrange)"/>
   <path d="M 460,746 L 564,746 C 554,765 540,778 512,778 C 484,778 470,765 460,746 Z" fill="url(#moltenOrange)"/>
   <rect x="584" y="746" width="80" height="32" rx="6" fill="url(#moltenOrange)"/>

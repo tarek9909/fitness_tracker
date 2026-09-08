@@ -1,4 +1,4 @@
-# Kinetic Wellness Mobile Application
+# PulseForge Mobile Application
 
 Production-grade cross-platform Flutter mobile application for daily fitness tracking, workout execution, meal logging, and offline synchronization.
 

@@ -5,6 +5,7 @@ import '../../core/models/models.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/storage/local_cache.dart';
 import '../../core/widgets/premium_widgets.dart';
+import '../../core/widgets/pulse_forge_logo.dart';
 import '../workout/workout_execution_screen.dart';
 import '../weight/weight_screen.dart';
 import '../cardio/cardio_screen.dart';
@@ -445,15 +446,20 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(width: 10),
+            const PulseForgeLogo(
+              size: 26,
+              showGlow: false,
+            ),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Kinetic Wellness',
+                'PulseForge',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.3,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.4,
                   color: colors.textPrimary,
                 ),
               ),
