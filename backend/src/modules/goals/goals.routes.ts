@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { authenticate } from '../../middleware/authenticate.js';
 import { requireAdmin } from '../../middleware/authorize.js';
 import { AuthenticatedRequest } from '../../shared/types/index.js';
-import { parsePositiveInt, isDateOnly } from '../../shared/utils/request-utils.js';
+import { parsePositiveInt, isDateOnly, normalizeDateInput } from '../../shared/utils/request-utils.js';
 import { getUserLocalDate } from '../../shared/utils/date-utils.js';
 import { NotFoundError, ValidationError } from '../../shared/errors/app-error.js';
 import { UsersRepository } from '../users/users.repository.js';
@@ -349,8 +349,8 @@ const createWeightGoalSchema = z.object({
   goalType: z.enum(['lose_weight', 'gain_weight', 'build_muscle', 'maintain_weight']).optional().nullable(),
   startWeightKg: z.number().min(20).max(500),
   targetWeightKg: z.number().min(20).max(500),
-  startDate: z.string().refine(isDateOnly, 'Use YYYY-MM-DD').optional(),
-  targetDate: z.string().refine(isDateOnly, 'Use YYYY-MM-DD').optional().nullable(),
+  startDate: z.preprocess(normalizeDateInput, z.string().refine(isDateOnly, 'Use YYYY-MM-DD')).optional(),
+  targetDate: z.preprocess(normalizeDateInput, z.string().refine(isDateOnly, 'Use YYYY-MM-DD')).optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
 }).superRefine((data, ctx) => {
   if (data.startDate && data.targetDate && data.targetDate < data.startDate) {
@@ -360,8 +360,8 @@ const createWeightGoalSchema = z.object({
 
 const createWaterTargetSchema = z.object({
   dailyTargetMl: z.number().min(500).max(10000),
-  effectiveFrom: z.string().refine(isDateOnly, 'Use YYYY-MM-DD'),
-  effectiveUntil: z.string().refine(isDateOnly, 'Use YYYY-MM-DD').optional().nullable(),
+  effectiveFrom: z.preprocess(normalizeDateInput, z.string().refine(isDateOnly, 'Use YYYY-MM-DD')),
+  effectiveUntil: z.preprocess(normalizeDateInput, z.string().refine(isDateOnly, 'Use YYYY-MM-DD')).optional().nullable(),
 });
 
 const waterQuickAddSchema = z.object({
@@ -391,8 +391,8 @@ const createCardioTargetSchema = z.object({
   targetDistanceMinKm: z.number().min(0).max(1000).optional().nullable(),
   targetDistanceMaxKm: z.number().min(0).max(1000).optional().nullable(),
   weekdays: z.array(z.number().int().min(1).max(7)).min(1, 'At least one weekday is required'),
-  effectiveFrom: z.string().refine(isDateOnly, 'Use YYYY-MM-DD'),
-  effectiveUntil: z.string().refine(isDateOnly, 'Use YYYY-MM-DD').optional().nullable(),
+  effectiveFrom: z.preprocess(normalizeDateInput, z.string().refine(isDateOnly, 'Use YYYY-MM-DD')),
+  effectiveUntil: z.preprocess(normalizeDateInput, z.string().refine(isDateOnly, 'Use YYYY-MM-DD')).optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
 });
 
@@ -402,8 +402,8 @@ const adherenceConfigSchema = z.object({
   cardioWeightPct: z.number().min(0).max(100),
   waterWeightPct: z.number().min(0).max(100),
   weightLoggingWeightPct: z.number().min(0).max(100),
-  effectiveFrom: z.string().refine(isDateOnly, 'Use YYYY-MM-DD').optional(),
-  effectiveUntil: z.string().refine(isDateOnly, 'Use YYYY-MM-DD').optional().nullable(),
+  effectiveFrom: z.preprocess(normalizeDateInput, z.string().refine(isDateOnly, 'Use YYYY-MM-DD')).optional(),
+  effectiveUntil: z.preprocess(normalizeDateInput, z.string().refine(isDateOnly, 'Use YYYY-MM-DD')).optional().nullable(),
 });
 
 export class GoalsController {

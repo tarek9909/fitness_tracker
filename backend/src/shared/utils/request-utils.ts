@@ -3,10 +3,24 @@ import { FastifyRequest } from 'fastify';
 import { DatabasePool } from '../../database/types.js';
 import { ConflictError, ValidationError } from '../errors/app-error.js';
 
+export function normalizeDateInput(value: unknown): unknown {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const datePart = trimmed.includes('T') ? trimmed.split('T')[0] : trimmed.split(' ')[0];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+      return datePart;
+    }
+  }
+  return value;
+}
+
 export function isDateOnly(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const parsed = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
+  if (typeof value !== 'string') return false;
+  const datePart = value.includes('T') ? value.split('T')[0] : value.split(' ')[0];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return false;
+  const parsed = new Date(`${datePart}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(datePart);
 }
 
 export function parseDateOnly(value: unknown, fieldName: string): string {
