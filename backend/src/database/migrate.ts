@@ -1123,6 +1123,43 @@ const migrations: Migration[] = [
       await backfillColumnData(db, 'workout_plan_exercise_sets', 'rest_seconds', 'rest_seconds_target', 'rest_seconds_target');
     },
   },
+  {
+    version: '015-seed-baseline-cardio-activities-if-empty',
+    up: async (db) => {
+      logger.info('Running migration 015: ensuring baseline cardio activities exist');
+      try {
+        const countRes = await db.queryOne<{ count: number }>('SELECT COUNT(*) as count FROM cardio_activities WHERE is_active = 1');
+        if (!countRes || Number(countRes.count) === 0) {
+          const activities = [
+            [1, 'Treadmill Incline Walking', 1, 1, 1, 1, 1, 4.8],
+            [2, 'Stationary Cycling', 1, 0, 1, 1, 1, 7.0],
+            [3, 'Rowing Machine', 1, 0, 1, 1, 1, 7.0],
+            [4, 'Outdoor Running', 1, 0, 1, 1, 1, 9.8],
+            [5, 'Stair Climber', 1, 0, 0, 1, 1, 9.0],
+            [6, 'Walking', 1, 1, 1, 1, 1, 3.5],
+          ];
+          for (const a of activities) {
+            try {
+              await db.execute(
+                `INSERT INTO cardio_activities (id, name, supports_speed, supports_incline, supports_distance, is_active, is_system, met_value)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE name = VALUES(name), is_active = 1`,
+                a
+              );
+            } catch {
+              await db.execute(
+                `INSERT OR IGNORE INTO cardio_activities (id, name, supports_speed, supports_incline, supports_distance, is_active, is_system, met_value)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                a
+              );
+            }
+          }
+        }
+      } catch (err) {
+        logger.warn({ err }, 'Could not run migration 015 baseline cardio activities seeding');
+      }
+    },
+  },
 ];
 
 export async function runMigrations(customDb?: DatabasePool) {

@@ -41,21 +41,24 @@ export class CardioController {
 
     const dateStr = body.cardioDate || getUserLocalDate(user?.timezone || 'UTC');
 
-    const activity = await this.db.queryOne<{ name: string }>('SELECT name FROM cardio_activities WHERE id = ?', [body.cardioActivityId]);
+    const activity = await this.db.queryOne<{ name: string }>(
+      'SELECT name FROM cardio_activities WHERE id = ?',
+      [body.cardioActivityId],
+    );
     if (!activity) throw new NotFoundError('Cardio activity not found');
     const activityName = activity.name;
 
-      const responsePayload = await this.db.withTransaction(async (conn) => {
-        const res = await conn.execute(
-          `INSERT INTO cardio_logs (
-            user_id, cardio_activity_id, activity_name_snapshot, cardio_date, duration_minutes, distance_km, calories_burned,
-            speed_kmh, incline, notes
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            auth.userId,
-            body.cardioActivityId,
-            activityName,
-            dateStr,
+    const responsePayload = await this.db.withTransaction(async (conn) => {
+      const res = await conn.execute(
+        `INSERT INTO cardio_logs (
+          user_id, cardio_activity_id, activity_name_snapshot, cardio_date, duration_minutes, distance_km, calories_burned,
+          speed_kmh, incline, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          auth.userId,
+          body.cardioActivityId,
+          activityName,
+          dateStr,
             body.durationMinutes,
             body.distanceKm || null,
             body.caloriesBurned || null,
