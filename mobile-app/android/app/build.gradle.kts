@@ -98,11 +98,6 @@ android {
         }
     }
 
-    packaging {
-        jniLibs {
-            keepDebugSymbols.add("**/*.so")
-        }
-    }
 }
 
 // Fail closed during release tasks when keystore configuration is absent or invalid
