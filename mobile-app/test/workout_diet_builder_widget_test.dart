@@ -9,6 +9,7 @@ import 'package:fitness_mobile_app/core/storage/secure_storage_service.dart';
 import 'package:fitness_mobile_app/core/sync/sync_coordinator.dart';
 import 'package:fitness_mobile_app/features/workout/workout_plan_builder_screen.dart';
 import 'package:fitness_mobile_app/features/diet/diet_plan_builder_screen.dart';
+import 'package:fitness_mobile_app/features/cardio/cardio_screen.dart';
 
 Future<ApiClient> createMockClient(
     Future<http.Response> Function(http.Request) handler) async {
@@ -287,5 +288,251 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       expect(postMealCalled, isTrue);
     });
+
+    testWidgets('DietPlanBuilderScreen and WorkoutPlanBuilderScreen render without RenderFlex overflow on narrow 360x640 screen',
+        (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final client = await createMockClient((req) async {
+        if (req.url.path == '/api/v1/me/diet-plans/2') {
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'data': {
+                'id': 2,
+                'name': 'High Protein Low Carb Ketogenic Plan',
+                'description': 'Targeting maximum fat loss and muscle retention with structured meals',
+                'versions': [
+                  {'id': 20, 'version_number': 1, 'status': 'draft'}
+                ],
+              },
+            }),
+            200,
+          );
+        }
+        if (req.url.path == '/api/v1/me/diet-plans/2/versions/20') {
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'data': {
+                'id': 20,
+                'version_number': 1,
+                'status': 'draft',
+                'meals': [
+                  {
+                    'id': 501,
+                    'name': 'Post-Workout High Protein Recovery Shake & Oats',
+                    'scheduled_time': '12:30 PM',
+                    'is_required': 1,
+                    'notes': 'Drink immediately after training session',
+                    'option_groups': [
+                      {
+                        'id': 601,
+                        'name': 'Primary Protein & Essential Aminos Choice',
+                        'is_required': 1,
+                        'min_selections': 1,
+                        'max_selections': 2,
+                        'options': [
+                          {
+                            'id': 701,
+                            'label': 'Organic Liquid Egg Whites & Whey Isolate',
+                            'calories_snapshot': 320,
+                            'protein_g_snapshot': 45,
+                            'carbs_g_snapshot': 12,
+                            'fat_g_snapshot': 4,
+                            'quantity': 350,
+                          }
+                        ],
+                      }
+                    ],
+                  }
+                ],
+              },
+            }),
+            200,
+          );
+        }
+        if (req.url.path == '/api/v1/foods') {
+          return http.Response(jsonEncode({'success': true, 'data': []}), 200);
+        }
+        if (req.url.path == '/api/v1/me/workout-plans/1') {
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'data': {
+                'id': 1,
+                'name': 'Periodized Heavy Strength Protocol Plan',
+                'description': 'Targeting maximum power development and progressive overload with structured schedule',
+                'goal_category': 'strength',
+                'versions': [
+                  {'id': 10, 'version_number': 1, 'status': 'draft'}
+                ],
+              },
+            }),
+            200,
+          );
+        }
+        if (req.url.path == '/api/v1/me/workout-plans/1/versions/10') {
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'data': {
+                'id': 10,
+                'version_number': 1,
+                'status': 'draft',
+                'days': [
+                  {
+                    'id': 101,
+                    'weekday': 1,
+                    'name': 'Upper Body Heavy Bench Press & Row Day',
+                    'is_rest_day': 0,
+                    'notes': 'Full warm up and dynamic stretching required',
+                    'exercises': [
+                      {
+                        'id': 201,
+                        'name': 'Incline Barbell Bench Press With Paused Repetitions',
+                        'target_sets': 4,
+                        'target_reps_min': 6,
+                        'target_reps_max': 8,
+                        'is_optional': 0,
+                        'sets': [
+                          {'target_reps_min': 6, 'target_reps_max': 8, 'target_weight_kg': 100}
+                        ],
+                      }
+                    ],
+                  }
+                ],
+              },
+            }),
+            200,
+          );
+        }
+        return http.Response('{}', 404);
+      });
+
+      final flutterErrors = <FlutterErrorDetails>[];
+      final originalOnError = FlutterError.onError;
+      FlutterError.onError = (details) {
+        flutterErrors.add(details);
+        originalOnError?.call(details);
+      };
+
+      await tester.pumpWidget(MaterialApp(
+        home: DietPlanBuilderScreen(apiClient: client, planId: 2),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.pumpWidget(MaterialApp(
+        home: WorkoutPlanBuilderScreen(apiClient: client, planId: 1),
+      ));
+      await tester.pumpAndSettle();
+
+      FlutterError.onError = originalOnError;
+
+      final overflowErrors = flutterErrors.where((e) => e.toString().contains('A RenderFlex overflowed by'));
+      expect(overflowErrors, isEmpty, reason: 'Builder screen had RenderFlex overflow on 360x640 screen: $overflowErrors');
+    });
+
+    testWidgets('Active status: Workout & Diet show 1-click Make Active Plan button and Cardio displays active goal', (tester) async {
+      var workoutActivated = false;
+      var dietActivated = false;
+
+      final client = await createMockClient((req) async {
+        if (req.method == 'GET' && req.url.path == '/api/v1/me/workout-plans/1') {
+          return http.Response(jsonEncode({
+            'success': true,
+            'data': {
+              'id': 1,
+              'name': 'My Draft Workout',
+              'description': 'Draft Routine',
+              'is_currently_active': false,
+              'versions': [{'id': 10, 'version_number': 1, 'status': 'draft'}],
+            },
+          }), 200);
+        }
+        if (req.method == 'GET' && req.url.path == '/api/v1/me/workout-plans/1/versions/10') {
+          return http.Response(jsonEncode({
+            'success': true,
+            'data': {
+              'id': 10,
+              'status': 'draft',
+              'days': [],
+            },
+          }), 200);
+        }
+        if (req.method == 'POST' && req.url.path == '/api/v1/me/workout-plans/1/activate') {
+          workoutActivated = true;
+          return http.Response(jsonEncode({'success': true, 'data': {'status': 'active'}}), 200);
+        }
+
+        if (req.method == 'GET' && req.url.path == '/api/v1/me/diet-plans/2') {
+          return http.Response(jsonEncode({
+            'success': true,
+            'data': {
+              'id': 2,
+              'name': 'My Draft Diet',
+              'description': 'Draft Meals',
+              'is_currently_active': false,
+              'versions': [{'id': 20, 'version_number': 1, 'status': 'draft'}],
+            },
+          }), 200);
+        }
+        if (req.method == 'GET' && req.url.path == '/api/v1/me/diet-plans/2/versions/20') {
+          return http.Response(jsonEncode({
+            'success': true,
+            'data': {
+              'id': 20,
+              'status': 'draft',
+              'meals': [],
+            },
+          }), 200);
+        }
+        if (req.method == 'POST' && req.url.path == '/api/v1/me/diet-plans/2/activate') {
+          dietActivated = true;
+          return http.Response(jsonEncode({'success': true, 'data': {'status': 'active'}}), 200);
+        }
+
+        if (req.method == 'GET' && req.url.path == '/api/v1/me/cardio/activities') {
+          return http.Response(jsonEncode({'success': true, 'data': [{'id': 1, 'name': 'Treadmill'}]}), 200);
+        }
+        if (req.method == 'GET' && req.url.path == '/api/v1/me/cardio/history') {
+          return http.Response(jsonEncode({'success': true, 'data': []}), 200);
+        }
+        if (req.method == 'GET' && req.url.path == '/api/v1/me/goals/cardio') {
+          return http.Response(jsonEncode({'success': true, 'data': [{'id': 5, 'min_duration_minutes': 30, 'activity_name': 'Treadmill'}]}), 200);
+        }
+
+        return http.Response('{}', 404);
+      });
+
+      // 1. Verify Workout Plan Builder shows "Make Active Plan" and activates in 1-click
+      await tester.pumpWidget(MaterialApp(home: WorkoutPlanBuilderScreen(apiClient: client, planId: 1)));
+      await tester.pumpAndSettle();
+      expect(find.text('Make Active Plan'), findsOneWidget);
+      await tester.tap(find.text('Make Active Plan'));
+      await tester.pumpAndSettle();
+      expect(workoutActivated, isTrue);
+
+      // 2. Verify Diet Plan Builder shows "Make Active Plan" and activates in 1-click
+      await tester.pumpWidget(MaterialApp(home: DietPlanBuilderScreen(apiClient: client, planId: 2)));
+      await tester.pumpAndSettle();
+      expect(find.text('Make Active Plan'), findsOneWidget);
+      await tester.tap(find.text('Make Active Plan'));
+      await tester.pumpAndSettle();
+      expect(dietActivated, isTrue);
+
+      // 3. Verify CardioScreen displays active goal banner
+      await tester.pumpWidget(MaterialApp(home: CardioScreen(apiClient: client)));
+      await tester.pumpAndSettle();
+      expect(find.text('ACTIVE CARDIO GOAL'), findsOneWidget);
+      expect(find.text('30 min / day'), findsOneWidget);
+      expect(find.text('Edit'), findsOneWidget);
+    });
   });
 }
+

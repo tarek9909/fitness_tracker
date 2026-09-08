@@ -60,13 +60,20 @@ export class DietPlanRepository {
              (CASE WHEN dp.status = 'archived' THEN 1 ELSE 0 END) as is_archived,
              (SELECT COUNT(*) FROM diet_plan_versions dpv WHERE dpv.diet_plan_id = dp.id) as version_count,
              (SELECT dpv.version_number FROM diet_plan_versions dpv WHERE dpv.diet_plan_id = dp.id AND dpv.status = 'published' ORDER BY dpv.version_number DESC LIMIT 1) as active_version_number,
+             (SELECT dpv.id FROM diet_plan_versions dpv WHERE dpv.diet_plan_id = dp.id ORDER BY dpv.version_number DESC LIMIT 1) as latest_version_id,
+             (SELECT dpv.status FROM diet_plan_versions dpv WHERE dpv.diet_plan_id = dp.id ORDER BY dpv.version_number DESC LIMIT 1) as latest_version_status,
              (SELECT dpv.daily_calorie_target FROM diet_plan_versions dpv WHERE dpv.diet_plan_id = dp.id ORDER BY dpv.version_number DESC LIMIT 1) as daily_calories_target,
-             (SELECT dpv.daily_calorie_target FROM diet_plan_versions dpv WHERE dpv.diet_plan_id = dp.id ORDER BY dpv.version_number DESC LIMIT 1) as daily_calorie_target
+             (SELECT dpv.daily_calorie_target FROM diet_plan_versions dpv WHERE dpv.diet_plan_id = dp.id ORDER BY dpv.version_number DESC LIMIT 1) as daily_calorie_target,
+             EXISTS (
+               SELECT 1 FROM user_diet_assignments uda
+               JOIN diet_plan_versions dpv ON dpv.id = uda.diet_plan_version_id
+               WHERE dpv.diet_plan_id = dp.id AND uda.user_id = ? AND uda.status = 'active'
+             ) as is_currently_active
       FROM diet_plans dp
       WHERE dp.owner_user_id = ? OR dp.visibility = 'admin'
       ORDER BY dp.id DESC
     `;
-    return this.db.query(sql, [userId]);
+    return this.db.query(sql, [userId, userId]);
   }
 
   async updatePlan(planId: number, data: Partial<{ name: string; description: string | null; isArchived: number }>): Promise<void> {

@@ -15,11 +15,22 @@ export class WorkoutPlanService {
     return this.repo.findPlansForUser(userId);
   }
 
-  async getPlanById(planId: number) {
+  async getPlanById(planId: number, userId?: number) {
     const plan = await this.repo.findPlanById(planId);
     if (!plan) throw new NotFoundError('Workout plan not found');
     const versions = await this.repo.findVersionsByPlanId(planId);
-    return { ...plan, versions };
+    let isCurrentlyActive = false;
+    if (userId) {
+      const activeAssign = await this.db.queryOne<any>(
+        `SELECT 1 FROM user_workout_assignments uwa
+         JOIN workout_plan_versions wpv ON wpv.id = uwa.workout_plan_version_id
+         WHERE wpv.workout_plan_id = ? AND uwa.user_id = ? AND uwa.status = 'active'
+         LIMIT 1`,
+        [planId, userId]
+      );
+      isCurrentlyActive = !!activeAssign;
+    }
+    return { ...plan, versions, is_currently_active: isCurrentlyActive };
   }
 
   async createPlan(data: {
@@ -563,12 +574,27 @@ export class WorkoutPlanService {
     const plan = await this.repo.findPlanById(planId);
     if (!plan) throw new NotFoundError('Workout plan not found');
 
-    const publishedVersion = await this.db.queryOne<any>(
+    let publishedVersion = await this.db.queryOne<any>(
       `SELECT * FROM workout_plan_versions 
        WHERE workout_plan_id = ? AND status = 'published' 
        ORDER BY version_number DESC LIMIT 1`,
       [planId]
     );
+    if (!publishedVersion) {
+      const draftVersion = await this.db.queryOne<any>(
+        `SELECT * FROM workout_plan_versions
+         WHERE workout_plan_id = ? AND status = 'draft'
+         ORDER BY version_number DESC LIMIT 1`,
+        [planId]
+      );
+      if (draftVersion) {
+        await this.publishVersion(draftVersion.id);
+        publishedVersion = await this.db.queryOne<any>(
+          `SELECT * FROM workout_plan_versions WHERE id = ?`,
+          [draftVersion.id]
+        );
+      }
+    }
     if (!publishedVersion) {
       throw new ValidationError('Workout plan must have a published version before it can be activated');
     }

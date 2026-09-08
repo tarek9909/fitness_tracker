@@ -824,33 +824,36 @@ class _DietMealEditorModalState extends State<DietMealEditorModal> {
               final desc = def['desc'] as String;
               final isChecked = _selectedStarterGroupNames.contains(name);
 
-              return CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                activeColor: colors.amber,
-                checkColor: Colors.black,
-                title: Text(
-                  name,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: colors.textPrimary,
+              return Material(
+                color: Colors.transparent,
+                child: CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  activeColor: colors.amber,
+                  checkColor: Colors.black,
+                  title: Text(
+                    name,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: colors.textPrimary,
+                    ),
                   ),
+                  subtitle: Text(
+                    desc,
+                    style: TextStyle(fontSize: 11, color: colors.textMuted),
+                  ),
+                  value: isChecked,
+                  onChanged: (val) {
+                    setState(() {
+                      if (val == true) {
+                        _selectedStarterGroupNames.add(name);
+                      } else {
+                        _selectedStarterGroupNames.remove(name);
+                      }
+                    });
+                  },
                 ),
-                subtitle: Text(
-                  desc,
-                  style: TextStyle(fontSize: 11, color: colors.textMuted),
-                ),
-                value: isChecked,
-                onChanged: (val) {
-                  setState(() {
-                    if (val == true) {
-                      _selectedStarterGroupNames.add(name);
-                    } else {
-                      _selectedStarterGroupNames.remove(name);
-                    }
-                  });
-                },
               );
             }),
           ],
