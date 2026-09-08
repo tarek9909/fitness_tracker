@@ -198,7 +198,7 @@ export class DietPlanService {
     return this.db.withTransaction(async (conn) => {
       await conn.execute(
         `UPDATE user_diet_assignments 
-         SET status = 'completed', effective_until = ?, updated_at = CURRENT_TIMESTAMP 
+         SET status = 'ended', effective_until = ?, updated_at = CURRENT_TIMESTAMP 
          WHERE user_id = ? AND status = 'active' AND effective_from < ?`,
         [effectiveUntil, userId, effectiveFromDate]
       );
