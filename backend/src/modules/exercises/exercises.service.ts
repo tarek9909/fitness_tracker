@@ -32,14 +32,18 @@ export class ExercisesService {
     trackingType: string;
     videoUrl?: string;
     instructions?: string;
-  }): Promise<ExerciseItem> {
-    const existing = await this.repo.findAll({ search: data.name, isArchived: false });
-    const duplicate = existing.exercises.find(e => e.name.toLowerCase() === data.name.toLowerCase());
+  }, throwOnDuplicate = false): Promise<ExerciseItem> {
+    const trimmedName = data.name.trim();
+    const existing = await this.repo.findAll({ search: trimmedName, isArchived: false });
+    const duplicate = existing.exercises.find(e => e.name.trim().toLowerCase() === trimmedName.toLowerCase());
     if (duplicate) {
-      throw new ConflictError('An exercise with this name already exists', 'EXERCISE_NAME_EXISTS');
+      if (throwOnDuplicate) {
+        throw new ConflictError('An exercise with this name already exists', 'EXERCISE_NAME_EXISTS');
+      }
+      return duplicate;
     }
 
-    const id = await this.repo.create(data);
+    const id = await this.repo.create({ ...data, name: trimmedName });
     return this.getExerciseById(id);
   }
 

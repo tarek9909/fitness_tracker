@@ -118,8 +118,13 @@ async function run() {
 
   await addCol('workout_plan_versions', 'published_at', 'DATETIME NULL');
   await addCol('diet_plan_versions', 'published_at', 'DATETIME NULL');
-  await addCol('meal_logs', 'updated_at', 'TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)');
   await addCol('meal_log_selections', 'fiber_g_snapshot', 'DECIMAL(10,2) NULL');
+  try {
+    await conn.query('ALTER TABLE meal_log_selections MODIFY COLUMN diet_meal_option_group_id BIGINT UNSIGNED NULL');
+    console.log('Modified meal_log_selections.diet_meal_option_group_id to NULLABLE');
+  } catch (e) {
+    console.warn('Could not modify meal_log_selections column:', e.message);
+  }
 
   // 6. workout_plan_days & workout_plan_exercises
   await addCol('workout_plan_days', 'notes', 'TEXT NULL');

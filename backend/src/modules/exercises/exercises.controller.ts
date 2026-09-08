@@ -63,7 +63,8 @@ export class ExercisesController {
 
   async createExercise(request: FastifyRequest, reply: FastifyReply) {
     const body = createExerciseSchema.parse(request.body);
-    const exercise = await this.service.createExercise(body);
+    const isUserEndpoint = !request.url.includes('/admin/');
+    const exercise = await this.service.createExercise(body, !isUserEndpoint);
     return reply.status(201).send({
       success: true,
       data: exercise,

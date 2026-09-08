@@ -115,6 +115,10 @@ ALTER TABLE workout_plan_exercises
   ADD COLUMN IF NOT EXISTS notes TEXT NULL,
   ADD COLUMN IF NOT EXISTS is_optional BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- 7. meal_log_selections
+ALTER TABLE meal_log_selections
+  MODIFY COLUMN diet_meal_option_group_id BIGINT UNSIGNED NULL;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- Pre-seed daily tasks for Tarek for today (2026-09-06)

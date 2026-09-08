@@ -790,7 +790,7 @@ CREATE TABLE IF NOT EXISTS meal_logs (
 CREATE TABLE IF NOT EXISTS meal_log_selections (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     meal_log_id BIGINT UNSIGNED NOT NULL,
-    diet_meal_option_group_id BIGINT UNSIGNED NOT NULL,
+    diet_meal_option_group_id BIGINT UNSIGNED NULL,
     diet_meal_option_id BIGINT UNSIGNED NULL,
     group_name_snapshot VARCHAR(150) NOT NULL,
     option_label_snapshot VARCHAR(255) NOT NULL,

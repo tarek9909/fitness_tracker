@@ -1041,6 +1041,22 @@ const migrations: Migration[] = [
       await ensureColumnExists(db, 'diet_meals', 'is_required', 'INTEGER NOT NULL DEFAULT 1');
     },
   },
+  {
+    version: '012-meal-log-selections-nullable-group',
+    up: async (db) => {
+      logger.info('Running migration 012: making diet_meal_option_group_id nullable in meal_log_selections');
+      if (configuredDbClient() === 'mysql') {
+        try {
+          await db.execute(`
+            ALTER TABLE meal_log_selections
+            MODIFY COLUMN diet_meal_option_group_id BIGINT UNSIGNED NULL
+          `);
+        } catch (err: any) {
+          logger.warn({ err }, 'Could not modify diet_meal_option_group_id in MySQL table meal_log_selections');
+        }
+      }
+    },
+  },
 ];
 
 export async function runMigrations(customDb?: DatabasePool) {

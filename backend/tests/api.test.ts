@@ -656,6 +656,56 @@ describe('Fitness Platform REST API Suite', () => {
       const json = res.json();
       expect(json.data.name).toBe('Hammer Strength Incline Chest Press');
     });
+
+    it('POST /api/v1/exercises allows regular user to create custom exercise and returns existing duplicate idempotently', async () => {
+      // 1. First creation
+      const res1 = await app.inject({
+        method: 'POST',
+        url: '/api/v1/exercises',
+        headers: { authorization: `Bearer ${userToken}` },
+        payload: {
+          name: 'Standing Cable Fly',
+          trackingType: 'weight_reps',
+        },
+      });
+      expect(res1.statusCode).toBe(201);
+      const json1 = res1.json();
+      expect(json1.success).toBe(true);
+      expect(json1.data.name).toBe('Standing Cable Fly');
+      const exerciseId = json1.data.id;
+
+      // 2. Duplicate creation from regular user returns existing exercise without 409 Conflict
+      const res2 = await app.inject({
+        method: 'POST',
+        url: '/api/v1/exercises',
+        headers: { authorization: `Bearer ${userToken}` },
+        payload: {
+          name: '  standing cable fly  ',
+          trackingType: 'weight_reps',
+        },
+      });
+      expect(res2.statusCode).toBe(201);
+      const json2 = res2.json();
+      expect(json2.success).toBe(true);
+      expect(json2.data.id).toBe(exerciseId);
+    });
+
+    it('POST /api/v1/admin/exercises rejects duplicate exercise name with 409 Conflict', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/v1/admin/exercises',
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          name: 'Hammer Strength Incline Chest Press',
+          primaryMuscleGroupId: 1,
+          equipmentTypeId: 4,
+          trackingType: 'weight_reps',
+        },
+      });
+      expect(res.statusCode).toBe(409);
+      const json = res.json();
+      expect(json.error.code).toBe('EXERCISE_NAME_EXISTS');
+    });
   });
 
   describe('5. Workout & Diet Plans Immutability & Overlap Rules', () => {

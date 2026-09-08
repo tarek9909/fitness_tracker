@@ -3,7 +3,7 @@ import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/premium_widgets.dart';
 
-/// Single set draft holding live controllers for per-set prescriptions
+/// Single set draft holding live controllers for per-set prescriptions (kept for backward compatibility)
 class WorkoutSetDraft {
   final TextEditingController repsMin;
   final TextEditingController repsMax;
@@ -40,9 +40,13 @@ class WorkoutSetDraft {
   }
 }
 
-/// A comprehensive, high-end redesign of the Workout Exercise Editor Modal.
-/// Provides tracking-type adaptive controls, searchable library, custom exercise fallback,
-/// quick presets, and complete payload construction.
+/// Workout Exercise Editor Modal
+/// Directly aligns with the web admin dashboard flow (WorkoutPlanBuilderPage.tsx):
+/// 1. Select Exercise (Searchable library dropdown / picker with quick presets fallback)
+/// 2. Working Sets, Min Reps, Max Reps (3-column layout)
+/// 3. Rest (seconds) with quick preset chips
+/// 4. Technique & Cue Notes
+/// 5. Mark as Optional Movement
 class WorkoutExerciseEditorModal extends StatefulWidget {
   final ApiClient apiClient;
   final int planId;
@@ -59,7 +63,7 @@ class WorkoutExerciseEditorModal extends StatefulWidget {
     this.existing,
   });
 
-  /// Opens the editor inside a luxurious modal bottom sheet
+  /// Opens the editor inside a modal bottom sheet
   static Future<bool?> show(
     BuildContext context, {
     required ApiClient apiClient,
@@ -97,22 +101,18 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
   // Selected exercise state
   int? _selectedExerciseId;
   String _selectedExerciseName = '';
-  String _trackingType = 'weight_reps'; // weight_reps, reps_only, duration, distance
+  String _selectedMuscleGroupName = '';
+  String _trackingType = 'weight_reps';
   final TextEditingController _customNameCtrl = TextEditingController();
 
-  // Top-level targets
-  int _targetSets = 3;
+  // Dashboard-parity form controllers
+  late final TextEditingController _setsCtrl;
   late final TextEditingController _repsMinCtrl;
   late final TextEditingController _repsMaxCtrl;
-  late final TextEditingController _weightCtrl;
-  late final TextEditingController _durationCtrl;
-  late final TextEditingController _distanceCtrl;
   late final TextEditingController _restCtrl;
   late final TextEditingController _notesCtrl;
   bool _isOptional = false;
 
-  // Per-set drafts
-  final List<WorkoutSetDraft> _setDrafts = [];
   bool _saving = false;
   String? _errorMessage;
 
@@ -144,43 +144,23 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
 
     _selectedExerciseId = _asInt(e?['exercise_id']);
     _selectedExerciseName = e?['exercise_name']?.toString() ?? e?['name']?.toString() ?? '';
+    _selectedMuscleGroupName = e?['primary_muscle_group_name']?.toString() ??
+        e?['target_muscle_group']?.toString() ??
+        e?['muscle_group_name']?.toString() ?? '';
     _customNameCtrl.text = _selectedExerciseName;
 
-    _targetSets = _asInt(e?['target_sets']) ?? ((e?['sets'] as List?)?.length ?? 3);
-    if (_targetSets < 1) _targetSets = 3;
+    final targetSets = _asInt(e?['target_sets']) ?? ((e?['sets'] as List?)?.length ?? 3);
+    _setsCtrl = TextEditingController(text: '${targetSets < 1 ? 3 : targetSets}');
 
     _repsMinCtrl = TextEditingController(text: '${e?['target_reps_min'] ?? e?['reps_min'] ?? 8}');
     _repsMaxCtrl = TextEditingController(text: '${e?['target_reps_max'] ?? e?['reps_max'] ?? 12}');
-    _weightCtrl = TextEditingController();
-    _durationCtrl = TextEditingController(text: e?['target_duration_seconds']?.toString() ?? '');
-    _distanceCtrl = TextEditingController(text: e?['target_distance_meters']?.toString() ?? '');
-    _restCtrl = TextEditingController(text: e?['rest_seconds']?.toString() ?? '90');
+    _restCtrl = TextEditingController(text: '${e?['rest_seconds'] ?? 90}');
     _notesCtrl = TextEditingController(text: e?['notes']?.toString() ?? '');
     _isOptional = e?['is_optional'] == 1 || e?['isOptional'] == true;
 
-    // Detect initial tracking type
     final rawTrackingType = e?['tracking_type_snapshot'] ?? e?['tracking_type'];
     if (rawTrackingType != null && rawTrackingType.toString().isNotEmpty) {
       _trackingType = rawTrackingType.toString();
-    } else if (_durationCtrl.text.isNotEmpty && _repsMinCtrl.text.isEmpty) {
-      _trackingType = 'duration';
-    } else if (_distanceCtrl.text.isNotEmpty) {
-      _trackingType = 'distance';
-    }
-
-    // Initialize set drafts
-    final rawSets = (e?['sets'] as List?)?.whereType<Map>().toList() ?? const [];
-    for (var index = 0; index < _targetSets; index++) {
-      final raw = index < rawSets.length ? rawSets[index] : const <String, dynamic>{};
-      _setDrafts.add(WorkoutSetDraft(
-        repsMin: '${raw['target_reps_min'] ?? e?['target_reps_min'] ?? e?['reps_min'] ?? 8}',
-        repsMax: '${raw['target_reps_max'] ?? e?['target_reps_max'] ?? e?['reps_max'] ?? 12}',
-        weight: raw['target_weight_kg']?.toString(),
-        duration: raw['target_duration_seconds']?.toString() ?? e?['target_duration_seconds']?.toString(),
-        distance: raw['target_distance_meters']?.toString() ?? e?['target_distance_meters']?.toString(),
-        rest: '${raw['rest_seconds'] ?? e?['rest_seconds'] ?? 90}',
-        notes: raw['notes']?.toString(),
-      ));
     }
 
     _fetchLibrary();
@@ -189,16 +169,11 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
   @override
   void dispose() {
     _customNameCtrl.dispose();
+    _setsCtrl.dispose();
     _repsMinCtrl.dispose();
     _repsMaxCtrl.dispose();
-    _weightCtrl.dispose();
-    _durationCtrl.dispose();
-    _distanceCtrl.dispose();
     _restCtrl.dispose();
     _notesCtrl.dispose();
-    for (final draft in _setDrafts) {
-      draft.dispose();
-    }
     super.dispose();
   }
 
@@ -232,6 +207,9 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
             );
             if (match != null) {
               _selectedExerciseName = match['name']?.toString() ?? _selectedExerciseName;
+              _selectedMuscleGroupName = match['primary_muscle_group_name']?.toString() ??
+                  match['target_muscle_group']?.toString() ??
+                  match['muscle_group_name']?.toString() ?? '';
               if (match['tracking_type'] != null) {
                 _trackingType = match['tracking_type'].toString();
               }
@@ -248,6 +226,9 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
     setState(() {
       _selectedExerciseId = _asInt(item['id']);
       _selectedExerciseName = item['name']?.toString() ?? 'Exercise';
+      _selectedMuscleGroupName = item['primary_muscle_group_name']?.toString() ??
+          item['target_muscle_group']?.toString() ??
+          item['muscle_group_name']?.toString() ?? '';
       _customNameCtrl.text = _selectedExerciseName;
       if (item['tracking_type'] != null) {
         _trackingType = item['tracking_type'].toString();
@@ -255,78 +236,49 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
     });
   }
 
-  void _selectPreset(Map<String, String> preset) {
-    setState(() {
-      _selectedExerciseName = preset['name']!;
-      _customNameCtrl.text = preset['name']!;
-      _trackingType = preset['type']!;
-      // Find matching item in library if present
-      final match = _library.firstWhere(
-        (item) => item['name']?.toString().toLowerCase() == preset['name']!.toLowerCase(),
-        orElse: () => null,
-      );
-      if (match != null) {
-        _selectedExerciseId = _asInt(match['id']);
-      } else {
-        _selectedExerciseId = null; // Will auto-create on save
-      }
-    });
-  }
-
-  void _updateSetCount(int newCount) {
-    newCount = newCount.clamp(1, 20);
-    setState(() {
-      _targetSets = newCount;
-      while (_setDrafts.length < _targetSets) {
-        _setDrafts.add(WorkoutSetDraft(
-          repsMin: _repsMinCtrl.text.isNotEmpty ? _repsMinCtrl.text : '8',
-          repsMax: _repsMaxCtrl.text.isNotEmpty ? _repsMaxCtrl.text : '12',
-          weight: _weightCtrl.text.isNotEmpty ? _weightCtrl.text : null,
-          duration: _durationCtrl.text.isNotEmpty ? _durationCtrl.text : null,
-          distance: _distanceCtrl.text.isNotEmpty ? _distanceCtrl.text : null,
-          rest: _restCtrl.text.isNotEmpty ? _restCtrl.text : '90',
-        ));
-      }
-      while (_setDrafts.length > _targetSets) {
-        _setDrafts.removeLast().dispose();
-      }
-    });
-  }
-
-  void _applyDefaultsToAllSets() {
-    setState(() {
-      for (final draft in _setDrafts) {
-        if (_repsMinCtrl.text.isNotEmpty) draft.repsMin.text = _repsMinCtrl.text;
-        if (_repsMaxCtrl.text.isNotEmpty) draft.repsMax.text = _repsMaxCtrl.text;
-        if (_weightCtrl.text.isNotEmpty) draft.weight.text = _weightCtrl.text;
-        if (_durationCtrl.text.isNotEmpty) draft.duration.text = _durationCtrl.text;
-        if (_distanceCtrl.text.isNotEmpty) draft.distance.text = _distanceCtrl.text;
-        if (_restCtrl.text.isNotEmpty) draft.rest.text = _restCtrl.text;
-      }
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Applied default targets to all sets'), duration: Duration(seconds: 1)),
-    );
-  }
-
   Future<int?> _ensureExerciseId() async {
     if (_selectedExerciseId != null) return _selectedExerciseId;
-
     final name = _selectedExerciseName.trim().isNotEmpty
         ? _selectedExerciseName.trim()
         : _customNameCtrl.text.trim();
     if (name.isEmpty) return null;
 
-    // First check if library now has it
-    final existingMatch = _library.firstWhere(
-      (item) => item['name']?.toString().toLowerCase() == name.toLowerCase(),
+    final lowerName = name.toLowerCase();
+
+    // 1. Search existing library
+    final existingLib = _library.firstWhere(
+      (item) => item['name']?.toString().trim().toLowerCase() == lowerName,
       orElse: () => null,
     );
-    if (existingMatch != null && _asInt(existingMatch['id']) != null) {
-      return _asInt(existingMatch['id']);
+    if (existingLib != null && _asInt(existingLib['id']) != null) {
+      final id = _asInt(existingLib['id']);
+      _selectedExerciseId = id;
+      return id;
     }
 
-    // Attempt to create custom exercise on backend
+    // 2. Search server by exact name
+    try {
+      final searchRes = await widget.apiClient.get(
+        '/exercises?search=${Uri.encodeComponent(name)}&limit=5',
+      );
+      List<dynamic> searchItems = [];
+      if (searchRes is Map && searchRes['data'] is List) {
+        searchItems = searchRes['data'] as List;
+      } else if (searchRes is List) {
+        searchItems = searchRes;
+      }
+      final searchMatch = searchItems.firstWhere(
+        (item) => item['name']?.toString().trim().toLowerCase() == lowerName,
+        orElse: () => null,
+      );
+      if (searchMatch != null && _asInt(searchMatch['id']) != null) {
+        final id = _asInt(searchMatch['id']);
+        _selectedExerciseId = id;
+        return id;
+      }
+    } catch (_) {}
+
+    // 3. Attempt to create custom exercise via user endpoint (idempotent 201)
     try {
       final res = await widget.apiClient.post('/exercises', body: {
         'name': name,
@@ -334,27 +286,43 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
         'instructions': 'Added via workout plan builder',
       });
       if (res is Map && res['data'] is Map && res['data']['id'] != null) {
-        return _asInt(res['data']['id']);
+        final id = _asInt(res['data']['id']);
+        _selectedExerciseId = id;
+        return id;
       }
       if (res is Map && res['id'] != null) {
-        return _asInt(res['id']);
+        final id = _asInt(res['id']);
+        _selectedExerciseId = id;
+        return id;
       }
     } catch (_) {
-      // Fallback: if user is admin, try /admin/exercises
       try {
-        final adminRes = await widget.apiClient.post('/admin/exercises', body: {
-          'name': name,
-          'trackingType': _trackingType,
-        });
-        if (adminRes is Map && adminRes['data'] is Map && adminRes['data']['id'] != null) {
-          return _asInt(adminRes['data']['id']);
+        final searchRes = await widget.apiClient.get(
+          '/exercises?search=${Uri.encodeComponent(name)}&limit=10',
+        );
+        List<dynamic> searchItems = [];
+        if (searchRes is Map && searchRes['data'] is List) {
+          searchItems = searchRes['data'] as List;
+        } else if (searchRes is List) {
+          searchItems = searchRes;
+        }
+        final searchMatch = searchItems.firstWhere(
+          (item) => item['name']?.toString().trim().toLowerCase() == lowerName,
+          orElse: () => searchItems.isNotEmpty ? searchItems.first : null,
+        );
+        if (searchMatch != null && _asInt(searchMatch['id']) != null) {
+          final id = _asInt(searchMatch['id']);
+          _selectedExerciseId = id;
+          return id;
         }
       } catch (_) {}
     }
 
-    // If still null but library had at least 1, fallback to first library exercise
+    // 4. Fallback to first library exercise if available
     if (_library.isNotEmpty) {
-      return _asInt(_library.first['id']);
+      final id = _asInt(_library.first['id']);
+      _selectedExerciseId = id;
+      return id;
     }
 
     return null;
@@ -370,47 +338,66 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
     if (exId == null && widget.existing == null) {
       setState(() {
         _saving = false;
-        _errorMessage = 'Please select or name an exercise to proceed.';
+        _errorMessage = 'Please select an exercise from the library';
       });
       return;
     }
 
-    final minReps = int.tryParse(_repsMinCtrl.text);
-    final maxReps = int.tryParse(_repsMaxCtrl.text);
-    if (minReps != null && maxReps != null && maxReps < minReps) {
+    final targetSets = int.tryParse(_setsCtrl.text.trim());
+    if (targetSets == null || targetSets < 1) {
       setState(() {
         _saving = false;
-        _errorMessage = 'Default Max Reps cannot be less than Min Reps.';
+        _errorMessage = 'Please enter valid target sets (minimum 1)';
       });
       return;
     }
 
-    // Assemble comprehensive payload
+    final repsMin = int.tryParse(_repsMinCtrl.text.trim());
+    if (repsMin == null || repsMin < 1) {
+      setState(() {
+        _saving = false;
+        _errorMessage = 'Please enter valid minimum reps (minimum 1)';
+      });
+      return;
+    }
+
+    final repsMax = int.tryParse(_repsMaxCtrl.text.trim());
+    if (repsMax != null && repsMax < repsMin) {
+      setState(() {
+        _saving = false;
+        _errorMessage = 'Max reps cannot be less than Min reps';
+      });
+      return;
+    }
+
+    final restSeconds = int.tryParse(_restCtrl.text.trim()) ?? 90;
+    if (restSeconds < 0) {
+      setState(() {
+        _saving = false;
+        _errorMessage = 'Rest seconds cannot be negative';
+      });
+      return;
+    }
+
+    final notes = _notesCtrl.text.trim();
+
+    // Build complete payload matching dashboard
     final payload = <String, dynamic>{
       if (exId != null) 'exerciseId': exId,
-      'targetSets': _setDrafts.length,
-      if (minReps != null) 'repsMin': minReps,
-      if (maxReps != null) 'repsMax': maxReps,
-      if (int.tryParse(_durationCtrl.text) != null) 'targetDurationSeconds': int.tryParse(_durationCtrl.text),
-      if (double.tryParse(_distanceCtrl.text) != null) 'targetDistanceMeters': double.tryParse(_distanceCtrl.text),
-      'restSeconds': int.tryParse(_restCtrl.text) ?? 90,
+      'targetSets': targetSets,
+      'repsMin': repsMin,
+      if (repsMax != null) 'repsMax': repsMax,
+      'restSeconds': restSeconds,
+      if (notes.isNotEmpty) 'notes': notes,
       'isOptional': _isOptional,
-      'notes': _notesCtrl.text.trim(),
-      'sets': _setDrafts.asMap().entries.map((entry) {
-        final s = entry.value;
-        final sMin = int.tryParse(s.repsMin.text);
-        final sMax = int.tryParse(s.repsMax.text);
-        return <String, dynamic>{
-          'setNumber': entry.key + 1,
-          if (sMin != null) 'targetRepsMin': sMin,
-          if (sMax != null) 'targetRepsMax': sMax,
-          if (double.tryParse(s.weight.text) != null) 'targetWeightKg': double.tryParse(s.weight.text),
-          if (int.tryParse(s.duration.text) != null) 'targetDurationSeconds': int.tryParse(s.duration.text),
-          if (double.tryParse(s.distance.text) != null) 'targetDistanceMeters': double.tryParse(s.distance.text),
-          if (int.tryParse(s.rest.text) != null) 'restSeconds': int.tryParse(s.rest.text),
-          if (s.notes.text.trim().isNotEmpty) 'notes': s.notes.text.trim(),
-        };
-      }).toList(),
+      // Generated sets array for complete downstream compatibility
+      'sets': List.generate(targetSets, (index) => {
+        'setNumber': index + 1,
+        'targetRepsMin': repsMin,
+        if (repsMax != null) 'targetRepsMax': repsMax,
+        'restSeconds': restSeconds,
+        if (notes.isNotEmpty) 'notes': notes,
+      }),
     };
 
     try {
@@ -449,7 +436,8 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
         return StatefulBuilder(builder: (context, setPickerState) {
           final filtered = _library.where((item) {
             final name = item['name']?.toString().toLowerCase() ?? '';
-            final muscle = item['target_muscle_group']?.toString().toLowerCase() ??
+            final muscle = item['primary_muscle_group_name']?.toString().toLowerCase() ??
+                item['target_muscle_group']?.toString().toLowerCase() ??
                 item['muscle_group_name']?.toString().toLowerCase() ?? '';
             final matchesQuery = _searchQuery.isEmpty || name.contains(_searchQuery.toLowerCase());
             final matchesGroup = _selectedMuscleGroup == 'All' ||
@@ -458,7 +446,7 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
           }).toList();
 
           return Container(
-            height: MediaQuery.of(context).size.height * 0.75,
+            height: MediaQuery.of(context).size.height * 0.8,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -498,7 +486,7 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                   style: TextStyle(color: colors.textPrimary),
                   decoration: InputDecoration(
                     prefixIcon: Icon(Icons.search, color: colors.textMuted, size: 20),
-                    hintText: 'Search 50+ exercises...',
+                    hintText: 'Search exercises...',
                     filled: true,
                     fillColor: colors.surfaceElevated,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -536,15 +524,43 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                 Expanded(
                   child: filtered.isEmpty
                       ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.search_off_rounded, size: 40, color: colors.textMuted),
-                              const SizedBox(height: 8),
-                              Text('No matching exercises', style: TextStyle(color: colors.textSecondary, fontWeight: FontWeight.w600)),
-                              const SizedBox(height: 4),
-                              Text('Use custom name below to add directly', style: TextStyle(color: colors.textMuted, fontSize: 12)),
-                            ],
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.fitness_center_rounded, size: 40, color: colors.cyan),
+                                const SizedBox(height: 12),
+                                Text(
+                                  _searchQuery.trim().isEmpty ? 'No matching exercises' : 'No catalog match for "${_searchQuery.trim()}"',
+                                  style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 6),
+                                Text('You can add this as your custom exercise:', style: TextStyle(color: colors.textMuted, fontSize: 12)),
+                                if (_searchQuery.trim().isNotEmpty) ...[
+                                  const SizedBox(height: 14),
+                                  ElevatedButton.icon(
+                                    onPressed: () {
+                                      final q = _searchQuery.trim();
+                                      setState(() {
+                                        _selectedExerciseId = null;
+                                        _selectedExerciseName = q;
+                                        _selectedMuscleGroupName = 'Custom';
+                                        _customNameCtrl.text = q;
+                                      });
+                                      Navigator.pop(pickerCtx);
+                                    },
+                                    icon: const Icon(Icons.add_circle_outline, size: 18),
+                                    label: Text('Use "$_searchQuery" as Custom Exercise'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: colors.primary,
+                                      foregroundColor: colors.onPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
                         )
                       : ListView.separated(
@@ -553,37 +569,19 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                           itemBuilder: (context, idx) {
                             final item = filtered[idx];
                             final name = item['name']?.toString() ?? 'Exercise';
-                            final muscle = item['target_muscle_group']?.toString() ??
-                                item['muscle_group_name']?.toString() ?? '';
-                            final type = item['tracking_type']?.toString() ?? 'weight_reps';
+                            final muscle = item['primary_muscle_group_name']?.toString() ??
+                                item['target_muscle_group']?.toString() ??
+                                item['muscle_group_name']?.toString() ?? 'General';
                             final isSel = _selectedExerciseId == _asInt(item['id']);
 
                             return ListTile(
                               contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                               title: Text(
-                                name,
+                                '$name ($muscle)',
                                 style: TextStyle(
                                   fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
                                   color: isSel ? colors.cyan : colors.textPrimary,
                                 ),
-                              ),
-                              subtitle: Row(
-                                children: [
-                                  if (muscle.isNotEmpty)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      margin: const EdgeInsets.only(right: 6),
-                                      decoration: BoxDecoration(
-                                        color: colors.surfaceElevated,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(muscle, style: TextStyle(fontSize: 10, color: colors.textMuted)),
-                                    ),
-                                  Text(
-                                    _formatTrackingType(type),
-                                    style: TextStyle(fontSize: 11, color: colors.textSecondary),
-                                  ),
-                                ],
                               ),
                               trailing: isSel ? Icon(Icons.check_circle, color: colors.cyan, size: 20) : null,
                               onTap: () {
@@ -602,27 +600,17 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
     );
   }
 
-  String _formatTrackingType(String type) {
-    switch (type) {
-      case 'reps_only':
-        return 'Reps Only';
-      case 'duration':
-        return 'Duration / Time';
-      case 'distance':
-        return 'Cardio / Distance';
-      default:
-        return 'Weight & Reps';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final colors = AppThemeColors.of(context);
     final isEditing = widget.existing != null;
+    final title = isEditing
+        ? 'Edit ${_selectedExerciseName.isNotEmpty ? _selectedExerciseName : "Exercise"}'
+        : (widget.dayName != null ? 'Add Exercise to ${widget.dayName}' : 'Add Exercise to Workout Day');
 
     return Container(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.92,
+        maxHeight: MediaQuery.of(context).size.height * 0.90,
       ),
       decoration: BoxDecoration(
         color: colors.card,
@@ -663,15 +651,15 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isEditing ? 'Edit Exercise' : 'Add Exercise',
+                        title,
                         style: TextStyle(
-                          fontSize: 19,
+                          fontSize: 18,
                           fontWeight: FontWeight.w800,
                           color: colors.textPrimary,
                           letterSpacing: -0.3,
                         ),
                       ),
-                      if (widget.dayName != null)
+                      if (widget.dayName != null && isEditing)
                         Text(
                           widget.dayName!,
                           style: TextStyle(fontSize: 12, color: colors.textSecondary),
@@ -688,10 +676,10 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
           ),
           Divider(height: 1, color: colors.border),
 
-          // Scrollable Content
+          // Form Body (Clean Dashboard Flow)
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               children: [
                 if (_errorMessage != null) ...[
                   Container(
@@ -717,35 +705,374 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                   ),
                 ],
 
-                // 1. EXERCISE SELECTOR CARD
-                _buildExerciseSelectorSection(colors),
+                // 1. SELECT EXERCISE (Dashboard FormField)
+                Text(
+                  'Select Exercise',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: colors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
 
-                const SizedBox(height: 16),
+                if (_library.isEmpty && !_loadingLibrary && !isEditing) ...[
+                  // Empty Library or Quick Presets
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceElevated,
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                      border: Border.all(color: colors.amber.withOpacity(0.4)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.edit_note_rounded, color: colors.amber, size: 18),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Name Your Exercise',
+                              style: TextStyle(fontWeight: FontWeight.w700, color: colors.textPrimary, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _customNameCtrl,
+                          style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w600),
+                          onChanged: (val) => setState(() => _selectedExerciseName = val),
+                          decoration: InputDecoration(
+                            hintText: 'e.g., Barbell Bench Press, Incline DB Curl...',
+                            filled: true,
+                            fillColor: colors.card,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: colors.border),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text('Quick Presets:', style: TextStyle(color: colors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: _commonPresets.map((preset) {
+                            final pName = preset['name']!;
+                            final isSel = _selectedExerciseName == pName;
+                            return InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _selectedExerciseId = null;
+                                  _selectedExerciseName = pName;
+                                  _selectedMuscleGroupName = preset['group'] ?? '';
+                                  _customNameCtrl.text = pName;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(6),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: isSel ? colors.cyan.withOpacity(0.18) : colors.card,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: isSel ? colors.cyan : colors.border),
+                                ),
+                                child: Text(
+                                  pName,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                                    color: isSel ? colors.cyan : colors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  // Exercise Dropdown / Selector Card
+                  InkWell(
+                    onTap: isEditing ? null : () => _showExercisePickerSheet(colors),
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceElevated,
+                        borderRadius: BorderRadius.circular(AppRadii.md),
+                        border: Border.all(color: colors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.fitness_center_rounded, color: colors.cyan, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _selectedExerciseName.isNotEmpty
+                                      ? (_selectedMuscleGroupName.isNotEmpty
+                                          ? '$_selectedExerciseName ($_selectedMuscleGroupName)'
+                                          : _selectedExerciseName)
+                                      : 'Choose Exercise...',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: _selectedExerciseName.isNotEmpty ? colors.textPrimary : colors.textMuted,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (!isEditing)
+                            Icon(Icons.keyboard_arrow_down_rounded, color: colors.textSecondary),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
 
-                // 2. TRACKING TYPE SEGMENTED CHIPS
-                _buildTrackingTypeSection(colors),
+                const SizedBox(height: 18),
 
-                const SizedBox(height: 16),
+                // 2. WORKING SETS, MIN REPS, MAX REPS (3-Column Layout from Dashboard)
+                Row(
+                  children: [
+                    // Working Sets
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'Working Sets',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: colors.textPrimary),
+                              ),
+                              Text(' *', style: TextStyle(color: colors.rose, fontSize: 12)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            key: const Key('input-target-sets'),
+                            controller: _setsCtrl,
+                            keyboardType: TextInputType.number,
+                            style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
+                            decoration: InputDecoration(
+                              hintText: 'e.g. 3',
+                              filled: true,
+                              fillColor: colors.surfaceElevated,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(AppRadii.md),
+                                borderSide: BorderSide(color: colors.border),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    // Min Reps
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'Min Reps',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: colors.textPrimary),
+                              ),
+                              Text(' *', style: TextStyle(color: colors.rose, fontSize: 12)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            key: const Key('input-reps-min'),
+                            controller: _repsMinCtrl,
+                            keyboardType: TextInputType.number,
+                            style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
+                            decoration: InputDecoration(
+                              hintText: 'e.g. 8',
+                              filled: true,
+                              fillColor: colors.surfaceElevated,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(AppRadii.md),
+                                borderSide: BorderSide(color: colors.border),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    // Max Reps
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Max Reps',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: colors.textPrimary),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            key: const Key('input-reps-max'),
+                            controller: _repsMaxCtrl,
+                            keyboardType: TextInputType.number,
+                            style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
+                            decoration: InputDecoration(
+                              hintText: 'e.g. 12',
+                              filled: true,
+                              fillColor: colors.surfaceElevated,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(AppRadii.md),
+                                borderSide: BorderSide(color: colors.border),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
 
-                // 3. TARGET PRESCRIPTION & DEFAULTS
-                _buildDefaultsSection(colors),
+                const SizedBox(height: 18),
 
-                const SizedBox(height: 16),
+                // 3. REST (SECONDS)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Rest (seconds)',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: colors.textPrimary),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      key: const Key('input-rest-seconds'),
+                      controller: _restCtrl,
+                      keyboardType: TextInputType.number,
+                      style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
+                      decoration: InputDecoration(
+                        hintText: 'e.g. 90',
+                        filled: true,
+                        fillColor: colors.surfaceElevated,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadii.md),
+                          borderSide: BorderSide(color: colors.border),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Rest Quick Chips
+                    Wrap(
+                      spacing: 8,
+                      children: ['45', '60', '90', '120', '180'].map((sec) {
+                        final isSel = _restCtrl.text.trim() == sec;
+                        return ChoiceChip(
+                          label: Text('${sec}s', style: const TextStyle(fontSize: 12)),
+                          selected: isSel,
+                          selectedColor: colors.primary,
+                          backgroundColor: colors.surfaceElevated,
+                          labelStyle: TextStyle(
+                            color: isSel ? colors.onPrimary : colors.textSecondary,
+                            fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                          ),
+                          onSelected: (_) => setState(() => _restCtrl.text = sec),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
 
-                // 4. PER-SET TARGETS LIST
-                _buildPerSetSection(colors),
+                const SizedBox(height: 18),
 
-                const SizedBox(height: 16),
+                // 4. TECHNIQUE & CUE NOTES (Dashboard FormField)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Technique & Cue Notes',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: colors.textPrimary),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      key: const Key('input-exercise-notes'),
+                      controller: _notesCtrl,
+                      maxLines: 2,
+                      style: TextStyle(color: colors.textPrimary, fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Pause 1 second at the bottom, maintain neutral spine',
+                        hintStyle: TextStyle(color: colors.textMuted, fontSize: 12),
+                        filled: true,
+                        fillColor: colors.surfaceElevated,
+                        contentPadding: const EdgeInsets.all(12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadii.md),
+                          borderSide: BorderSide(color: colors.border),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
 
-                // 5. ADDITIONAL OPTIONS & NOTES
-                _buildOptionsSection(colors),
+                const SizedBox(height: 14),
 
-                const SizedBox(height: 20),
+                // 5. OPTIONAL MOVEMENT CHECKBOX/SWITCH
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceElevated,
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                    border: Border.all(color: colors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Mark as Optional Movement',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: colors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Accessory / Finisher movement that can be skipped',
+                              style: TextStyle(fontSize: 11, color: colors.textMuted),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        key: const Key('checkbox-is-optional'),
+                        value: _isOptional,
+                        activeColor: colors.cyan,
+                        onChanged: (val) => setState(() => _isOptional = val),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 24),
               ],
             ),
           ),
 
-          // Bottom Action Bar
+          // Bottom Action Buttons (Dashboard Parity)
           Container(
             padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(context).viewInsets.bottom + 16),
             decoration: BoxDecoration(
@@ -765,791 +1092,12 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                 Expanded(
                   flex: 2,
                   child: PremiumButton(
-                    text: isEditing ? 'Update Exercise' : 'Save Exercise',
+                    text: isEditing ? 'Save Changes' : 'Add to Day',
                     loading: _saving,
                     onPressed: _handleSave,
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==========================================
-  // SECTION BUILDERS
-  // ==========================================
-
-  Widget _buildExerciseSelectorSection(AppThemeColors colors) {
-    final hasSelection = _selectedExerciseName.isNotEmpty;
-
-    if (_library.isEmpty && !_loadingLibrary) {
-      // Empty Library State: Friendly custom creator + quick presets
-      return Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: colors.surfaceElevated,
-          borderRadius: BorderRadius.circular(AppRadii.lg),
-          border: Border.all(color: colors.amber.withOpacity(0.3)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.edit_note_rounded, color: colors.amber, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  'Name Your Exercise',
-                  style: TextStyle(fontWeight: FontWeight.w700, color: colors.textPrimary, fontSize: 14),
-                ),
-                const Spacer(),
-                TextButton(
-                  onPressed: _fetchLibrary,
-                  style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
-                  child: Text('Retry Library', style: TextStyle(color: colors.cyan, fontSize: 12)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _customNameCtrl,
-              style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w600),
-              onChanged: (val) => setState(() => _selectedExerciseName = val),
-              decoration: InputDecoration(
-                hintText: 'e.g., Barbell Bench Press, Incline DB Curl...',
-                filled: true,
-                fillColor: colors.card,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.border)),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text('Quick Presets:', style: TextStyle(color: colors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: _commonPresets.map((preset) {
-                final isCur = _selectedExerciseName == preset['name'];
-                return ActionChip(
-                  label: Text(preset['name']!, style: TextStyle(fontSize: 11, color: isCur ? colors.onPrimary : colors.textPrimary)),
-                  backgroundColor: isCur ? colors.primary : colors.card,
-                  side: BorderSide(color: isCur ? colors.primary : colors.border),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  onPressed: () => _selectPreset(preset),
-                );
-              }).toList(),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Standard Library Card with Browse Button
-    return InkWell(
-      onTap: () => _showExercisePickerSheet(colors),
-      borderRadius: BorderRadius.circular(AppRadii.lg),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: colors.surfaceElevated,
-          borderRadius: BorderRadius.circular(AppRadii.lg),
-          border: Border.all(color: hasSelection ? colors.cyan.withOpacity(0.4) : colors.border),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'EXERCISE MOVEMENT',
-                    style: TextStyle(color: colors.textMuted, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.5),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    hasSelection ? _selectedExerciseName : 'Tap to select an exercise...',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: hasSelection ? colors.textPrimary : colors.textMuted,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: colors.cyanMuted,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          _formatTrackingType(_trackingType).toUpperCase(),
-                          style: TextStyle(color: colors.cyan, fontSize: 9, fontWeight: FontWeight.w800),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${_library.length} exercises in catalog',
-                        style: TextStyle(color: colors.textMuted, fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: colors.card,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: colors.border),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    hasSelection ? 'Change' : 'Browse',
-                    style: TextStyle(color: colors.textPrimary, fontSize: 12, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(width: 4),
-                  Icon(Icons.arrow_forward_ios_rounded, size: 10, color: colors.textSecondary),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTrackingTypeSection(AppThemeColors colors) {
-    const types = [
-      {'id': 'weight_reps', 'label': 'Weight & Reps', 'icon': Icons.fitness_center_rounded},
-      {'id': 'reps_only', 'label': 'Reps Only', 'icon': Icons.accessibility_new_rounded},
-      {'id': 'duration', 'label': 'Duration', 'icon': Icons.timer_outlined},
-      {'id': 'distance', 'label': 'Distance', 'icon': Icons.directions_run_rounded},
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'TRACKING TYPE',
-          style: TextStyle(color: colors.textMuted, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 38,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: types.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (context, idx) {
-              final t = types[idx];
-              final isSel = _trackingType == t['id'];
-              return InkWell(
-                onTap: () => setState(() => _trackingType = t['id'] as String),
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isSel ? colors.primary : colors.surfaceElevated,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: isSel ? colors.primary : colors.border),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(t['icon'] as IconData, size: 16, color: isSel ? colors.onPrimary : colors.textSecondary),
-                      const SizedBox(width: 6),
-                      Text(
-                        t['label'] as String,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
-                          color: isSel ? colors.onPrimary : colors.textPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDefaultsSection(AppThemeColors colors) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(AppRadii.lg),
-        border: Border.all(color: colors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'TARGET PRESCRIPTION',
-                style: TextStyle(color: colors.textMuted, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5),
-              ),
-              const Spacer(),
-              // Quick sets preset pills
-              Row(
-                children: [3, 4, 5].map((cnt) {
-                  final isCur = _targetSets == cnt;
-                  return Padding(
-                    padding: const EdgeInsets.only(left: 4),
-                    child: InkWell(
-                      onTap: () => _updateSetCount(cnt),
-                      borderRadius: BorderRadius.circular(4),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: isCur ? colors.cyan : colors.card,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: isCur ? colors.cyan : colors.border),
-                        ),
-                        child: Text(
-                          '$cnt sets',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: isCur ? Colors.black : colors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Sets stepper & Rest row
-          Row(
-            children: [
-              // Sets Stepper
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Sets', style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 4),
-                    Container(
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: colors.card,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: colors.border),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.remove, size: 18),
-                            color: colors.textSecondary,
-                            onPressed: _targetSets > 1 ? () => _updateSetCount(_targetSets - 1) : null,
-                          ),
-                          Text(
-                            '$_targetSets',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: colors.textPrimary),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.add, size: 18),
-                            color: colors.textSecondary,
-                            onPressed: _targetSets < 20 ? () => _updateSetCount(_targetSets + 1) : null,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Rest Seconds
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Rest (sec)', style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 4),
-                    TextField(
-                      controller: _restCtrl,
-                      keyboardType: TextInputType.number,
-                      style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
-                      decoration: InputDecoration(
-                        hintText: '90',
-                        suffixText: 'sec',
-                        suffixStyle: TextStyle(color: colors.textMuted, fontSize: 12),
-                        filled: true,
-                        fillColor: colors.card,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.border)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // Contextual Target Inputs based on trackingType
-          if (_trackingType == 'weight_reps' || _trackingType == 'reps_only') ...[
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Default Min Reps', style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 4),
-                      TextField(
-                        controller: _repsMinCtrl,
-                        keyboardType: TextInputType.number,
-                        style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
-                        decoration: InputDecoration(
-                          hintText: '8',
-                          filled: true,
-                          fillColor: colors.card,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.border)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Default Max Reps', style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 4),
-                      TextField(
-                        controller: _repsMaxCtrl,
-                        keyboardType: TextInputType.number,
-                        style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
-                        decoration: InputDecoration(
-                          hintText: '12',
-                          filled: true,
-                          fillColor: colors.card,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.border)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (_trackingType == 'weight_reps') ...[
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Target (kg)', style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 4),
-                        TextField(
-                          controller: _weightCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
-                          decoration: InputDecoration(
-                            hintText: 'e.g. 60',
-                            filled: true,
-                            fillColor: colors.card,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.border)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 8),
-            // Quick rep presets
-            Row(
-              children: [
-                Text('Presets: ', style: TextStyle(color: colors.textMuted, fontSize: 11)),
-                _repPresetChip('6-8', 6, 8, colors),
-                _repPresetChip('8-12', 8, 12, colors),
-                _repPresetChip('10-15', 10, 15, colors),
-                _repPresetChip('12-15', 12, 15, colors),
-              ],
-            ),
-          ] else if (_trackingType == 'duration') ...[
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Target Duration (sec)', style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 4),
-                      TextField(
-                        controller: _durationCtrl,
-                        keyboardType: TextInputType.number,
-                        style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
-                        decoration: InputDecoration(
-                          hintText: 'e.g. 60',
-                          suffixText: 'sec',
-                          filled: true,
-                          fillColor: colors.card,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.border)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ] else if (_trackingType == 'distance') ...[
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Distance (meters)', style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 4),
-                      TextField(
-                        controller: _distanceCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
-                        decoration: InputDecoration(
-                          hintText: 'e.g. 1000',
-                          suffixText: 'm',
-                          filled: true,
-                          fillColor: colors.card,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.border)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Duration (sec)', style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 4),
-                      TextField(
-                        controller: _durationCtrl,
-                        keyboardType: TextInputType.number,
-                        style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
-                        decoration: InputDecoration(
-                          hintText: 'e.g. 300',
-                          suffixText: 'sec',
-                          filled: true,
-                          fillColor: colors.card,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.border)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _repPresetChip(String label, int min, int max, AppThemeColors colors) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            _repsMinCtrl.text = '$min';
-            _repsMaxCtrl.text = '$max';
-          });
-        },
-        borderRadius: BorderRadius.circular(4),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(
-            color: colors.card,
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: colors.border),
-          ),
-          child: Text(label, style: TextStyle(fontSize: 10, color: colors.textSecondary, fontWeight: FontWeight.w600)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPerSetSection(AppThemeColors colors) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              'PER-SET PRESCRIPTIONS (${_setDrafts.length})',
-              style: TextStyle(color: colors.textMuted, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5),
-            ),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: _applyDefaultsToAllSets,
-              icon: Icon(Icons.sync_rounded, size: 14, color: colors.cyan),
-              label: Text('Apply Defaults', style: TextStyle(fontSize: 11, color: colors.cyan, fontWeight: FontWeight.w700)),
-              style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-
-        // Set Cards
-        ..._setDrafts.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final draft = entry.value;
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: colors.surfaceElevated,
-              borderRadius: BorderRadius.circular(AppRadii.md),
-              border: Border.all(color: colors.border),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Set Header
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: colors.cyanMuted,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'SET ${idx + 1}',
-                        style: TextStyle(
-                          color: colors.cyan,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 11,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    if (_setDrafts.length > 1)
-                      IconButton(
-                        icon: Icon(Icons.delete_outline_rounded, size: 18, color: colors.rose),
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        onPressed: () {
-                          setState(() {
-                            final removed = _setDrafts.removeAt(idx);
-                            removed.dispose();
-                            _targetSets = _setDrafts.length;
-                          });
-                        },
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                // Responsive Fields according to trackingType
-                if (_trackingType == 'weight_reps') ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _compactField('Min Reps', draft.repsMin, TextInputType.number, colors),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _compactField('Max Reps', draft.repsMax, TextInputType.number, colors),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _compactField('Weight (kg)', draft.weight, const TextInputType.numberWithOptions(decimal: true), colors),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _compactField('Rest (s)', draft.rest, TextInputType.number, colors),
-                      ),
-                    ],
-                  ),
-                ] else if (_trackingType == 'reps_only') ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _compactField('Min Reps', draft.repsMin, TextInputType.number, colors),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _compactField('Max Reps', draft.repsMax, TextInputType.number, colors),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _compactField('Rest (sec)', draft.rest, TextInputType.number, colors),
-                      ),
-                    ],
-                  ),
-                ] else if (_trackingType == 'duration') ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _compactField('Duration (sec)', draft.duration, TextInputType.number, colors),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _compactField('Rest (sec)', draft.rest, TextInputType.number, colors),
-                      ),
-                    ],
-                  ),
-                ] else if (_trackingType == 'distance') ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _compactField('Distance (m)', draft.distance, const TextInputType.numberWithOptions(decimal: true), colors),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _compactField('Duration (s)', draft.duration, TextInputType.number, colors),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _compactField('Rest (s)', draft.rest, TextInputType.number, colors),
-                      ),
-                    ],
-                  ),
-                ],
-
-                const SizedBox(height: 8),
-                // Compact set notes
-                TextField(
-                  controller: draft.notes,
-                  style: TextStyle(color: colors.textPrimary, fontSize: 12),
-                  decoration: InputDecoration(
-                    hintText: 'Set ${idx + 1} notes (e.g., RPE 8, drop set, warm-up)...',
-                    hintStyle: TextStyle(color: colors.textMuted, fontSize: 11),
-                    filled: true,
-                    fillColor: colors.card,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: colors.border)),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }),
-
-        const SizedBox(height: 4),
-        // Add Set Button
-        OutlinedButton.icon(
-          onPressed: () => _updateSetCount(_targetSets + 1),
-          icon: const Icon(Icons.add, size: 16),
-          label: const Text('Add Another Set'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: colors.primary,
-            side: BorderSide(color: colors.border),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            minimumSize: const Size(double.infinity, 38),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _compactField(String label, TextEditingController ctrl, TextInputType keyboard, AppThemeColors colors) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(color: colors.textMuted, fontSize: 10, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 3),
-        TextField(
-          controller: ctrl,
-          keyboardType: keyboard,
-          style: TextStyle(color: colors.textPrimary, fontSize: 13, fontWeight: FontWeight.w700),
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: colors.card,
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: colors.border)),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOptionsSection(AppThemeColors colors) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(AppRadii.lg),
-        border: Border.all(color: colors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Optional Exercise',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: colors.textPrimary),
-                    ),
-                    Text(
-                      'Athletes can skip this exercise without penalty',
-                      style: TextStyle(fontSize: 11, color: colors.textMuted),
-                    ),
-                  ],
-                ),
-              ),
-              Switch(
-                value: _isOptional,
-                activeColor: colors.cyan,
-                onChanged: (val) => setState(() => _isOptional = val),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Exercise Coach Notes',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.textSecondary),
-          ),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _notesCtrl,
-            maxLines: 2,
-            style: TextStyle(color: colors.textPrimary, fontSize: 13),
-            decoration: InputDecoration(
-              hintText: 'Tempo cues (e.g. 3-0-1-0), equipment setup, or form guidance...',
-              hintStyle: TextStyle(color: colors.textMuted, fontSize: 12),
-              filled: true,
-              fillColor: colors.card,
-              contentPadding: const EdgeInsets.all(12),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.border)),
             ),
           ),
         ],

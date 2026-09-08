@@ -198,33 +198,70 @@ export class MealsController {
 
         // Record any custom foods added inside the meal
         const customFoods = body.customFoods || [];
-        for (const cf of customFoods) {
-          if (cf.calories != null) {
-            totalCalories += Number(cf.calories);
-            hasCustomMacros = true;
-          }
-          if (cf.proteinG != null) totalProtein += Number(cf.proteinG);
-          if (cf.carbsG != null) totalCarbs += Number(cf.carbsG);
-          if (cf.fatG != null) totalFat += Number(cf.fatG);
+        if (customFoods.length > 0) {
+          let fallbackGroupId: number | null = null;
+          try {
+            const firstGroup = await conn.queryOne<any>(
+              'SELECT id FROM diet_meal_option_groups WHERE diet_meal_id = ? ORDER BY group_order ASC LIMIT 1',
+              [mealId]
+            );
+            if (firstGroup) fallbackGroupId = firstGroup.id;
+          } catch (_) {}
 
-          await conn.execute(
-            `INSERT INTO meal_log_selections (
-               meal_log_id, diet_meal_option_group_id, diet_meal_option_id, group_name_snapshot,
-               option_label_snapshot, quantity_snapshot, unit_code_snapshot,
-               calories_snapshot, protein_g_snapshot, carbs_g_snapshot, fat_g_snapshot
-             ) VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-              currentLogId,
-              'Custom Food',
-              cf.name,
-              cf.quantity ?? 1,
-              cf.servingSize || null,
-              cf.calories ?? null,
-              cf.proteinG ?? null,
-              cf.carbsG ?? null,
-              cf.fatG ?? null,
-            ]
-          );
+          for (const cf of customFoods) {
+            if (cf.calories != null) {
+              totalCalories += Number(cf.calories);
+              hasCustomMacros = true;
+            }
+            if (cf.proteinG != null) totalProtein += Number(cf.proteinG);
+            if (cf.carbsG != null) totalCarbs += Number(cf.carbsG);
+            if (cf.fatG != null) totalFat += Number(cf.fatG);
+
+            try {
+              await conn.execute(
+                `INSERT INTO meal_log_selections (
+                   meal_log_id, diet_meal_option_group_id, diet_meal_option_id, group_name_snapshot,
+                   option_label_snapshot, quantity_snapshot, unit_code_snapshot,
+                   calories_snapshot, protein_g_snapshot, carbs_g_snapshot, fat_g_snapshot
+                 ) VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                  currentLogId,
+                  'Custom Food',
+                  cf.name,
+                  cf.quantity ?? 1,
+                  cf.servingSize || null,
+                  cf.calories ?? null,
+                  cf.proteinG ?? null,
+                  cf.carbsG ?? null,
+                  cf.fatG ?? null,
+                ]
+              );
+            } catch (insertErr: any) {
+              if ((insertErr?.code === 'ER_BAD_NULL_ERROR' || insertErr?.message?.includes('cannot be null')) && fallbackGroupId != null) {
+                await conn.execute(
+                  `INSERT INTO meal_log_selections (
+                     meal_log_id, diet_meal_option_group_id, diet_meal_option_id, group_name_snapshot,
+                     option_label_snapshot, quantity_snapshot, unit_code_snapshot,
+                     calories_snapshot, protein_g_snapshot, carbs_g_snapshot, fat_g_snapshot
+                   ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                  [
+                    currentLogId,
+                    fallbackGroupId,
+                    'Custom Food',
+                    cf.name,
+                    cf.quantity ?? 1,
+                    cf.servingSize || null,
+                    cf.calories ?? null,
+                    cf.proteinG ?? null,
+                    cf.carbsG ?? null,
+                    cf.fatG ?? null,
+                  ]
+                );
+              } else {
+                throw insertErr;
+              }
+            }
+          }
         }
 
         if (hasCustomMacros || customFoods.length > 0 || selections.length > 0) {
