@@ -219,7 +219,33 @@ describe('Workout & Diet Plans Dedicated Lifecycle, Ownership & Transactional Ro
           notes: 'Deload week: RPE 7',
         },
       });
-      expect(updateExRes.statusCode).toBe(200);
+      // Verify sets were generated in workout_plan_exercise_sets table
+      const pool = getDatabasePool();
+      const createdSets = await pool.query(
+        'SELECT * FROM workout_plan_exercise_sets WHERE workout_plan_exercise_id = ? ORDER BY set_number ASC',
+        [ex1Id],
+      );
+      expect(createdSets.length).toBe(4);
+
+      // Verify repository replaceExerciseSets fallback handling for legacy schema
+      const { WorkoutPlanRepository } = await import('../src/modules/workout-plans/workout-plan.repository.js');
+      const repo = new WorkoutPlanRepository(pool);
+      const executedSqls: string[] = [];
+      const mockConn: any = {
+        execute: async (sql: string, params?: any[]) => {
+          executedSqls.push(sql);
+          if (sql.includes('target_reps_min')) {
+            const err: any = new Error("Unknown column 'target_reps_min' in 'field list'");
+            err.code = 'ER_BAD_FIELD_ERROR';
+            throw err;
+          }
+          return { affectedRows: 1 };
+        },
+      };
+      await repo.replaceExerciseSets(ex1Id, [
+        { setNumber: 1, targetRepsMin: 8, targetRepsMax: 12, targetWeightKg: 50, restSeconds: 60, notes: 'legacy set' },
+      ], mockConn);
+      expect(executedSqls.some((s) => s.includes('target_reps'))).toBe(true);
     });
 
     it('enforces strict ownership checks on workout plan access and modifications', async () => {

@@ -333,24 +333,52 @@ export class WorkoutPlanRepository {
   }>, client: DbConnection = this.db): Promise<void> {
     await client.execute('DELETE FROM workout_plan_exercise_sets WHERE workout_plan_exercise_id = ?', [exerciseId]);
     for (const set of sets) {
-      await client.execute(
-        `INSERT INTO workout_plan_exercise_sets (
-          workout_plan_exercise_id, set_number, target_reps_min, target_reps_max,
-          target_weight_kg, target_duration_seconds, target_distance_meters,
-          rest_seconds, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          exerciseId,
-          set.setNumber,
-          set.targetRepsMin ?? null,
-          set.targetRepsMax ?? null,
-          set.targetWeightKg ?? null,
-          set.targetDurationSeconds ?? null,
-          set.targetDistanceMeters ?? null,
-          set.restSeconds ?? null,
-          set.notes || null,
-        ],
-      );
+      try {
+        await client.execute(
+          `INSERT INTO workout_plan_exercise_sets (
+            workout_plan_exercise_id, set_number, target_reps_min, target_reps_max,
+            target_weight_kg, target_duration_seconds, target_distance_meters,
+            rest_seconds, notes
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            exerciseId,
+            set.setNumber,
+            set.targetRepsMin ?? null,
+            set.targetRepsMax ?? null,
+            set.targetWeightKg ?? null,
+            set.targetDurationSeconds ?? null,
+            set.targetDistanceMeters ?? null,
+            set.restSeconds ?? null,
+            set.notes || null,
+          ],
+        );
+      } catch (err: any) {
+        if (
+          err.code === 'ER_BAD_FIELD_ERROR' ||
+          err.message?.includes('target_reps_min') ||
+          err.message?.includes('Unknown column')
+        ) {
+          // Backward compatibility fallback for databases where target_reps column exists
+          await client.execute(
+            `INSERT INTO workout_plan_exercise_sets (
+              workout_plan_exercise_id, set_number, target_reps,
+              target_weight_kg, target_duration_seconds, target_distance_meters,
+              notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [
+              exerciseId,
+              set.setNumber,
+              set.targetRepsMax ?? set.targetRepsMin ?? null,
+              set.targetWeightKg ?? null,
+              set.targetDurationSeconds ?? null,
+              set.targetDistanceMeters ?? null,
+              set.notes || null,
+            ],
+          );
+        } else {
+          throw err;
+        }
+      }
     }
   }
 

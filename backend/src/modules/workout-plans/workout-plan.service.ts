@@ -118,13 +118,13 @@ export class WorkoutPlanService {
             isOptional: ex.is_optional,
             sets: (ex.sets || []).map((set: any) => ({
               setNumber: set.set_number,
-              targetRepsMin: set.target_reps_min,
-              targetRepsMax: set.target_reps_max,
-              targetWeightKg: set.target_weight_kg,
-              targetDurationSeconds: set.target_duration_seconds,
-              targetDistanceMeters: set.target_distance_meters,
-              restSeconds: set.rest_seconds,
-              notes: set.notes,
+              targetRepsMin: set.target_reps_min ?? set.target_reps ?? null,
+              targetRepsMax: set.target_reps_max ?? set.target_reps ?? null,
+              targetWeightKg: set.target_weight_kg ?? null,
+              targetDurationSeconds: set.target_duration_seconds ?? null,
+              targetDistanceMeters: set.target_distance_meters ?? null,
+              restSeconds: set.rest_seconds ?? null,
+              notes: set.notes ?? null,
             })),
           }, conn);
         }
@@ -201,13 +201,13 @@ export class WorkoutPlanService {
               isOptional: ex.is_optional,
               sets: (ex.sets || []).map((set: any) => ({
                 setNumber: set.set_number,
-                targetRepsMin: set.target_reps_min,
-                targetRepsMax: set.target_reps_max,
-                targetWeightKg: set.target_weight_kg,
-                targetDurationSeconds: set.target_duration_seconds,
-                targetDistanceMeters: set.target_distance_meters,
-                restSeconds: set.rest_seconds,
-                notes: set.notes,
+                targetRepsMin: set.target_reps_min ?? set.target_reps ?? null,
+                targetRepsMax: set.target_reps_max ?? set.target_reps ?? null,
+                targetWeightKg: set.target_weight_kg ?? null,
+                targetDurationSeconds: set.target_duration_seconds ?? null,
+                targetDistanceMeters: set.target_distance_meters ?? null,
+                restSeconds: set.rest_seconds ?? null,
+                notes: set.notes ?? null,
               })),
             }, conn);
           }

@@ -1100,6 +1100,29 @@ const migrations: Migration[] = [
       }
     },
   },
+  {
+    version: '014-workout-plan-exercise-sets-columns',
+    up: async (db) => {
+      logger.info('Running migration 014: ensuring target_reps_min and prescription columns on workout_plan_exercise_sets');
+      await ensureColumnExists(db, 'workout_plan_exercise_sets', 'set_number', 'INTEGER NOT NULL DEFAULT 1');
+      await ensureColumnExists(db, 'workout_plan_exercise_sets', 'target_reps_min', 'INTEGER NULL');
+      await ensureColumnExists(db, 'workout_plan_exercise_sets', 'target_reps_max', 'INTEGER NULL');
+      await ensureColumnExists(db, 'workout_plan_exercise_sets', 'target_weight_kg', 'DECIMAL(8,2) NULL');
+      await ensureColumnExists(db, 'workout_plan_exercise_sets', 'target_duration_seconds', 'INTEGER NULL');
+      await ensureColumnExists(db, 'workout_plan_exercise_sets', 'target_distance_meters', 'DECIMAL(10,2) NULL');
+      await ensureColumnExists(db, 'workout_plan_exercise_sets', 'rest_seconds', 'INTEGER NULL');
+      await ensureColumnExists(db, 'workout_plan_exercise_sets', 'notes', 'VARCHAR(1000) NULL');
+
+      await reconcileOrderingColumns(db, 'workout_plan_exercise_sets', 'set_number', 'set_order');
+      await backfillColumnData(db, 'workout_plan_exercise_sets', 'target_reps_min', 'reps_min_target', 'reps_min_target');
+      await backfillColumnData(db, 'workout_plan_exercise_sets', 'target_reps_max', 'reps_max_target', 'reps_max_target');
+      await backfillColumnData(db, 'workout_plan_exercise_sets', 'target_reps_min', 'target_reps', 'target_reps');
+      await backfillColumnData(db, 'workout_plan_exercise_sets', 'target_reps_max', 'target_reps', 'target_reps');
+      await backfillColumnData(db, 'workout_plan_exercise_sets', 'target_weight_kg', 'weight_kg_target', 'weight_kg_target');
+      await backfillColumnData(db, 'workout_plan_exercise_sets', 'target_duration_seconds', 'duration_seconds_target', 'duration_seconds_target');
+      await backfillColumnData(db, 'workout_plan_exercise_sets', 'rest_seconds', 'rest_seconds_target', 'rest_seconds_target');
+    },
+  },
 ];
 
 export async function runMigrations(customDb?: DatabasePool) {
