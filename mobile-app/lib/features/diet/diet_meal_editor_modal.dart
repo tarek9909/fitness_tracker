@@ -379,7 +379,7 @@ class _DietMealEditorModalState extends State<DietMealEditorModal> {
                     decoration: BoxDecoration(
                       color: colors.roseMuted,
                       borderRadius: BorderRadius.circular(AppRadii.md),
-                      border: Border.all(color: colors.rose.withOpacity(0.5)),
+                      border: Border.all(color: colors.rose.withValues(alpha: 0.5)),
                     ),
                     child: Row(
                       children: [
@@ -587,11 +587,11 @@ class _DietMealEditorModalState extends State<DietMealEditorModal> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.access_time_rounded, size: 14, color: colors.cyan),
+                      Icon(Icons.access_time_rounded, size: 14, color: colors.primary),
                       const SizedBox(width: 4),
                       Text(
                         'Open Clock Picker',
-                        style: TextStyle(fontSize: 11, color: colors.cyan, fontWeight: FontWeight.w700),
+                        style: TextStyle(fontSize: 11, color: colors.primary, fontWeight: FontWeight.w700),
                       ),
                     ],
                   ),
@@ -614,7 +614,7 @@ class _DietMealEditorModalState extends State<DietMealEditorModal> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.schedule_rounded, color: colors.cyan, size: 20),
+                  Icon(Icons.schedule_rounded, color: colors.primary, size: 20),
                   const SizedBox(width: 10),
                   Text(
                     _timeCtrl.text.isEmpty ? '08:00' : _timeCtrl.text,
@@ -657,16 +657,16 @@ class _DietMealEditorModalState extends State<DietMealEditorModal> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: isCurrent ? colors.cyan : colors.card,
+                    color: isCurrent ? colors.primary : colors.card,
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: isCurrent ? colors.cyan : colors.border),
+                    border: Border.all(color: isCurrent ? colors.primary : colors.border),
                   ),
                   child: Text(
                     t,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: isCurrent ? Colors.black : colors.textSecondary,
+                      color: isCurrent ? colors.onPrimary : colors.textSecondary,
                     ),
                   ),
                 ),
@@ -723,7 +723,7 @@ class _DietMealEditorModalState extends State<DietMealEditorModal> {
               ),
               Switch(
                 value: _isRequired,
-                activeColor: colors.cyan,
+                activeThumbColor: colors.primary,
                 onChanged: (val) => setState(() => _isRequired = val),
               ),
             ],
@@ -743,7 +743,7 @@ class _DietMealEditorModalState extends State<DietMealEditorModal> {
               const Spacer(),
               Text(
                 '$_graceMinutes mins',
-                style: TextStyle(color: colors.cyan, fontWeight: FontWeight.w700, fontSize: 12),
+                style: TextStyle(color: colors.primary, fontWeight: FontWeight.w700, fontSize: 12),
               ),
             ],
           ),
@@ -761,14 +761,14 @@ class _DietMealEditorModalState extends State<DietMealEditorModal> {
               return ChoiceChip(
                 label: Text('${mins}m'),
                 selected: isCurrent,
-                selectedColor: colors.cyan,
+                selectedColor: colors.primary,
                 backgroundColor: colors.card,
                 labelStyle: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: isCurrent ? Colors.black : colors.textPrimary,
+                  color: isCurrent ? colors.onPrimary : colors.textPrimary,
                 ),
-                side: BorderSide(color: isCurrent ? colors.cyan : colors.border),
+                side: BorderSide(color: isCurrent ? colors.primary : colors.border),
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 onSelected: (val) {
                   if (val) setState(() => _graceMinutes = mins);
@@ -808,7 +808,7 @@ class _DietMealEditorModalState extends State<DietMealEditorModal> {
               const Spacer(),
               Switch(
                 value: _seedStarterGroups,
-                activeColor: colors.amber,
+                activeThumbColor: colors.amber,
                 onChanged: (val) => setState(() => _seedStarterGroups = val),
               ),
             ],

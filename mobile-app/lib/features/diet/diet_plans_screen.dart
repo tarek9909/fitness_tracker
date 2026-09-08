@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/premium_widgets.dart';
+import 'diet_food_option_editor_modal.dart';
 import 'diet_plan_builder_screen.dart';
 import 'diet_meal_editor_modal.dart';
 
@@ -709,154 +710,16 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
   }
 
   Future<void> _showAddFoodOptionDialog(int groupId) async {
-    List<dynamic> foodCatalog = [];
-    bool loadingFoods = true;
-    int? selectedFoodId;
-    final portionCtrl = TextEditingController(text: '100');
-
-    try {
-      final res = await widget.apiClient.get('/foods');
-      if (res is Map<String, dynamic> && res['data'] is List) {
-        foodCatalog = res['data'] as List<dynamic>;
-      } else if (res is List) {
-        foodCatalog = res;
-      }
-      loadingFoods = false;
-      if (foodCatalog.isNotEmpty) {
-        selectedFoodId = foodCatalog.first['id'] as int;
-      }
-    } catch (_) {
-      loadingFoods = false;
-    }
-
-    if (!mounted) return;
-
-    await showPremiumDialog(
-      context: context,
-      builder: (ctx) {
-        final colors = AppThemeColors.of(ctx);
-        return StatefulBuilder(
-          builder: (dialogCtx, setDialogState) {
-            return AlertDialog(
-              backgroundColor: colors.card,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadii.xl),
-                side: BorderSide(color: colors.border),
-              ),
-              title: Text(
-                'Add Food Option',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18,
-                  color: colors.textPrimary,
-                ),
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (loadingFoods)
-                      const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: CircularProgressIndicator(),
-                      )
-                    else if (foodCatalog.isEmpty)
-                      Text('No foods available in catalog.',
-                          style: TextStyle(color: colors.textSecondary))
-                    else
-                      DropdownButtonFormField<int>(
-                        initialValue: selectedFoodId,
-                        dropdownColor: colors.surfaceElevated,
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          labelText: 'Select Food',
-                          labelStyle: TextStyle(color: colors.textSecondary),
-                          filled: true,
-                          fillColor: colors.surfaceElevated,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.lg),
-                            borderSide: BorderSide(color: colors.border),
-                          ),
-                        ),
-                        items: foodCatalog.map((food) {
-                          return DropdownMenuItem<int>(
-                            value: food['id'] as int,
-                            child: Text(
-                              food['name'] as String? ?? 'Food',
-                              style: TextStyle(color: colors.textPrimary),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          setDialogState(() => selectedFoodId = val);
-                        },
-                      ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: PremiumTextField(
-                            label: 'Portion',
-                            controller: portionCtrl,
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                PremiumButton(
-                  text: 'Cancel',
-                  isSecondary: true,
-                  onPressed: () => Navigator.pop(ctx),
-                ),
-                PremiumButton(
-                  text: 'Add Food',
-                  onPressed: () async {
-                    if (selectedFoodId == null) return;
-                    final portion =
-                        double.tryParse(portionCtrl.text.trim()) ?? 100.0;
-                    final selectedFood = foodCatalog.cast<dynamic>().firstWhere(
-                      (food) => food is Map && food['id'] == selectedFoodId,
-                      orElse: () => null,
-                    );
-                    final servingUnitId = selectedFood is Map
-                        ? selectedFood['measurement_unit_id'] as int?
-                        : null;
-
-                    Navigator.pop(ctx);
-                    try {
-                      await widget.apiClient.post(
-                        '/me/diet-plans/${widget.planId}/option-groups/$groupId/options',
-                        body: {
-                          'foodId': selectedFoodId,
-                          'servingQuantity': portion,
-                          if (servingUnitId != null) 'servingUnitId': servingUnitId,
-                        },
-                      );
-                      if (mounted) {
-                        showPremiumSnackBar(context, 'Food option added');
-                        _loadPlanDetails();
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        showPremiumSnackBar(
-                          context,
-                          'Failed to add food: ${e.toString().replaceAll("Exception: ", "")}',
-                          isError: true,
-                        );
-                      }
-                    }
-                  },
-                ),
-              ],
-            );
-          },
-        );
-      },
+    final changed = await DietFoodOptionEditorModal.show(
+      context,
+      apiClient: widget.apiClient,
+      planId: widget.planId,
+      groupId: groupId,
     );
+    if (changed == true && mounted) {
+      showPremiumSnackBar(context, 'Food option added');
+      _loadPlanDetails();
+    }
   }
 
   @override

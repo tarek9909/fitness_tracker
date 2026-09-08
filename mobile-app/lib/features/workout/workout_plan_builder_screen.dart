@@ -280,10 +280,31 @@ class _WorkoutPlanBuilderScreenState extends State<WorkoutPlanBuilderScreen> {
               final setCount = exercise['target_sets'] ?? (exercise['sets'] as List?)?.length ?? 0;
               final reps = exercise['target_reps_min'] ?? exercise['reps_min'];
               final maxReps = exercise['target_reps_max'] ?? exercise['reps_max'];
+              final firstSet = (exercise['sets'] as List?)?.isNotEmpty == true
+                  ? (exercise['sets'] as List).first
+                  : null;
+              final weight = firstSet is Map
+                  ? firstSet['target_weight_kg'] ?? firstSet['targetWeightKg']
+                  : null;
+              final duration = exercise['target_duration_seconds'] ??
+                  (firstSet is Map
+                      ? firstSet['target_duration_seconds'] ?? firstSet['targetDurationSeconds']
+                      : null);
+              final distance = exercise['target_distance_meters'] ??
+                  (firstSet is Map
+                      ? firstSet['target_distance_meters'] ?? firstSet['targetDistanceMeters']
+                      : null);
+              final exerciseSummary = [
+                '$setCount sets',
+                if (reps != null) '$reps${maxReps != null ? '-$maxReps' : ''} reps',
+                if (weight != null) '$weight kg',
+                if (duration != null) '$duration sec',
+                if (distance != null) '$distance m',
+              ].join(' • ');
               return ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text('${exercise['exercise_name'] ?? exercise['name'] ?? 'Exercise'}${exercise['is_optional'] == 1 ? ' (optional)' : ''}'),
-                subtitle: Text('$setCount sets • ${reps ?? '-'}${maxReps != null ? '-$maxReps' : ''} reps${exercise['target_duration_seconds'] != null ? ' • ${exercise['target_duration_seconds']} sec' : ''}'),
+                subtitle: Text(exerciseSummary),
                 leading: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [

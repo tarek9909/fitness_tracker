@@ -23,76 +23,77 @@ import 'package:flutter/material.dart';
 ///
 /// High-end athletic performance system aesthetic.
 class AppColors {
-  // Dark Palette (Monochrome Architectural - Obsidian & Titanium)
-  static const Color background = Color(0xFF0A0A0B); // Deep Obsidian Canvas
-  static const Color surface = Color(0xFF141416); // Structural Charcoal Surface
-  static const Color surfaceElevated = Color(0xFF1C1C1F); // Form fields, elevated cards
-  static const Color card = Color(0xFF141416); // Architectural containers
-  static const Color cardHover = Color(0xFF222226);
-  static const Color border = Color(0xFF26262A); // Single 1px crisp architectural hairline
-  static const Color borderHover = Color(0xFF3F3F46);
+  // Dark Palette (Solar Lava - Carbon & Molten Flame)
+  static const Color background = Color(0xFF0D0D11); // Deep Carbon Smoke Canvas
+  static const Color surface = Color(0xFF15151B); // Dark Vulcanite Slate
+  static const Color surfaceElevated = Color(0xFF1D1D26); // Form fields, elevated cards
+  static const Color card = Color(0xFF15151B); // Architectural containers
+  static const Color cardHover = Color(0xFF22222E);
+  static const Color border = Color(0xFF2B2220); // Warm Hairline Border
+  static const Color borderHover = Color(0xFF4A342B); // Heated Copper Accent
 
-  // Primary Action Tokens (Pure Titanium White on Obsidian)
-  static const Color primary = Color(0xFFFFFFFF); // Pure Titanium White
-  static const Color primaryDark = Color(0xFFE4E4E7);
-  static const Color primaryMuted = Color(0x1AFFFFFF); // 10% White tint
-  static const Color primaryGlow = Color(0x0DFFFFFF); // Subtle pure ambient glow
-  static const Color onPrimary = Color(0xFF0A0A0B); // Stark high-contrast black on white
+  // Primary Action Tokens (Molten Solar Lava)
+  static const Color primary = Color(0xFFFF5500); // Radiant Molten Orange
+  static const Color primaryDark = Color(0xFFE04500); // Deep Flame
+  static const Color primaryMuted = Color(0x26FF5500); // 15% Molten Wash
+  static const Color primaryGlow = Color(0x33FF5500); // Radiant Warm Ambient Glow
+  static const Color onPrimary = Color(0xFFFFFFFF); // Stark high-contrast white on molten orange
 
   // Soft Premium Accent Color Tokens (Dark Mode)
-  static const Color emerald = Color(0xFF34D399); // Soft Mint / Emerald
-  static const Color emeraldMuted = Color(0x2634D399);
+  static const Color emerald = Color(0xFF10B981); // Mint Vitality
+  static const Color emeraldMuted = Color(0x2610B981);
 
-  static const Color cyan = Color(0xFF38BDF8); // Soft Sky Cyan
+  static const Color cyan = Color(0xFF38BDF8); // Cool Recovery Cyan
   static const Color cyanMuted = Color(0x2638BDF8);
 
   static const Color violet = Color(0xFFA78BFA); // Soft Lavender
   static const Color violetMuted = Color(0x26A78BFA);
 
-  static const Color amber = Color(0xFFFBBF24); // Soft Warm Amber
-  static const Color amberMuted = Color(0x26FBBF24);
+  static const Color amber = Color(0xFFF59E0B); // Golden Solar Amber
+  static const Color amberMuted = Color(0x26F59E0B);
 
-  static const Color rose = Color(0xFFFB7185); // Soft Warm Rose / Coral
-  static const Color roseMuted = Color(0x26FB7185);
+  static const Color rose = Color(0xFFEF4444); // Crimson Flame / Heat Zone
+  static const Color roseMuted = Color(0x26EF4444);
 
   // Dark Typography Tokens (Austere high-contrast architectural hierarchy)
   static const Color textPrimary = Color(0xFFFAFAFA);
-  static const Color textSecondary = Color(0xFFA1A1AA);
-  static const Color textMuted = Color(0xFF71717A);
+  static const Color textSecondary = Color(0xFFA39E9B);
+  static const Color textMuted = Color(0xFF736D6B);
 
-  // Light Palette (Monochrome Architectural - Concrete & Ink)
-  static const Color lightBackground = Color(0xFFF4F4F6); // Crisp Architectural Stone Canvas
+  // Light Palette (Solar Daylight - Warm Porcelain & Heated Terracotta)
+  static const Color lightBackground = Color(0xFFF9F8F6); // Crisp Warm Porcelain Canvas
   static const Color lightSurface = Color(0xFFFFFFFF); // Stark White Planar Surface
-  static const Color lightSurfaceElevated = Color(0xFFECECEE); // Pale Slate Elevated
+  static const Color lightSurfaceElevated = Color(0xFFF3EFE9); // Pale Warm Slate
   static const Color lightCard = Color(0xFFFFFFFF);
-  static const Color lightCardHover = Color(0xFFFAFAFA);
-  static const Color lightBorder = Color(0xFFE2E2E5); // 1px Precision Hairline Gridline
-  static const Color lightBorderHover = Color(0xFF18181B);
+  static const Color lightCardHover = Color(0xFFFAF8F5);
+  static const Color lightBorder = Color(0xFFE8E2D9); // Precision Warm Hairline
+  static const Color lightBorderHover = Color(0xFFD47036); // Heated Terracotta Accent
 
-  static const Color lightPrimary = Color(0xFF09090B); // Architectural Pitch Black
-  static const Color lightPrimaryDark = Color(0xFF18181B);
-  static const Color lightPrimaryMuted = Color(0x0D09090B);
-  static const Color lightOnPrimary = Color(0xFFFFFFFF); // Crisp White on Black
+  static const Color lightPrimary = Color(0xFFEA580C); // Terracotta Molten Orange
+  static const Color lightPrimaryDark = Color(0xFFC2410C);
+  static const Color lightPrimaryMuted = Color(0x1AEA580C); // Warm Orange Wash
+  static const Color lightPrimaryGlow = Color(0x20EA580C);
+  static const Color lightOnPrimary = Color(0xFFFFFFFF); // Crisp White on Terracotta
 
   // Soft Premium Accent Color Tokens (Light Mode - Pastel Washes & Soft Accents)
-  static const Color lightEmerald = Color(0xFF059669); // Soft Deep Mint
-  static const Color lightEmeraldMuted = Color(0xFFECFDF5); // Soft Mint Pastel Wash
+  static const Color lightEmerald = Color(0xFF059669); // Deep Mint
+  static const Color lightEmeraldMuted = Color(0xFFECFDF5);
 
-  static const Color lightCyan = Color(0xFF0284C7); // Soft Sky Blue
-  static const Color lightCyanMuted = Color(0xFFF0F9FF); // Soft Sky Wash
+  static const Color lightCyan = Color(0xFF0284C7); // Sky Cyan
+  static const Color lightCyanMuted = Color(0xFFF0F9FF);
 
-  static const Color lightViolet = Color(0xFF7C3AED); // Soft Royal Lavender
-  static const Color lightVioletMuted = Color(0xFFF5F3FF); // Soft Lavender Wash
+  static const Color lightViolet = Color(0xFF7C3AED); // Royal Lavender
+  static const Color lightVioletMuted = Color(0xFFF5F3FF);
 
-  static const Color lightAmber = Color(0xFFD97706); // Soft Golden Amber
-  static const Color lightAmberMuted = Color(0xFFFFFBEB); // Soft Amber Wash
+  static const Color lightAmber = Color(0xFFD97706); // Golden Amber
+  static const Color lightAmberMuted = Color(0xFFFFFBEB);
 
-  static const Color lightRose = Color(0xFFE11D48); // Soft Coral Rose
-  static const Color lightRoseMuted = Color(0xFFFFF1F2); // Soft Rose Wash
+  static const Color lightRose = Color(0xFFE11D48); // Coral Rose
+  static const Color lightRoseMuted = Color(0xFFFFF1F2);
 
-  static const Color lightTextPrimary = Color(0xFF09090B); // Stark Ink Black
-  static const Color lightTextSecondary = Color(0xFF52525B);
-  static const Color lightTextMuted = Color(0xFF8C8C94);
+  static const Color lightTextPrimary = Color(0xFF1C1917); // Warm Espresso Ink
+  static const Color lightTextSecondary = Color(0xFF57534E);
+  static const Color lightTextMuted = Color(0xFF8E8883);
 }
 
 /// Dynamic contextual theme colors that resolve seamlessly according to Brightness
@@ -117,7 +118,9 @@ class AppThemeColors {
   Color get borderHover => isDark ? AppColors.borderHover : AppColors.lightBorderHover;
 
   Color get primary => isDark ? AppColors.primary : AppColors.lightPrimary;
+  Color get primaryDark => isDark ? AppColors.primaryDark : AppColors.lightPrimaryDark;
   Color get primaryMuted => isDark ? AppColors.primaryMuted : AppColors.lightPrimaryMuted;
+  Color get primaryGlow => isDark ? AppColors.primaryGlow : AppColors.lightPrimaryGlow;
   Color get onPrimary => isDark ? AppColors.onPrimary : AppColors.lightOnPrimary;
 
   Color get emerald => isDark ? AppColors.emerald : AppColors.lightEmerald;
@@ -192,7 +195,7 @@ class AppTheme {
         surface: AppColors.surface,
         onSurface: AppColors.textPrimary,
         error: AppColors.rose,
-        onError: Colors.black,
+        onError: Colors.white,
       ),
       cardTheme: CardThemeData(
         color: AppColors.card,
@@ -223,7 +226,6 @@ class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadii.md),
-            side: const BorderSide(color: AppColors.border, width: 1.0),
           ),
           textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, letterSpacing: 0.2),
         ),
@@ -281,7 +283,7 @@ class AppTheme {
         elevation: 0,
       ),
       tabBarTheme: const TabBarThemeData(
-        labelColor: AppColors.textPrimary,
+        labelColor: AppColors.primary,
         unselectedLabelColor: AppColors.textMuted,
         indicatorColor: AppColors.primary,
         dividerColor: Colors.transparent,
@@ -321,7 +323,7 @@ class AppTheme {
     );
   }
 
-  /// Light Theme Definition (Monochrome Architectural)
+  /// Light Theme Definition (Solar Lava Daylight)
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
@@ -364,7 +366,6 @@ class AppTheme {
           textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, letterSpacing: 0.2),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadii.md),
-            side: const BorderSide(color: AppColors.lightBorder, width: 1.0),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         ),
@@ -416,13 +417,13 @@ class AppTheme {
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.lightSurface,
-        selectedItemColor: AppColors.lightTextPrimary,
+        selectedItemColor: AppColors.lightPrimary,
         unselectedItemColor: AppColors.lightTextMuted,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
       ),
       tabBarTheme: const TabBarThemeData(
-        labelColor: AppColors.lightTextPrimary,
+        labelColor: AppColors.lightPrimary,
         unselectedLabelColor: AppColors.lightTextMuted,
         indicatorColor: AppColors.lightPrimary,
         dividerColor: Colors.transparent,

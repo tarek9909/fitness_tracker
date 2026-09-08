@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/premium_widgets.dart';
+import 'diet_food_option_editor_modal.dart';
 import 'diet_meal_editor_modal.dart';
 
 class DietPlanBuilderScreen extends StatefulWidget {
@@ -23,6 +24,15 @@ class _DietPlanBuilderScreenState extends State<DietPlanBuilderScreen> {
   Map<String, dynamic>? get _version => _plan?['version'] is Map ? Map<String, dynamic>.from(_plan!['version'] as Map) : null;
   List<Map<String, dynamic>> get _meals => ((_version?['meals'] as List?) ?? const []).whereType<Map>().map(Map<String, dynamic>.from).toList();
   int? _id(dynamic value) => value is num ? value.toInt() : int.tryParse('$value');
+
+  String get _nutritionSummary {
+    String value(String snake, String camel) =>
+        (_version?[snake] ?? _version?[camel])?.toString() ?? '—';
+    return '${value('daily_calorie_target', 'dailyCaloriesTarget')} kcal • '
+        '${value('daily_protein_target_g', 'dailyProteinTargetG')}g protein • '
+        '${value('daily_carbs_target_g', 'dailyCarbsTargetG')}g carbs • '
+        '${value('daily_fat_target_g', 'dailyFatTargetG')}g fat';
+  }
 
   @override
   void initState() { super.initState(); _reload(); }
@@ -76,6 +86,57 @@ class _DietPlanBuilderScreenState extends State<DietPlanBuilderScreen> {
     final payload = {'name': name.text.trim(), 'description': description.text.trim()};
     if (saved != true || payload['name'] == '') return;
     await _mutate(() => widget.apiClient.patch('/me/diet-plans/${widget.planId}', body: payload).then((_) {}), 'Diet plan updated');
+  }
+
+  Future<void> _editNutritionTargets() async {
+    final calories = TextEditingController(
+      text: '${_version?['daily_calorie_target'] ?? _version?['dailyCaloriesTarget'] ?? ''}',
+    );
+    final protein = TextEditingController(
+      text: '${_version?['daily_protein_target_g'] ?? _version?['dailyProteinTargetG'] ?? ''}',
+    );
+    final carbs = TextEditingController(
+      text: '${_version?['daily_carbs_target_g'] ?? _version?['dailyCarbsTargetG'] ?? ''}',
+    );
+    final fat = TextEditingController(
+      text: '${_version?['daily_fat_target_g'] ?? _version?['dailyFatTargetG'] ?? ''}',
+    );
+    final saved = await _dialog('Edit nutrition targets', [
+      PremiumTextField(label: 'Calories (kcal)', controller: calories, keyboardType: TextInputType.number),
+      const SizedBox(height: 12),
+      PremiumTextField(label: 'Protein (g)', controller: protein, keyboardType: const TextInputType.numberWithOptions(decimal: true)),
+      const SizedBox(height: 12),
+      PremiumTextField(label: 'Carbohydrates (g)', controller: carbs, keyboardType: const TextInputType.numberWithOptions(decimal: true)),
+      const SizedBox(height: 12),
+      PremiumTextField(label: 'Fat (g)', controller: fat, keyboardType: const TextInputType.numberWithOptions(decimal: true)),
+    ]);
+    if (saved != true) return;
+
+    final calorieTarget = int.tryParse(calories.text.trim());
+    final proteinTarget = double.tryParse(protein.text.trim());
+    final carbTarget = double.tryParse(carbs.text.trim());
+    final fatTarget = double.tryParse(fat.text.trim());
+    if (calorieTarget == null || calorieTarget < 500 || calorieTarget > 10000 ||
+        proteinTarget == null || proteinTarget < 0 || proteinTarget > 1000 ||
+        carbTarget == null || carbTarget < 0 || carbTarget > 1000 ||
+        fatTarget == null || fatTarget < 0 || fatTarget > 1000) {
+      if (mounted) showPremiumSnackBar(context, 'Enter valid nutrition targets.', isError: true);
+      return;
+    }
+    final versionId = _id(_version?['id']);
+    if (versionId == null) return;
+    await _mutate(
+      () => widget.apiClient.patch(
+        '/me/diet-plans/${widget.planId}/versions/$versionId',
+        body: {
+          'dailyCaloriesTarget': calorieTarget,
+          'dailyProteinTargetG': proteinTarget,
+          'dailyCarbsTargetG': carbTarget,
+          'dailyFatTargetG': fatTarget,
+        },
+      ).then((_) {}),
+      'Nutrition targets updated',
+    );
   }
 
   Future<void> _editMeal({Map<String, dynamic>? existing}) async {
@@ -143,34 +204,15 @@ class _DietPlanBuilderScreenState extends State<DietPlanBuilderScreen> {
   }
 
   Future<void> _editOption(int groupId, {Map<String, dynamic>? existing}) async {
-    List<dynamic> foods = [];
-    try { final response = await widget.apiClient.get('/foods'); foods = response is Map && response['data'] is List ? response['data'] as List : response is List ? response : []; } catch (_) {}
-    if (!mounted) return;
-    var foodId = _id(existing?['food_id']) ?? (foods.isNotEmpty ? _id(foods.first['id']) : null);
-    final quantity = TextEditingController(text: '${existing?['serving_quantity'] ?? existing?['quantity'] ?? 100}');
-    final label = TextEditingController(text: existing?['custom_label']?.toString() ?? existing?['label']?.toString() ?? '');
-    final notes = TextEditingController(text: existing?['notes']?.toString() ?? '');
-    final saved = await _dialogWithState('Add food option', (setState) => [
-      if (foods.isEmpty) const Text('No foods are available in the catalog.') else DropdownButtonFormField<int>(initialValue: foodId, isExpanded: true, items: foods.map((food) => DropdownMenuItem<int>(value: _id(food['id']), child: Text('${food['name'] ?? 'Food'}'))).toList(), onChanged: (value) => setState(() => foodId = value), decoration: const InputDecoration(labelText: 'Food (nutrition is calculated by server)')),
-      PremiumTextField(label: 'Custom label', controller: label),
-      PremiumTextField(label: 'Quantity', controller: quantity, keyboardType: TextInputType.number),
-      PremiumTextField(label: 'Notes / alternative guidance', controller: notes, maxLines: 2),
-    ]);
-    final optionId = _id(existing?['id']);
-    final payload = {'foodId': foodId, 'customLabel': label.text.trim(), 'servingQuantity': double.tryParse(quantity.text) ?? 100, 'notes': notes.text.trim()};
-    if (saved != true || foodId == null) return;
-    await _mutate(() async {
-      if (optionId == null) {
-        await widget.apiClient.post('/me/diet-plans/${widget.planId}/option-groups/$groupId/options', body: payload);
-      } else {
-        await widget.apiClient.put('/me/diet-plans/${widget.planId}/options/$optionId', body: payload);
-      }
-    }, existing == null ? 'Food option added' : 'Food option updated');
+    final changed = await DietFoodOptionEditorModal.show(
+      context,
+      apiClient: widget.apiClient,
+      planId: widget.planId,
+      groupId: groupId,
+      existing: existing,
+    );
+    if (changed == true && mounted) await _reload();
   }
-
-  Future<bool?> _dialogWithState(String title, List<Widget> Function(void Function(void Function())) children) => showPremiumDialog<bool>(context: context, builder: (dialogContext) {
-    return StatefulBuilder(builder: (context, setState) => AlertDialog(title: Text(title), content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: children(setState))), actions: [PremiumButton(text: 'Cancel', isSecondary: true, onPressed: () => Navigator.pop(dialogContext, false)), PremiumButton(text: 'Save', onPressed: () => Navigator.pop(dialogContext, true))]));
-  });
 
   Future<void> _deleteOption(Map<String, dynamic> option) async { final id = _id(option['id']); if (id == null) return; await _mutate(() => widget.apiClient.delete('/me/diet-plans/${widget.planId}/options/$id').then((_) {}), 'Food option deleted'); }
 
@@ -203,7 +245,11 @@ class _DietPlanBuilderScreenState extends State<DietPlanBuilderScreen> {
     if (_error != null || _plan == null) return PremiumScaffold(appBar: const PremiumAppBar(title: Text('Diet plan')), body: Center(child: PremiumButton(text: 'Retry', onPressed: _reload)));
     final published = _version?['status'] == 'published';
     return PremiumScaffold(appBar: PremiumAppBar(title: Text(_plan!['name']?.toString() ?? 'Diet plan'), actions: [IconButton(onPressed: _editPlan, icon: const Icon(Icons.edit)), PopupMenuButton<String>(onSelected: (value) { if (value == 'publish') _publish(); if (value == 'activate') _reviewAndActivate(); }, itemBuilder: (_) => [if (!published) const PopupMenuItem(value: 'publish', child: Text('Publish')), if (published) const PopupMenuItem(value: 'activate', child: Text('Review & activate'))])]), body: ListView(padding: const EdgeInsets.all(AppSpacing.md), children: [
-      PremiumCard(child: Text(_plan!['description']?.toString() ?? 'Configure meals, alternatives, servings, and nutrition.', style: TextStyle(color: colors.textSecondary))),
+      PremiumCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(_plan!['description']?.toString() ?? 'Configure meals, alternatives, servings, and nutrition.', style: TextStyle(color: colors.textSecondary)),
+        const SizedBox(height: 12),
+        Row(children: [Expanded(child: Text(_nutritionSummary, style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700))), TextButton(onPressed: _editNutritionTargets, child: const Text('Edit targets'))]),
+      ])),
       const SizedBox(height: 14),
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('MEALS (${_meals.length})', style: TextStyle(color: colors.textSecondary, fontWeight: FontWeight.w800)), TextButton.icon(onPressed: _editMeal, icon: const Icon(Icons.add, size: 16), label: const Text('Add meal'))]),
       ..._meals.asMap().entries.map((mealEntry) {
@@ -217,7 +263,7 @@ class _DietPlanBuilderScreenState extends State<DietPlanBuilderScreen> {
             final group = groupEntry.value; final groupId = _id(group['id']); final options = ((group['options'] as List?) ?? const []).whereType<Map>().map(Map<String, dynamic>.from).toList();
             return Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: colors.surfaceElevated, borderRadius: BorderRadius.circular(8), border: Border.all(color: colors.border)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(mainAxisAlignment: MainAxisAlignment.end, children: [IconButton(onPressed: () => _reorderGroups(groups, groupEntry.key, -1), icon: const Icon(Icons.keyboard_arrow_up, size: 18)), IconButton(onPressed: () => _reorderGroups(groups, groupEntry.key, 1), icon: const Icon(Icons.keyboard_arrow_down, size: 18))]),
-              Row(children: [Expanded(child: Text('${group['name'] ?? 'Option group'}${group['is_required'] == 1 ? ' • REQUIRED' : ''}', style: TextStyle(color: colors.cyan, fontWeight: FontWeight.w700))), IconButton(onPressed: groupId == null ? null : () => _editGroup(mealId!, existing: group), icon: const Icon(Icons.edit_outlined)), IconButton(onPressed: () => _deleteGroup(group), icon: Icon(Icons.delete_outline, color: colors.rose))]),
+              Row(children: [Expanded(child: Text('${group['name'] ?? 'Option group'}${group['is_required'] == 1 ? ' • REQUIRED' : ''}', style: TextStyle(color: colors.primary, fontWeight: FontWeight.w700))), IconButton(onPressed: groupId == null ? null : () => _editGroup(mealId!, existing: group), icon: const Icon(Icons.edit_outlined)), IconButton(onPressed: () => _deleteGroup(group), icon: Icon(Icons.delete_outline, color: colors.rose))]),
               if ((group['notes']?.toString() ?? '').isNotEmpty) Text(group['notes'].toString(), style: TextStyle(color: colors.textSecondary)),
               Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: groupId == null ? null : () => _editOption(groupId), icon: const Icon(Icons.add, size: 16), label: const Text('Add food option'))),
               ...options.asMap().entries.map((optionEntry) {

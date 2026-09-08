@@ -103,6 +103,7 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
   String _selectedExerciseName = '';
   String _selectedMuscleGroupName = '';
   String _trackingType = 'weight_reps';
+  bool _useCustomExercise = false;
   final TextEditingController _customNameCtrl = TextEditingController();
 
   // Dashboard-parity form controllers
@@ -110,6 +111,9 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
   late final TextEditingController _repsMinCtrl;
   late final TextEditingController _repsMaxCtrl;
   late final TextEditingController _restCtrl;
+  late final TextEditingController _weightCtrl;
+  late final TextEditingController _durationCtrl;
+  late final TextEditingController _distanceCtrl;
   late final TextEditingController _notesCtrl;
   bool _isOptional = false;
 
@@ -149,19 +153,26 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
         e?['muscle_group_name']?.toString() ?? '';
     _customNameCtrl.text = _selectedExerciseName;
 
-    final targetSets = _asInt(e?['target_sets']) ?? ((e?['sets'] as List?)?.length ?? 3);
-    _setsCtrl = TextEditingController(text: '${targetSets < 1 ? 3 : targetSets}');
-
-    _repsMinCtrl = TextEditingController(text: '${e?['target_reps_min'] ?? e?['reps_min'] ?? 8}');
-    _repsMaxCtrl = TextEditingController(text: '${e?['target_reps_max'] ?? e?['reps_max'] ?? 12}');
-    _restCtrl = TextEditingController(text: '${e?['rest_seconds'] ?? 90}');
-    _notesCtrl = TextEditingController(text: e?['notes']?.toString() ?? '');
-    _isOptional = e?['is_optional'] == 1 || e?['isOptional'] == true;
-
     final rawTrackingType = e?['tracking_type_snapshot'] ?? e?['tracking_type'];
     if (rawTrackingType != null && rawTrackingType.toString().isNotEmpty) {
       _trackingType = rawTrackingType.toString();
     }
+
+    final targetSets = _asInt(e?['target_sets']) ?? ((e?['sets'] as List?)?.length ?? 3);
+    _setsCtrl = TextEditingController(text: '${targetSets < 1 ? 3 : targetSets}');
+
+    final usesReps = _supportsRepsFor(_trackingType);
+    _repsMinCtrl = TextEditingController(text: usesReps ? '${e?['target_reps_min'] ?? e?['reps_min'] ?? 8}' : '');
+    _repsMaxCtrl = TextEditingController(text: usesReps ? '${e?['target_reps_max'] ?? e?['reps_max'] ?? 12}' : '');
+    _restCtrl = TextEditingController(text: '${e?['rest_seconds'] ?? 90}');
+    final firstSet = (e?['sets'] as List?)?.isNotEmpty == true
+        ? (e?['sets'] as List).first
+        : null;
+    _weightCtrl = TextEditingController(text: '${firstSet is Map ? firstSet['target_weight_kg'] ?? firstSet['targetWeightKg'] ?? '' : ''}');
+    _durationCtrl = TextEditingController(text: '${e?['target_duration_seconds'] ?? (firstSet is Map ? firstSet['target_duration_seconds'] ?? firstSet['targetDurationSeconds'] ?? '' : '')}');
+    _distanceCtrl = TextEditingController(text: '${e?['target_distance_meters'] ?? (firstSet is Map ? firstSet['target_distance_meters'] ?? firstSet['targetDistanceMeters'] ?? '' : '')}');
+    _notesCtrl = TextEditingController(text: e?['notes']?.toString() ?? '');
+    _isOptional = e?['is_optional'] == 1 || e?['isOptional'] == true;
 
     _fetchLibrary();
   }
@@ -173,6 +184,9 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
     _repsMinCtrl.dispose();
     _repsMaxCtrl.dispose();
     _restCtrl.dispose();
+    _weightCtrl.dispose();
+    _durationCtrl.dispose();
+    _distanceCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
   }
@@ -182,6 +196,43 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
     if (v is num) return v.toInt();
     if (v is String) return int.tryParse(v);
     return null;
+  }
+
+  bool _supportsRepsFor(String trackingType) =>
+      trackingType != 'duration' && trackingType != 'distance';
+
+  bool get _supportsReps => _supportsRepsFor(_trackingType);
+  bool get _supportsWeight =>
+      _trackingType == 'weight_reps' || _trackingType == 'weight_duration';
+  bool get _supportsDuration =>
+      _trackingType == 'duration' || _trackingType == 'weight_duration';
+  bool get _supportsDistance => _trackingType == 'distance';
+
+  void _startCustomExercise({String? name}) {
+    setState(() {
+      _useCustomExercise = true;
+      _selectedExerciseId = null;
+      _selectedExerciseName = name ?? '';
+      _selectedMuscleGroupName = name == null ? '' : 'Custom';
+      _customNameCtrl.text = name ?? '';
+      _trackingType = 'weight_reps';
+      _repsMinCtrl.text = '8';
+      _repsMaxCtrl.text = '12';
+      _durationCtrl.clear();
+      _distanceCtrl.clear();
+      _weightCtrl.clear();
+      _errorMessage = null;
+    });
+  }
+
+  void _useLibraryExercise() {
+    setState(() {
+      _useCustomExercise = false;
+      _selectedExerciseId = null;
+      _selectedExerciseName = '';
+      _selectedMuscleGroupName = '';
+      _errorMessage = null;
+    });
   }
 
   Future<void> _fetchLibrary() async {
@@ -198,8 +249,26 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
         setState(() {
           _library = items;
           _loadingLibrary = false;
-          if (_selectedExerciseId == null && _selectedExerciseName.isEmpty && _library.isNotEmpty) {
-            _selectExercise(_library.first);
+          if (_library.isEmpty && widget.existing == null) {
+            _useCustomExercise = true;
+          }
+          if (_selectedExerciseId == null &&
+              _selectedExerciseName.isEmpty &&
+              _library.isNotEmpty &&
+              !_useCustomExercise &&
+              widget.existing == null) {
+            final first = _library.first;
+            _selectedExerciseId = _asInt(first['id']);
+            _selectedExerciseName = first['name']?.toString() ?? 'Exercise';
+            _selectedMuscleGroupName =
+                first['primary_muscle_group_name']?.toString() ??
+                    first['target_muscle_group']?.toString() ??
+                    first['muscle_group_name']?.toString() ??
+                    '';
+            _customNameCtrl.text = _selectedExerciseName;
+            if (first['tracking_type'] != null) {
+              _trackingType = first['tracking_type'].toString();
+            }
           } else if (_selectedExerciseId != null && _library.isNotEmpty) {
             final match = _library.firstWhere(
               (item) => _asInt(item['id']) == _selectedExerciseId,
@@ -224,6 +293,7 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
 
   void _selectExercise(dynamic item) {
     setState(() {
+      _useCustomExercise = false;
       _selectedExerciseId = _asInt(item['id']);
       _selectedExerciseName = item['name']?.toString() ?? 'Exercise';
       _selectedMuscleGroupName = item['primary_muscle_group_name']?.toString() ??
@@ -278,7 +348,9 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
       }
     } catch (_) {}
 
-    // 3. Attempt to create custom exercise via user endpoint (idempotent 201)
+    // 3. Create the custom exercise through the user-scoped exercise endpoint.
+    // Never silently substitute another library exercise: that would save a
+    // different movement than the one the user entered.
     try {
       final res = await widget.apiClient.post('/exercises', body: {
         'name': name,
@@ -295,35 +367,7 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
         _selectedExerciseId = id;
         return id;
       }
-    } catch (_) {
-      try {
-        final searchRes = await widget.apiClient.get(
-          '/exercises?search=${Uri.encodeComponent(name)}&limit=10',
-        );
-        List<dynamic> searchItems = [];
-        if (searchRes is Map && searchRes['data'] is List) {
-          searchItems = searchRes['data'] as List;
-        } else if (searchRes is List) {
-          searchItems = searchRes;
-        }
-        final searchMatch = searchItems.firstWhere(
-          (item) => item['name']?.toString().trim().toLowerCase() == lowerName,
-          orElse: () => searchItems.isNotEmpty ? searchItems.first : null,
-        );
-        if (searchMatch != null && _asInt(searchMatch['id']) != null) {
-          final id = _asInt(searchMatch['id']);
-          _selectedExerciseId = id;
-          return id;
-        }
-      } catch (_) {}
-    }
-
-    // 4. Fallback to first library exercise if available
-    if (_library.isNotEmpty) {
-      final id = _asInt(_library.first['id']);
-      _selectedExerciseId = id;
-      return id;
-    }
+    } catch (_) {}
 
     return null;
   }
@@ -338,7 +382,9 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
     if (exId == null && widget.existing == null) {
       setState(() {
         _saving = false;
-        _errorMessage = 'Please select an exercise from the library';
+        _errorMessage = _useCustomExercise
+            ? 'Enter a name for the custom exercise'
+            : 'Select an exercise from the library or choose Create custom exercise';
       });
       return;
     }
@@ -352,22 +398,62 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
       return;
     }
 
-    final repsMin = int.tryParse(_repsMinCtrl.text.trim());
-    if (repsMin == null || repsMin < 1) {
-      setState(() {
-        _saving = false;
-        _errorMessage = 'Please enter valid minimum reps (minimum 1)';
-      });
-      return;
+    int? repsMin;
+    int? repsMax;
+    if (_supportsReps) {
+      repsMin = int.tryParse(_repsMinCtrl.text.trim());
+      if (repsMin == null || repsMin < 1) {
+        setState(() {
+          _saving = false;
+          _errorMessage = 'Please enter valid minimum reps (minimum 1)';
+        });
+        return;
+      }
+
+      repsMax = int.tryParse(_repsMaxCtrl.text.trim());
+      if (repsMax != null && repsMax < repsMin) {
+        setState(() {
+          _saving = false;
+          _errorMessage = 'Max reps cannot be less than Min reps';
+        });
+        return;
+      }
     }
 
-    final repsMax = int.tryParse(_repsMaxCtrl.text.trim());
-    if (repsMax != null && repsMax < repsMin) {
-      setState(() {
-        _saving = false;
-        _errorMessage = 'Max reps cannot be less than Min reps';
-      });
-      return;
+    double? targetWeight;
+    if (_supportsWeight && _weightCtrl.text.trim().isNotEmpty) {
+      targetWeight = double.tryParse(_weightCtrl.text.trim());
+      if (targetWeight == null || targetWeight < 0 || targetWeight > 1000) {
+        setState(() {
+          _saving = false;
+          _errorMessage = 'Target weight must be between 0 and 1,000 kg';
+        });
+        return;
+      }
+    }
+
+    int? targetDuration;
+    if (_supportsDuration) {
+      targetDuration = int.tryParse(_durationCtrl.text.trim());
+      if (targetDuration == null || targetDuration < 1 || targetDuration > 86400) {
+        setState(() {
+          _saving = false;
+          _errorMessage = 'Enter a duration between 1 and 86,400 seconds';
+        });
+        return;
+      }
+    }
+
+    double? targetDistance;
+    if (_supportsDistance) {
+      targetDistance = double.tryParse(_distanceCtrl.text.trim());
+      if (targetDistance == null || targetDistance <= 0 || targetDistance > 1000000) {
+        setState(() {
+          _saving = false;
+          _errorMessage = 'Enter a distance between 0.01 and 1,000,000 meters';
+        });
+        return;
+      }
     }
 
     final restSeconds = int.tryParse(_restCtrl.text.trim()) ?? 90;
@@ -385,16 +471,21 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
     final payload = <String, dynamic>{
       if (exId != null) 'exerciseId': exId,
       'targetSets': targetSets,
-      'repsMin': repsMin,
+      if (repsMin != null) 'repsMin': repsMin,
       if (repsMax != null) 'repsMax': repsMax,
+      if (targetDuration != null) 'targetDurationSeconds': targetDuration,
+      if (targetDistance != null) 'targetDistanceMeters': targetDistance,
       'restSeconds': restSeconds,
       if (notes.isNotEmpty) 'notes': notes,
       'isOptional': _isOptional,
       // Generated sets array for complete downstream compatibility
       'sets': List.generate(targetSets, (index) => {
         'setNumber': index + 1,
-        'targetRepsMin': repsMin,
+        if (repsMin != null) 'targetRepsMin': repsMin,
         if (repsMax != null) 'targetRepsMax': repsMax,
+        if (targetWeight != null) 'targetWeightKg': targetWeight,
+        if (targetDuration != null) 'targetDurationSeconds': targetDuration,
+        if (targetDistance != null) 'targetDistanceMeters': targetDistance,
         'restSeconds': restSeconds,
         if (notes.isNotEmpty) 'notes': notes,
       }),
@@ -520,6 +611,25 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                   ),
                 ),
                 const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: PremiumButton(
+                    text: _searchQuery.trim().isEmpty
+                        ? 'Create custom exercise'
+                        : 'Create "${_searchQuery.trim()}" as custom',
+                    isSecondary: true,
+                    icon: const Icon(Icons.add_circle_outline, size: 18),
+                    onPressed: () {
+                      _startCustomExercise(
+                        name: _searchQuery.trim().isEmpty
+                            ? null
+                            : _searchQuery.trim(),
+                      );
+                      Navigator.pop(pickerCtx);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
                 // List of exercises
                 Expanded(
                   child: filtered.isEmpty
@@ -529,7 +639,7 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.fitness_center_rounded, size: 40, color: colors.cyan),
+                                Icon(Icons.fitness_center_rounded, size: 40, color: colors.primary),
                                 const SizedBox(height: 12),
                                 Text(
                                   _searchQuery.trim().isEmpty ? 'No matching exercises' : 'No catalog match for "${_searchQuery.trim()}"',
@@ -543,12 +653,7 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                                   ElevatedButton.icon(
                                     onPressed: () {
                                       final q = _searchQuery.trim();
-                                      setState(() {
-                                        _selectedExerciseId = null;
-                                        _selectedExerciseName = q;
-                                        _selectedMuscleGroupName = 'Custom';
-                                        _customNameCtrl.text = q;
-                                      });
+                                      _startCustomExercise(name: q);
                                       Navigator.pop(pickerCtx);
                                     },
                                     icon: const Icon(Icons.add_circle_outline, size: 18),
@@ -580,10 +685,10 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                                 '$name ($muscle)',
                                 style: TextStyle(
                                   fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                                  color: isSel ? colors.cyan : colors.textPrimary,
+                                  color: isSel ? colors.primary : colors.textPrimary,
                                 ),
                               ),
-                              trailing: isSel ? Icon(Icons.check_circle, color: colors.cyan, size: 20) : null,
+                              trailing: isSel ? Icon(Icons.check_circle, color: colors.primary, size: 20) : null,
                               onTap: () {
                                 _selectExercise(item);
                                 Navigator.pop(pickerCtx);
@@ -640,10 +745,10 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: colors.cyanMuted,
+                    color: colors.primaryMuted,
                     borderRadius: BorderRadius.circular(AppRadii.md),
                   ),
-                  child: Icon(Icons.fitness_center_rounded, color: colors.cyan, size: 20),
+                  child: Icon(Icons.fitness_center_rounded, color: colors.primary, size: 20),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -688,7 +793,7 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                     decoration: BoxDecoration(
                       color: colors.roseMuted,
                       borderRadius: BorderRadius.circular(AppRadii.md),
-                      border: Border.all(color: colors.rose.withOpacity(0.5)),
+                      border: Border.all(color: colors.rose.withValues(alpha: 0.5)),
                     ),
                     child: Row(
                       children: [
@@ -716,14 +821,43 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                 ),
                 const SizedBox(height: 8),
 
-                if (_library.isEmpty && !_loadingLibrary && !isEditing) ...[
+                if (!isEditing) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: PremiumButton(
+                          text: 'Library exercise',
+                          height: 42,
+                          isSecondary: _useCustomExercise,
+                          icon: const Icon(Icons.menu_book_outlined, size: 17),
+                          onPressed: _useLibraryExercise,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: PremiumButton(
+                          text: 'Custom exercise',
+                          height: 42,
+                          isSecondary: !_useCustomExercise,
+                          icon: const Icon(Icons.edit_note_outlined, size: 17),
+                          onPressed: _startCustomExercise,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                if (!isEditing &&
+                    (_useCustomExercise ||
+                        (_library.isEmpty && !_loadingLibrary))) ...[
                   // Empty Library or Quick Presets
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: colors.surfaceElevated,
                       borderRadius: BorderRadius.circular(AppRadii.md),
-                      border: Border.all(color: colors.amber.withOpacity(0.4)),
+                      border: Border.all(color: colors.amber.withValues(alpha: 0.4)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -740,6 +874,7 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                         ),
                         const SizedBox(height: 8),
                         TextField(
+                          key: const Key('input-custom-exercise-name'),
                           controller: _customNameCtrl,
                           style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w600),
                           onChanged: (val) => setState(() => _selectedExerciseName = val),
@@ -753,6 +888,41 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                               borderSide: BorderSide(color: colors.border),
                             ),
                           ),
+                        ),
+                        const SizedBox(height: 10),
+                        DropdownButtonFormField<String>(
+                          initialValue: _trackingType,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            labelText: 'How will you track it?',
+                            filled: true,
+                            fillColor: colors.card,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(AppRadii.md),
+                              borderSide: BorderSide(color: colors.border),
+                            ),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'weight_reps', child: Text('Weight and reps')),
+                            DropdownMenuItem(value: 'reps_only', child: Text('Reps only')),
+                            DropdownMenuItem(value: 'duration', child: Text('Duration')),
+                            DropdownMenuItem(value: 'distance', child: Text('Distance')),
+                            DropdownMenuItem(value: 'weight_duration', child: Text('Weight and duration')),
+                            DropdownMenuItem(value: 'custom', child: Text('Custom tracking')),
+                          ],
+                          onChanged: (value) {
+                            if (value == null) return;
+                            setState(() {
+                              _trackingType = value;
+                              if (!_supportsReps) {
+                                _repsMinCtrl.clear();
+                                _repsMaxCtrl.clear();
+                              } else if (_repsMinCtrl.text.isEmpty) {
+                                _repsMinCtrl.text = '8';
+                                _repsMaxCtrl.text = '12';
+                              }
+                            });
+                          },
                         ),
                         const SizedBox(height: 10),
                         Text('Quick Presets:', style: TextStyle(color: colors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
@@ -769,6 +939,7 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                                   _selectedExerciseId = null;
                                   _selectedExerciseName = pName;
                                   _selectedMuscleGroupName = preset['group'] ?? '';
+                                  _trackingType = preset['type'] ?? 'weight_reps';
                                   _customNameCtrl.text = pName;
                                 });
                               },
@@ -776,16 +947,16 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                                 decoration: BoxDecoration(
-                                  color: isSel ? colors.cyan.withOpacity(0.18) : colors.card,
+                                  color: isSel ? colors.primary.withValues(alpha: 0.18) : colors.card,
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: isSel ? colors.cyan : colors.border),
+                                  border: Border.all(color: isSel ? colors.primary : colors.border),
                                 ),
                                 child: Text(
                                   pName,
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
-                                    color: isSel ? colors.cyan : colors.textPrimary,
+                                    color: isSel ? colors.primary : colors.textPrimary,
                                   ),
                                 ),
                               ),
@@ -809,7 +980,7 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.fitness_center_rounded, color: colors.cyan, size: 20),
+                          Icon(Icons.fitness_center_rounded, color: colors.primary, size: 20),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
@@ -877,73 +1048,132 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                         ],
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    // Min Reps
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                'Min Reps',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: colors.textPrimary),
-                              ),
-                              Text(' *', style: TextStyle(color: colors.rose, fontSize: 12)),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          TextField(
-                            key: const Key('input-reps-min'),
-                            controller: _repsMinCtrl,
-                            keyboardType: TextInputType.number,
-                            style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
-                            decoration: InputDecoration(
-                              hintText: 'e.g. 8',
-                              filled: true,
-                              fillColor: colors.surfaceElevated,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(AppRadii.md),
-                                borderSide: BorderSide(color: colors.border),
+                    if (_supportsReps) ...[
+                      const SizedBox(width: 10),
+                      // Min Reps
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  'Min Reps',
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: colors.textPrimary),
+                                ),
+                                Text(' *', style: TextStyle(color: colors.rose, fontSize: 12)),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            TextField(
+                              key: const Key('input-reps-min'),
+                              controller: _repsMinCtrl,
+                              keyboardType: TextInputType.number,
+                              style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
+                              decoration: InputDecoration(
+                                hintText: 'e.g. 8',
+                                filled: true,
+                                fillColor: colors.surfaceElevated,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(AppRadii.md),
+                                  borderSide: BorderSide(color: colors.border),
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    // Max Reps
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Max Reps',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: colors.textPrimary),
-                          ),
-                          const SizedBox(height: 6),
-                          TextField(
-                            key: const Key('input-reps-max'),
-                            controller: _repsMaxCtrl,
-                            keyboardType: TextInputType.number,
-                            style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
-                            decoration: InputDecoration(
-                              hintText: 'e.g. 12',
-                              filled: true,
-                              fillColor: colors.surfaceElevated,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(AppRadii.md),
-                                borderSide: BorderSide(color: colors.border),
+                      const SizedBox(width: 10),
+                      // Max Reps
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Max Reps',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: colors.textPrimary),
+                            ),
+                            const SizedBox(height: 6),
+                            TextField(
+                              key: const Key('input-reps-max'),
+                              controller: _repsMaxCtrl,
+                              keyboardType: TextInputType.number,
+                              style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
+                              decoration: InputDecoration(
+                                hintText: 'e.g. 12',
+                                filled: true,
+                                fillColor: colors.surfaceElevated,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(AppRadii.md),
+                                  borderSide: BorderSide(color: colors.border),
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
+
+                if (_supportsWeight || _supportsDuration || _supportsDistance) ...[
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      if (_supportsWeight)
+                        Expanded(
+                          child: TextField(
+                            key: const Key('input-target-weight'),
+                            controller: _weightCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
+                            decoration: InputDecoration(
+                              labelText: 'Target weight (kg)',
+                              hintText: 'Optional',
+                              filled: true,
+                              fillColor: colors.surfaceElevated,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.md), borderSide: BorderSide(color: colors.border)),
+                            ),
+                          ),
+                        ),
+                      if (_supportsWeight && (_supportsDuration || _supportsDistance)) const SizedBox(width: 10),
+                      if (_supportsDuration)
+                        Expanded(
+                          child: TextField(
+                            key: const Key('input-target-duration'),
+                            controller: _durationCtrl,
+                            keyboardType: TextInputType.number,
+                            style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
+                            decoration: InputDecoration(
+                              labelText: 'Duration (sec)',
+                              hintText: 'e.g. 30',
+                              filled: true,
+                              fillColor: colors.surfaceElevated,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.md), borderSide: BorderSide(color: colors.border)),
+                            ),
+                          ),
+                        ),
+                      if (_supportsDistance)
+                        Expanded(
+                          child: TextField(
+                            key: const Key('input-target-distance'),
+                            controller: _distanceCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
+                            decoration: InputDecoration(
+                              labelText: 'Distance (m)',
+                              hintText: 'e.g. 1000',
+                              filled: true,
+                              fillColor: colors.surfaceElevated,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.md), borderSide: BorderSide(color: colors.border)),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
 
                 const SizedBox(height: 18),
 
@@ -1060,7 +1290,7 @@ class _WorkoutExerciseEditorModalState extends State<WorkoutExerciseEditorModal>
                       Switch(
                         key: const Key('checkbox-is-optional'),
                         value: _isOptional,
-                        activeColor: colors.cyan,
+                        activeThumbColor: colors.primary,
                         onChanged: (val) => setState(() => _isOptional = val),
                       ),
                     ],

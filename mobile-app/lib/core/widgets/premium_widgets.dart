@@ -36,9 +36,7 @@ class PremiumCard extends StatelessWidget {
         boxShadow: ambientGlow
             ? [
                 BoxShadow(
-                  color: colors.isDark
-                      ? const Color(0x26FFFFFF)
-                      : const Color(0x0F000000),
+                  color: colors.primaryGlow,
                   blurRadius: 20,
                   offset: const Offset(0, 4),
                 ),

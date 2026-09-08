@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kinetic Wellness • Mobile Design Showcase</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070709;
+      --card: #121216;
+      --border: #222228;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      padding: 2.5rem 1.5rem;
+      min-height: 100vh;
+    }
+    header {
+      text-align: center;
+      max-width: 800px;
+      margin: 0 auto 3rem;
+    }
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.75rem;
+      background: linear-gradient(135deg, #FFFFFF 30%, #94A3B8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      line-height: 1.5;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 2.5rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .option-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .option-card:hover {
+      transform: translateY(-4px);
+      border-color: #3F3F46;
+    }
+    .option-header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 800;
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .device-preview {
+      width: 100%;
+      max-width: 380px;
+      border-radius: 36px;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      border: 2px solid rgba(255,255,255,0.08);
+      background: #000;
+    }
+    .device-preview img,
+    .device-preview svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .palette-swatches {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1.25rem;
+      width: 100%;
+    }
+    .swatch {
+      flex: 1;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #000;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .desc {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-top: 0.75rem;
+      line-height: 1.4;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Kinetic Wellness Design Gallery</h1>
+    <p class="subtitle">Side-by-side visualization of all 6 mobile aesthetic directions. Pick the signature palette for your brand.</p>
+  </header>
+
+  <div class="grid">
+    <!-- Option 1 -->
+    <div class="option-card">
+      <div class="option-header">
+        <h2>1. Electric Performance</h2>
+        <span class="badge" style="background: rgba(212,255,0,0.15); color: #D4FF00; border: 1px solid #D4FF00;">Recommended</span>
+      </div>
+      <div class="device-preview">
+        <img src="./option1_electric.jpg" alt="Option 1: Electric Performance">
+      </div>
+      <div class="palette-swatches">
+        <div class="swatch" style="background: #0A0A0B; color: #FFF;">#0A0A0B</div>
+        <div class="swatch" style="background: #D4FF00; color: #000;">#D4FF00</div>
+        <div class="swatch" style="background: #34D399; color: #000;">#34D399</div>
+        <div class="swatch" style="background: #38BDF8; color: #000;">#38BDF8</div>
+      </div>
+      <p class="desc">High-energy athletic adrenaline like Nike Training Club &amp; Whoop. Volt Lime primary actions on deep obsidian.</p>
+    </div>
+
+    <!-- Option 2 -->
+    <div class="option-card">
+      <div class="option-header">
+        <h2>2. Cyber Cyan</h2>
+        <span class="badge" style="background: rgba(0,240,255,0.15); color: #00F0FF; border: 1px solid #00F0FF;">Telemetry</span>
+      </div>
+      <div class="device-preview">
+        <img src="./option2_cyber.jpg" alt="Option 2: Cyber Cyan">
+      </div>
+      <div class="palette-swatches">
+        <div class="swatch" style="background: #07090E; color: #FFF;">#07090E</div>
+        <div class="swatch" style="background: #00F0FF; color: #000;">#00F0FF</div>
+        <div class="swatch" style="background: #A78BFA; color: #000;">#A78BFA</div>
+        <div class="swatch" style="background: #00F59B; color: #000;">#00F59B</div>
+      </div>
+      <p class="desc">High-tech biometric cockpit with glowing telemetry rings, dark frosted glass, and electric cyan indicators.</p>
+    </div>
+
+    <!-- Option 3 -->
+    <div class="option-card">
+      <div class="option-header">
+        <h2>3. Luxury Stealth</h2>
+        <span class="badge" style="background: rgba(229,192,123,0.15); color: #E5C07B; border: 1px solid #E5C07B;">Equinox Tier</span>
+      </div>
+      <div class="device-preview">
+        <img src="./option3_luxury.jpg" alt="Option 3: Luxury Stealth">
+      </div>
+      <div class="palette-swatches">
+        <div class="swatch" style="background: #0C0D0F; color: #FFF;">#0C0D0F</div>
+        <div class="swatch" style="background: #E5C07B; color: #000;">#E5C07B</div>
+        <div class="swatch" style="background: #E2E8F0; color: #000;">#E2E8F0</div>
+        <div class="swatch" style="background: #F59E0B; color: #000;">#F59E0B</div>
+      </div>
+      <p class="desc">Understated quiet luxury. Warm champagne gold, architectural titanium slate, and refined high-contrast typography.</p>
+    </div>
+
+    <!-- Option 4 (Inlined Vector SVG) -->
+    <div class="option-card">
+      <div class="option-header">
+        <h2>4. Solar Lava</h2>
+        <span class="badge" style="background: rgba(255,85,0,0.15); color: #FF5500; border: 1px solid #FF5500;">Adrenaline</span>
+      </div>
+      <div class="device-preview">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 860" width="420" height="860">
+          <defs>
+            <radialGradient id="lavaAmbient" cx="50%" cy="85%" r="60%">
+              <stop offset="0%" stop-color="#FF5500" stop-opacity="0.18" />
+              <stop offset="100%" stop-color="#0A0A0E" stop-opacity="0" />
+            </radialGradient>
+            <linearGradient id="cardGrad4" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#18181F" />
+              <stop offset="100%" stop-color="#101014" />
+            </linearGradient>
+            <linearGradient id="buttonGrad4" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FF6B00" />
+              <stop offset="100%" stop-color="#FF2E00" />
+            </linearGradient>
+            <linearGradient id="ringGrad4" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FF8A00" />
+              <stop offset="50%" stop-color="#FF4800" />
+              <stop offset="100%" stop-color="#FF1A40" />
+            </linearGradient>
+            <filter id="lavaGlow4" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="16" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+            <filter id="btnGlow4" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="14" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
+
+          <!-- Frame -->
+          <rect width="420" height="860" rx="48" fill="#08080B" stroke="#222228" stroke-width="4"/>
+          <rect x="6" y="6" width="408" height="848" rx="44" fill="#0D0D11"/>
+          <rect x="6" y="6" width="408" height="848" rx="44" fill="url(#lavaAmbient)"/>
+
+          <!-- Dynamic Island -->
+          <rect x="150" y="16" width="120" height="28" rx="14" fill="#000000"/>
+          <circle cx="248" cy="30" r="4.5" fill="#1A1A22"/>
+
+          <!-- Status Bar -->
+          <text x="44" y="35" fill="#FAFAFA" font-size="13" font-family="-apple-system, sans-serif" font-weight="600">9:41</text>
+          <g transform="translate(345, 24)" fill="#FAFAFA">
+            <rect x="0" y="7" width="2.5" height="5" rx="0.5"/>
+            <rect x="4" y="5" width="2.5" height="7" rx="0.5"/>
+            <rect x="8" y="3" width="2.5" height="9" rx="0.5"/>
+            <rect x="12" y="1" width="2.5" height="11" rx="0.5"/>
+            <path d="M22 2 C24.5 0 28.5 0 31 2 M23.5 5 C25.2 3.5 27.8 3.5 29.5 5 M25.5 8 C26 7.5 27 7.5 27.5 8" stroke="#FAFAFA" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            <rect x="36" y="2" width="18" height="9" rx="2.5" fill="none" stroke="#FAFAFA" stroke-width="1.2"/>
+            <rect x="38" y="4" width="12" height="5" rx="1.5" fill="#FAFAFA"/>
+            <path d="M55 5 C55.5 5 56 5.5 56 6.5 C56 7.5 55.5 8 55 8" fill="#FAFAFA"/>
+          </g>
+
+          <!-- Navigation -->
+          <g transform="translate(28, 70)">
+            <path d="M6 1 L1 6 L6 11" stroke="#A1A1AA" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <text x="24" y="9" fill="#FAFAFA" font-size="18" font-family="'Plus Jakarta Sans', sans-serif" font-weight="800">Workout Day • Leg Power</text>
+          </g>
+
+          <!-- Card 1: Telemetry -->
+          <g transform="translate(24, 110)">
+            <rect width="372" height="210" rx="20" fill="url(#cardGrad4)" stroke="#2C1A14" stroke-width="1.5"/>
+            <text x="20" y="32" fill="#A1A1AA" font-size="13" font-family="sans-serif" font-weight="600">Session Intensity &amp; Calories</text>
+            <circle cx="340" cy="28" r="4" fill="#FF5500"/>
+            <circle cx="340" cy="28" r="8" fill="#FF5500" opacity="0.25"/>
+
+            <g transform="translate(85, 120)">
+              <circle cx="0" cy="0" r="54" fill="none" stroke="#221B1A" stroke-width="10"/>
+              <circle cx="0" cy="0" r="54" fill="none" stroke="url(#ringGrad4)" stroke-width="10" stroke-dasharray="339" stroke-dashoffset="85" stroke-linecap="round" transform="rotate(-90)" filter="url(#lavaGlow4)"/>
+              <text x="0" y="3" fill="#FFFFFF" font-size="24" text-anchor="middle" font-family="sans-serif" font-weight="800">740</text>
+              <text x="0" y="20" fill="#FF8A00" font-size="11" text-anchor="middle" font-family="sans-serif" font-weight="700">KCAL BURN</text>
+            </g>
+
+            <g transform="translate(195, 80)">
+              <text x="0" y="0" fill="#A1A1AA" font-size="11" font-family="sans-serif">HEART RATE ZONE</text>
+              <text x="0" y="22" fill="#FFFFFF" font-size="19" font-family="sans-serif" font-weight="800">162 <tspan fill="#FF5500" font-size="12">BPM</tspan></text>
+              <text x="0" y="60" fill="#A1A1AA" font-size="11" font-family="sans-serif">WORKOUT VOLUME</text>
+              <text x="0" y="82" fill="#FFFFFF" font-size="19" font-family="sans-serif" font-weight="800">8,450 <tspan fill="#A1A1AA" font-size="12">KG</tspan></text>
+            </g>
+          </g>
+
+          <!-- Card 2: Exercise Builder -->
+          <g transform="translate(24, 340)">
+            <rect width="372" height="230" rx="20" fill="url(#cardGrad4)" stroke="#2C1A14" stroke-width="1.5"/>
+            <rect x="20" y="20" width="86" height="22" rx="6" fill="#FF4D00" fill-opacity="0.15" stroke="#FF4D00" stroke-opacity="0.3"/>
+            <text x="63" y="35" fill="#FF7700" font-size="10" text-anchor="middle" font-family="sans-serif" font-weight="700">QUADRICEPS</text>
+            <text x="20" y="70" fill="#FFFFFF" font-size="20" font-family="sans-serif" font-weight="800">Barbell Back Squat</text>
+
+            <g transform="translate(20, 100)">
+              <rect x="0" y="0" width="102" height="78" rx="12" fill="#141419" stroke="#2B1A14" stroke-width="1"/>
+              <text x="51" y="26" fill="#A1A1AA" font-size="11" text-anchor="middle" font-family="sans-serif">Working Sets</text>
+              <text x="51" y="58" fill="#FFFFFF" font-size="24" text-anchor="middle" font-family="sans-serif" font-weight="800">4</text>
+
+              <rect x="114" y="0" width="102" height="78" rx="12" fill="#141419" stroke="#2B1A14" stroke-width="1"/>
+              <text x="165" y="26" fill="#A1A1AA" font-size="11" text-anchor="middle" font-family="sans-serif">Target Reps</text>
+              <text x="165" y="58" fill="#FFFFFF" font-size="24" text-anchor="middle" font-family="sans-serif" font-weight="800">6–8</text>
+
+              <rect x="228" y="0" width="104" height="78" rx="12" fill="#141419" stroke="#2B1A14" stroke-width="1"/>
+              <text x="280" y="26" fill="#A1A1AA" font-size="11" text-anchor="middle" font-family="sans-serif">Rest Period</text>
+              <text x="280" y="58" fill="#FF6B00" font-size="22" text-anchor="middle" font-family="sans-serif" font-weight="800">120s</text>
+            </g>
+
+            <text x="20" y="206" fill="#888890" font-size="12" font-family="sans-serif">Cue: Drive heels into floor, neutral lumbar spine</text>
+          </g>
+
+          <g transform="translate(24, 600)">
+            <rect width="372" height="42" rx="12" fill="#1B1210" stroke="#FF4D00" stroke-opacity="0.3"/>
+            <circle cx="40" cy="21" r="5" fill="#FF5500"/>
+            <text x="55" y="26" fill="#FF7700" font-size="13" font-family="sans-serif" font-weight="700">Option 4 • Solar Lava (Adrenaline &amp; Power)</text>
+          </g>
+
+          <!-- Button -->
+          <g transform="translate(24, 730)">
+            <rect x="10" y="8" width="352" height="52" rx="18" fill="#FF4400" filter="url(#btnGlow4)" opacity="0.6"/>
+            <rect width="372" height="58" rx="18" fill="url(#buttonGrad4)"/>
+            <text x="186" y="36" fill="#FFFFFF" font-size="17" text-anchor="middle" font-family="sans-serif" font-weight="800">Add Exercise to Day</text>
+          </g>
+          <rect x="145" y="836" width="130" height="4.5" rx="2.5" fill="#FFFFFF" fill-opacity="0.4"/>
+        </svg>
+      </div>
+      <div class="palette-swatches">
+        <div class="swatch" style="background: #0D0D11; color: #FFF;">#0D0D11</div>
+        <div class="swatch" style="background: #FF5500; color: #FFF;">#FF5500</div>
+        <div class="swatch" style="background: #FF2E00; color: #FFF;">#FF2E00</div>
+        <div class="swatch" style="background: #FF8A00; color: #000;">#FF8A00</div>
+      </div>
+      <p class="desc">Molten orange &amp; crimson heat energy. Perfect for intense calorie-burning, heart-rate zones, and explosive power.</p>
+    </div>
+
+    <!-- Option 5 (Inlined Vector SVG) -->
+    <div class="option-card">
+      <div class="option-header">
+        <h2>5. Nordic Alpine</h2>
+        <span class="badge" style="background: rgba(132,204,22,0.15); color: #84CC16; border: 1px solid #84CC16;">Longevity</span>
+      </div>
+      <div class="device-preview">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 860" width="420" height="860">
+          <defs>
+            <radialGradient id="pineAmbient5" cx="50%" cy="85%" r="65%">
+              <stop offset="0%" stop-color="#10B981" stop-opacity="0.14" />
+              <stop offset="100%" stop-color="#090E0C" stop-opacity="0" />
+            </radialGradient>
+            <linearGradient id="alpineCardGrad5" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#151E1A" />
+              <stop offset="100%" stop-color="#0E1512" />
+            </linearGradient>
+            <linearGradient id="matchaBtnGrad5" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#A3E635" />
+              <stop offset="100%" stop-color="#84CC16" />
+            </linearGradient>
+            <linearGradient id="sageRingGrad5" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#A3E635" />
+              <stop offset="50%" stop-color="#34D399" />
+              <stop offset="100%" stop-color="#059669" />
+            </linearGradient>
+            <filter id="matchaGlow5" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="14" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
+
+          <rect width="420" height="860" rx="48" fill="#080C0A" stroke="#1D2A24" stroke-width="4"/>
+          <rect x="6" y="6" width="408" height="848" rx="44" fill="#0A0E0C"/>
+          <rect x="6" y="6" width="408" height="848" rx="44" fill="url(#pineAmbient5)"/>
+
+          <rect x="150" y="16" width="120" height="28" rx="14" fill="#000000"/>
+          <circle cx="248" cy="30" r="4.5" fill="#141E19"/>
+
+          <text x="44" y="35" fill="#E2E8F0" font-size="13" font-family="sans-serif" font-weight="600">9:41</text>
+          <g transform="translate(345, 24)" fill="#E2E8F0">
+            <rect x="0" y="7" width="2.5" height="5" rx="0.5"/>
+            <rect x="4" y="5" width="2.5" height="7" rx="0.5"/>
+            <rect x="8" y="3" width="2.5" height="9" rx="0.5"/>
+            <rect x="12" y="1" width="2.5" height="11" rx="0.5"/>
+            <path d="M22 2 C24.5 0 28.5 0 31 2 M23.5 5 C25.2 3.5 27.8 3.5 29.5 5 M25.5 8 C26 7.5 27 7.5 27.5 8" stroke="#E2E8F0" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            <rect x="36" y="2" width="18" height="9" rx="2.5" fill="none" stroke="#E2E8F0" stroke-width="1.2"/>
+            <rect x="38" y="4" width="12" height="5" rx="1.5" fill="#E2E8F0"/>
+            <path d="M55 5 C55.5 5 56 5.5 56 6.5 C56 7.5 55.5 8 55 8" fill="#E2E8F0"/>
+          </g>
+
+          <g transform="translate(28, 70)">
+            <path d="M6 1 L1 6 L6 11" stroke="#94A3B8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <text x="24" y="9" fill="#F8FAFC" font-size="18" font-family="'Plus Jakarta Sans', sans-serif" font-weight="800">Workout • Posterior Chain</text>
+          </g>
+
+          <g transform="translate(24, 110)">
+            <rect width="372" height="210" rx="20" fill="url(#alpineCardGrad5)" stroke="#1F332B" stroke-width="1.5"/>
+            <text x="20" y="32" fill="#94A3B8" font-size="13" font-family="sans-serif" font-weight="600">Recovery &amp; Strain Readiness</text>
+            <circle cx="340" cy="28" r="4" fill="#10B981"/>
+
+            <g transform="translate(85, 120)">
+              <circle cx="0" cy="0" r="54" fill="none" stroke="#14241E" stroke-width="10"/>
+              <circle cx="0" cy="0" r="54" fill="none" stroke="url(#sageRingGrad5)" stroke-width="10" stroke-dasharray="339" stroke-dashoffset="60" stroke-linecap="round" transform="rotate(-90)" filter="url(#matchaGlow5)"/>
+              <text x="0" y="3" fill="#FFFFFF" font-size="25" text-anchor="middle" font-family="sans-serif" font-weight="800">92%</text>
+              <text x="0" y="20" fill="#A3E635" font-size="11" text-anchor="middle" font-family="sans-serif" font-weight="700">OPTIMAL</text>
+            </g>
+
+            <g transform="translate(195, 80)">
+              <text x="0" y="0" fill="#8DA69B" font-size="11" font-family="sans-serif">TARGET STRAIN</text>
+              <text x="0" y="22" fill="#F8FAFC" font-size="19" font-family="sans-serif" font-weight="800">14.8 <tspan fill="#A3E635" font-size="12">DAY</tspan></text>
+              <text x="0" y="60" fill="#8DA69B" font-size="11" font-family="sans-serif">ACTIVE METABOLISM</text>
+              <text x="0" y="82" fill="#F8FAFC" font-size="19" font-family="sans-serif" font-weight="800">2,150 <tspan fill="#8DA69B" font-size="12">KCAL</tspan></text>
+            </g>
+          </g>
+
+          <g transform="translate(24, 340)">
+            <rect width="372" height="230" rx="20" fill="url(#alpineCardGrad5)" stroke="#1F332B" stroke-width="1.5"/>
+            <rect x="20" y="20" width="88" height="22" rx="6" fill="#10B981" fill-opacity="0.15" stroke="#10B981" stroke-opacity="0.3"/>
+            <text x="64" y="35" fill="#34D399" font-size="10" text-anchor="middle" font-family="sans-serif" font-weight="700">HAMSTRINGS</text>
+            <text x="20" y="70" fill="#F8FAFC" font-size="20" font-family="sans-serif" font-weight="800">Romanian Deadlift (RDL)</text>
+
+            <g transform="translate(20, 100)">
+              <rect x="0" y="0" width="102" height="78" rx="12" fill="#111B17" stroke="#22362E" stroke-width="1"/>
+              <text x="51" y="26" fill="#8DA69B" font-size="11" text-anchor="middle" font-family="sans-serif">Working Sets</text>
+              <text x="51" y="58" fill="#F8FAFC" font-size="24" text-anchor="middle" font-family="sans-serif" font-weight="800">3</text>
+
+              <rect x="114" y="0" width="102" height="78" rx="12" fill="#111B17" stroke="#22362E" stroke-width="1"/>
+              <text x="165" y="26" fill="#8DA69B" font-size="11" text-anchor="middle" font-family="sans-serif">Target Reps</text>
+              <text x="165" y="58" fill="#F8FAFC" font-size="24" text-anchor="middle" font-family="sans-serif" font-weight="800">10–12</text>
+
+              <rect x="228" y="0" width="104" height="78" rx="12" fill="#111B17" stroke="#22362E" stroke-width="1"/>
+              <text x="280" y="26" fill="#8DA69B" font-size="11" text-anchor="middle" font-family="sans-serif">Rest Period</text>
+              <text x="280" y="58" fill="#A3E635" font-size="22" text-anchor="middle" font-family="sans-serif" font-weight="800">90s</text>
+            </g>
+
+            <text x="20" y="206" fill="#728F83" font-size="12" font-family="sans-serif">Cue: Hinge at hips, soft knees, deep hamstring stretch</text>
+          </g>
+
+          <g transform="translate(24, 600)">
+            <rect width="372" height="42" rx="12" fill="#121D18" stroke="#10B981" stroke-opacity="0.3"/>
+            <circle cx="40" cy="21" r="5" fill="#A3E635"/>
+            <text x="55" y="26" fill="#A3E635" font-size="13" font-family="sans-serif" font-weight="700">Option 5 • Nordic Alpine (Vitality &amp; Longevity)</text>
+          </g>
+
+          <g transform="translate(24, 730)">
+            <rect x="10" y="8" width="352" height="52" rx="18" fill="#84CC16" filter="url(#matchaGlow5)" opacity="0.45"/>
+            <rect width="372" height="58" rx="18" fill="url(#matchaBtnGrad5)"/>
+            <text x="186" y="36" fill="#0A110D" font-size="17" text-anchor="middle" font-family="sans-serif" font-weight="800">Add Exercise to Day</text>
+          </g>
+          <rect x="145" y="836" width="130" height="4.5" rx="2.5" fill="#FFFFFF" fill-opacity="0.4"/>
+        </svg>
+      </div>
+      <div class="palette-swatches">
+        <div class="swatch" style="background: #0A0E0C; color: #FFF;">#0A0E0C</div>
+        <div class="swatch" style="background: #A3E635; color: #000;">#A3E635</div>
+        <div class="swatch" style="background: #10B981; color: #000;">#10B981</div>
+        <div class="swatch" style="background: #34D399; color: #000;">#34D399</div>
+      </div>
+      <p class="desc">Scandinavian wellness and recovery. Luminous matcha sage, forest pine slate, and calming holistic vitality dials.</p>
+    </div>
+
+    <!-- Option 6 (Inlined Vector SVG) -->
+    <div class="option-card">
+      <div class="option-header">
+        <h2>6. Electric Iris</h2>
+        <span class="badge" style="background: rgba(99,102,241,0.15); color: #818CF8; border: 1px solid #6366F1;">OLED Tech</span>
+      </div>
+      <div class="device-preview">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 860" width="420" height="860">
+          <defs>
+            <radialGradient id="irisAmbient6" cx="50%" cy="85%" r="65%">
+              <stop offset="0%" stop-color="#6366F1" stop-opacity="0.18" />
+              <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+            </radialGradient>
+            <linearGradient id="irisCardGrad6" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#111221" />
+              <stop offset="100%" stop-color="#090A12" />
+            </linearGradient>
+            <linearGradient id="irisBtnGrad6" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#818CF8" />
+              <stop offset="100%" stop-color="#6366F1" />
+            </linearGradient>
+            <linearGradient id="irisRingGrad6" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#A78BFA" />
+              <stop offset="50%" stop-color="#6366F1" />
+              <stop offset="100%" stop-color="#38BDF8" />
+            </linearGradient>
+            <filter id="irisGlow6" x="-25%" y="-25%" width="150%" height="150%">
+              <feGaussianBlur stdDeviation="15" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
+
+          <rect width="420" height="860" rx="48" fill="#000000" stroke="#252636" stroke-width="4"/>
+          <rect x="6" y="6" width="408" height="848" rx="44" fill="#000000"/>
+          <rect x="6" y="6" width="408" height="848" rx="44" fill="url(#irisAmbient6)"/>
+
+          <rect x="150" y="16" width="120" height="28" rx="14" fill="#0E0F17" stroke="#1F2133" stroke-width="1"/>
+          <circle cx="248" cy="30" r="4.5" fill="#181A29"/>
+
+          <text x="44" y="35" fill="#F1F5F9" font-size="13" font-family="sans-serif" font-weight="600">9:41</text>
+          <g transform="translate(345, 24)" fill="#F1F5F9">
+            <rect x="0" y="7" width="2.5" height="5" rx="0.5"/>
+            <rect x="4" y="5" width="2.5" height="7" rx="0.5"/>
+            <rect x="8" y="3" width="2.5" height="9" rx="0.5"/>
+            <rect x="12" y="1" width="2.5" height="11" rx="0.5"/>
+            <path d="M22 2 C24.5 0 28.5 0 31 2 M23.5 5 C25.2 3.5 27.8 3.5 29.5 5 M25.5 8 C26 7.5 27 7.5 27.5 8" stroke="#F1F5F9" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            <rect x="36" y="2" width="18" height="9" rx="2.5" fill="none" stroke="#F1F5F9" stroke-width="1.2"/>
+            <rect x="38" y="4" width="12" height="5" rx="1.5" fill="#F1F5F9"/>
+            <path d="M55 5 C55.5 5 56 5.5 56 6.5 C56 7.5 55.5 8 55 8" fill="#F1F5F9"/>
+          </g>
+
+          <g transform="translate(28, 70)">
+            <path d="M6 1 L1 6 L6 11" stroke="#94A3B8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <text x="24" y="9" fill="#FFFFFF" font-size="18" font-family="'Plus Jakarta Sans', sans-serif" font-weight="800">Workout • Upper Hypertrophy</text>
+          </g>
+
+          <g transform="translate(24, 110)">
+            <rect width="372" height="210" rx="20" fill="url(#irisCardGrad6)" stroke="#272945" stroke-width="1.5"/>
+            <text x="20" y="32" fill="#94A3B8" font-size="13" font-family="sans-serif" font-weight="600">Target Volume &amp; Density</text>
+            <circle cx="340" cy="28" r="4" fill="#6366F1"/>
+
+            <g transform="translate(85, 120)">
+              <circle cx="0" cy="0" r="54" fill="none" stroke="#161726" stroke-width="10"/>
+              <circle cx="0" cy="0" r="54" fill="none" stroke="url(#irisRingGrad6)" stroke-width="10" stroke-dasharray="339" stroke-dashoffset="75" stroke-linecap="round" transform="rotate(-90)" filter="url(#irisGlow6)"/>
+              <text x="0" y="3" fill="#FFFFFF" font-size="25" text-anchor="middle" font-family="sans-serif" font-weight="800">24</text>
+              <text x="0" y="20" fill="#A78BFA" font-size="11" text-anchor="middle" font-family="sans-serif" font-weight="700">SETS DONE</text>
+            </g>
+
+            <g transform="translate(195, 80)">
+              <text x="0" y="0" fill="#818CF8" font-size="11" font-family="sans-serif">TOTAL TONNAGE</text>
+              <text x="0" y="22" fill="#FFFFFF" font-size="19" font-family="sans-serif" font-weight="800">11,240 <tspan fill="#A78BFA" font-size="12">KG</tspan></text>
+              <text x="0" y="60" fill="#818CF8" font-size="11" font-family="sans-serif">REST PACING</text>
+              <text x="0" y="82" fill="#FFFFFF" font-size="19" font-family="sans-serif" font-weight="800">98% <tspan fill="#38BDF8" font-size="12">ON TIME</tspan></text>
+            </g>
+          </g>
+
+          <g transform="translate(24, 340)">
+            <rect width="372" height="230" rx="20" fill="url(#irisCardGrad6)" stroke="#272945" stroke-width="1.5"/>
+            <rect x="20" y="20" width="70" height="22" rx="6" fill="#6366F1" fill-opacity="0.2" stroke="#6366F1" stroke-opacity="0.4"/>
+            <text x="55" y="35" fill="#A78BFA" font-size="10" text-anchor="middle" font-family="sans-serif" font-weight="700">CHEST</text>
+            <text x="20" y="70" fill="#FFFFFF" font-size="20" font-family="sans-serif" font-weight="800">Incline Dumbbell Press</text>
+
+            <g transform="translate(20, 100)">
+              <rect x="0" y="0" width="102" height="78" rx="12" fill="#0C0D16" stroke="#25273D" stroke-width="1"/>
+              <text x="51" y="26" fill="#818CF8" font-size="11" text-anchor="middle" font-family="sans-serif">Working Sets</text>
+              <text x="51" y="58" fill="#FFFFFF" font-size="24" text-anchor="middle" font-family="sans-serif" font-weight="800">3</text>
+
+              <rect x="114" y="0" width="102" height="78" rx="12" fill="#0C0D16" stroke="#25273D" stroke-width="1"/>
+              <text x="165" y="26" fill="#818CF8" font-size="11" text-anchor="middle" font-family="sans-serif">Target Reps</text>
+              <text x="165" y="58" fill="#FFFFFF" font-size="24" text-anchor="middle" font-family="sans-serif" font-weight="800">8–12</text>
+
+              <rect x="228" y="0" width="104" height="78" rx="12" fill="#0C0D16" stroke="#25273D" stroke-width="1"/>
+              <text x="280" y="26" fill="#818CF8" font-size="11" text-anchor="middle" font-family="sans-serif">Rest Period</text>
+              <text x="280" y="58" fill="#A78BFA" font-size="22" text-anchor="middle" font-family="sans-serif" font-weight="800">90s</text>
+            </g>
+
+            <text x="20" y="206" fill="#6B7280" font-size="12" font-family="sans-serif">Cue: 30° bench angle, full stretch at chest level</text>
+          </g>
+
+          <g transform="translate(24, 600)">
+            <rect width="372" height="42" rx="12" fill="#121324" stroke="#6366F1" stroke-opacity="0.4"/>
+            <circle cx="40" cy="21" r="5" fill="#818CF8"/>
+            <text x="55" y="26" fill="#A78BFA" font-size="13" font-family="sans-serif" font-weight="700">Option 6 • Electric Iris (Silicon Valley Tech)</text>
+          </g>
+
+          <g transform="translate(24, 730)">
+            <rect x="10" y="8" width="352" height="52" rx="18" fill="#6366F1" filter="url(#irisGlow6)" opacity="0.5"/>
+            <rect width="372" height="58" rx="18" fill="url(#irisBtnGrad6)"/>
+            <text x="186" y="36" fill="#FFFFFF" font-size="17" text-anchor="middle" font-family="sans-serif" font-weight="800">Add Exercise to Day</text>
+          </g>
+          <rect x="145" y="836" width="130" height="4.5" rx="2.5" fill="#FFFFFF" fill-opacity="0.4"/>
+        </svg>
+      </div>
+      <div class="palette-swatches">
+        <div class="swatch" style="background: #000000; color: #FFF;">#000000</div>
+        <div class="swatch" style="background: #6366F1; color: #FFF;">#6366F1</div>
+        <div class="swatch" style="background: #A78BFA; color: #000;">#A78BFA</div>
+        <div class="swatch" style="background: #38BDF8; color: #000;">#38BDF8</div>
+      </div>
+      <p class="desc">Modern Silicon Valley software minimalism (Hevy / Linear). True pitch-black OLED background with royal violet accents.</p>
+    </div>
+  </div>
+</body>
+</html>
