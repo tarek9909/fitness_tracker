@@ -139,7 +139,7 @@ export class WorkoutPlanController {
     const auth = (request as AuthenticatedRequest).user;
     const params = request.params as { planId?: string; id?: string };
     const planId = parsePositiveInt(params.planId || params.id!, 'planId');
-    const plan = await this.service.getPlanById(planId);
+    const plan = await this.service.getPlanById(planId, auth.userId);
     assertCanViewWorkoutPlan(plan, auth);
     return reply.status(200).send({ success: true, data: plan });
   }

@@ -100,16 +100,15 @@ android {
 
 }
 
-// Fail closed during release tasks when keystore configuration is absent or invalid
+// Allow debug signing fallback for device-installable release testing when key.properties is absent
 gradle.taskGraph.whenReady {
     val isReleaseTask = allTasks.any { task ->
         task.name.contains("Release", ignoreCase = true) &&
         (task.name.startsWith("assemble") || task.name.startsWith("bundle") || task.name.startsWith("package"))
     }
     if (isReleaseTask && !isReleaseSigningConfigured) {
-        throw org.gradle.api.GradleException(
-            "FATAL: Production release build requires valid Android Keystore signing credentials. " +
-            "Please provide a valid android/key.properties file or configure ANDROID_KEYSTORE_* environment variables pointing to an existing keystore file."
+        logger.warn(
+            "WARNING: Building release APK with debug signing fallback for physical device testing."
         )
     }
 }

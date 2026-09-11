@@ -299,6 +299,71 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _setActiveWaterGoal(int targetMl) async {
+    try {
+      await widget.apiClient.put('/me/goals/water', body: {
+        'dailyTargetMl': targetMl,
+      });
+      if (mounted) {
+        showPremiumSnackBar(
+          context,
+          'Active water goal set to $targetMl ml/day',
+          isSuccess: true,
+        );
+        _fetchTodayPlan();
+      }
+    } catch (e) {
+      if (mounted) {
+        showPremiumSnackBar(context, 'Failed to update water goal: $e', isError: true);
+      }
+    }
+  }
+
+  void _showCustomWaterTargetDialog() {
+    final targetController = TextEditingController();
+    showPremiumDialog(
+      context: context,
+      title: 'Set Daily Water Goal',
+      content: PremiumTextField(
+        controller: targetController,
+        label: 'Daily Target in ml',
+        hint: 'e.g. 2500',
+        keyboardType: TextInputType.number,
+        textInputAction: TextInputAction.done,
+        onSubmitted: (val) {
+          final parsed = int.tryParse(val.trim());
+          if (parsed != null && parsed >= 500 && parsed <= 10000) {
+            Navigator.pop(context);
+            _setActiveWaterGoal(parsed);
+          }
+        },
+      ),
+      actions: [
+        PremiumButton(
+          text: 'Cancel',
+          isSecondary: true,
+          onPressed: () => Navigator.pop(context),
+        ),
+        PremiumButton(
+          text: 'Save & Activate',
+          onPressed: () {
+            final parsed = int.tryParse(targetController.text.trim());
+            if (parsed == null || parsed < 500 || parsed > 10000) {
+              showPremiumSnackBar(
+                context,
+                'Please enter a valid daily target (500–10000 ml)',
+                isError: true,
+              );
+              return;
+            }
+            Navigator.pop(context);
+            _setActiveWaterGoal(parsed);
+          },
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = AppThemeColors.of(context);
@@ -1392,6 +1457,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: colors.card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.lg)),
@@ -1399,12 +1465,18 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            return Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+            return SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: AppSpacing.lg,
+                  right: AppSpacing.lg,
+                  top: AppSpacing.lg,
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.lg,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -1494,12 +1566,77 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 18),
+                  Divider(color: colors.border, height: 1),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      Text(
+                        'DAILY WATER GOAL',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.6,
+                          color: colors.textSecondary,
+                        ),
+                      ),
+                      StatusBadge(
+                        label: water.targetMl > 0 ? '${water.targetMl} ml (Active)' : 'No Goal Set',
+                        color: water.targetMl > 0 ? colors.cyan : colors.amber,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      PremiumChoiceButton(
+                        label: '2.0 L',
+                        accentColor: colors.cyan,
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          await _setActiveWaterGoal(2000);
+                        },
+                      ),
+                      PremiumChoiceButton(
+                        label: '2.5 L',
+                        accentColor: colors.cyan,
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          await _setActiveWaterGoal(2500);
+                        },
+                      ),
+                      PremiumChoiceButton(
+                        label: '3.0 L',
+                        accentColor: colors.cyan,
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          await _setActiveWaterGoal(3000);
+                        },
+                      ),
+                      PremiumChoiceButton(
+                        label: 'Custom Target',
+                        icon: Icons.tune,
+                        accentColor: colors.cyan,
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _showCustomWaterTargetDialog();
+                        },
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 16),
                 ],
               ),
-            );
-          },
-        );
+            ),
+          );
+        },
+      );
       },
     );
   }

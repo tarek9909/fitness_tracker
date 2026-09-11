@@ -17,6 +17,7 @@ class _CardioScreenState extends State<CardioScreen>
   late TabController _tabController;
   List<dynamic> _activities = [];
   List<dynamic> _history = [];
+  List<dynamic> _cardioTargets = [];
   bool _loading = true;
   bool _submitting = false;
 
@@ -55,13 +56,16 @@ class _CardioScreenState extends State<CardioScreen>
     try {
       final actRes = await widget.apiClient.get('/me/cardio/activities');
       final histRes = await widget.apiClient.get('/me/cardio/history');
+      final targetRes = await widget.apiClient.get('/me/goals/cardio').catchError((_) => []);
 
       final activities = _asList(actRes);
       final history = _asList(histRes);
+      final targets = _asList(targetRes);
 
       setState(() {
         _activities = activities;
         _history = history;
+        _cardioTargets = targets;
         if (_activities.isNotEmpty && _selectedActivityId == null) {
           _selectedActivityId = _activities.first['id'] as int?;
         }
@@ -132,6 +136,140 @@ class _CardioScreenState extends State<CardioScreen>
     }
   }
 
+  Future<void> _showSetTargetSheet() async {
+    final colors = AppThemeColors.of(context);
+    int selectedMinutes = 30;
+    if (_cardioTargets.isNotEmpty) {
+      final current = _cardioTargets.first['min_duration_minutes'] ??
+          _cardioTargets.first['minDurationMinutes'];
+      if (current is num) selectedMinutes = current.toInt();
+    }
+    final customCtrl = TextEditingController(text: selectedMinutes.toString());
+    int? targetActivityId = _selectedActivityId;
+
+    await showPremiumModalSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: AppSpacing.lg,
+                right: AppSpacing.lg,
+                top: AppSpacing.md,
+                bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + AppSpacing.lg,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Set Active Cardio Goal',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: colors.textPrimary,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        onPressed: () => Navigator.pop(sheetCtx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Configure your daily conditioning target. It becomes active today for your daily plan.',
+                    style: TextStyle(fontSize: 13, color: colors.textSecondary),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'DAILY DURATION (MINUTES)',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                      color: colors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [20, 30, 45, 60].map((mins) {
+                      final isSelected = selectedMinutes == mins;
+                      return ChoiceChip(
+                        label: Text('$mins min'),
+                        selected: isSelected,
+                        selectedColor: colors.primary,
+                        backgroundColor: colors.surfaceElevated,
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.black : colors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        onSelected: (_) {
+                          setSheetState(() {
+                            selectedMinutes = mins;
+                            customCtrl.text = mins.toString();
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  PremiumTextField(
+                    controller: customCtrl,
+                    label: 'Target Minutes',
+                    keyboardType: TextInputType.number,
+                    onChanged: (val) {
+                      final parsed = int.tryParse(val.trim());
+                      if (parsed != null && parsed > 0) {
+                        setSheetState(() => selectedMinutes = parsed);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  PremiumButton(
+                    text: 'Save & Activate Goal',
+                    icon: const Icon(Icons.check_circle_outline, size: 18),
+                    onPressed: () async {
+                      final mins = int.tryParse(customCtrl.text.trim()) ?? selectedMinutes;
+                      if (mins <= 0) return;
+                      Navigator.pop(sheetCtx);
+                      try {
+                        await widget.apiClient.post('/me/goals/cardio', body: {
+                          'minDurationMinutes': mins,
+                          'weekdays': [1, 2, 3, 4, 5, 6, 7],
+                          if (targetActivityId != null) 'cardioActivityId': targetActivityId,
+                        });
+                        if (mounted) {
+                          showPremiumSnackBar(
+                            context,
+                            'Cardio target of $mins min/day activated!',
+                            isSuccess: true,
+                          );
+                          _loadData();
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          showPremiumSnackBar(context, 'Failed to save cardio goal: $e', isError: true);
+                        }
+                      }
+                    },
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = AppThemeColors.of(context);
@@ -163,11 +301,83 @@ class _CardioScreenState extends State<CardioScreen>
   }
 
   Widget _buildLogForm(AppThemeColors colors) {
+    final hasActiveTarget = _cardioTargets.isNotEmpty;
+    final targetMins = hasActiveTarget
+        ? (_cardioTargets.first['min_duration_minutes'] ??
+            _cardioTargets.first['minDurationMinutes'] ??
+            30)
+        : null;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Active Goal Card
+          PremiumCard(
+            ambientGlow: true,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: colors.primaryMuted,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.directions_run, color: colors.primary, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            'ACTIVE CARDIO GOAL',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                              color: colors.textSecondary,
+                            ),
+                          ),
+                          StatusBadge(
+                            label: hasActiveTarget ? 'ACTIVE' : 'NO GOAL',
+                            color: hasActiveTarget ? colors.primary : colors.amber,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        hasActiveTarget
+                            ? '$targetMins min / day'
+                            : 'Tap to activate daily goal',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: colors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                PremiumButton(
+                  text: hasActiveTarget ? 'Edit' : 'Set Goal',
+                  height: 32,
+                  width: 80,
+                  onPressed: _showSetTargetSheet,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           const SectionHeader(
             title: 'Activity & Prescription',
             subtitle: 'Record conditioning duration, incline, and speed',

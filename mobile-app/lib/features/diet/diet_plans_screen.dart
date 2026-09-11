@@ -60,6 +60,25 @@ class _DietPlansScreenState extends State<DietPlansScreen> {
     }
   }
 
+  Future<void> _quickActivatePlan(int planId) async {
+    try {
+      final now = DateTime.now();
+      final today = '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      await widget.apiClient.post(
+        '/me/diet-plans/$planId/activate',
+        body: {'effectiveFrom': today},
+      );
+      if (mounted) {
+        showPremiumSnackBar(context, 'Diet plan activated as your active nutrition', isSuccess: true);
+        _loadPlans();
+      }
+    } catch (e) {
+      if (mounted) {
+        showPremiumSnackBar(context, 'Failed to activate diet plan: $e', isError: true);
+      }
+    }
+  }
+
   Future<void> _showCreatePlanDialog() async {
     final nameCtrl = TextEditingController();
     final descCtrl = TextEditingController();
@@ -296,11 +315,13 @@ class _DietPlansScreenState extends State<DietPlansScreen> {
                           final planId = plan['id'] as int;
                           final name = plan['name'] as String? ?? 'Diet Plan';
                           final desc = plan['description'] as String?;
-                          final isActive = plan['is_active'] == 1 ||
+                          final isActive = plan['is_currently_active'] == 1 ||
+                              plan['is_currently_active'] == true ||
+                              plan['is_active'] == 1 ||
                               plan['isActive'] == true ||
                               plan['active_assignment_id'] != null;
                           final versionStatus =
-                              plan['version_status'] ?? plan['status'] ?? 'draft';
+                              plan['latest_version_status'] ?? plan['version_status'] ?? plan['status'] ?? 'draft';
 
                           return PremiumCard(
                             onTap: () async {
@@ -418,6 +439,37 @@ class _DietPlansScreenState extends State<DietPlansScreen> {
                                             ),
                                           ),
                                           const Spacer(),
+                                          if (!isActive)
+                                            Padding(
+                                              padding: const EdgeInsets.only(right: 6),
+                                              child: InkWell(
+                                                onTap: () => _quickActivatePlan(planId),
+                                                borderRadius: BorderRadius.circular(AppRadii.sm),
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: colors.primaryMuted,
+                                                    borderRadius: BorderRadius.circular(AppRadii.sm),
+                                                    border: Border.all(color: colors.primary.withValues(alpha: 0.4)),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Icon(Icons.flash_on, size: 12, color: colors.primary),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        'Set Active',
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          fontWeight: FontWeight.w700,
+                                                          color: colors.primary,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
                                           Icon(Icons.chevron_right,
                                               size: 18,
                                               color: colors.textMuted),
@@ -548,28 +600,6 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
         showPremiumSnackBar(
           context,
           'Activation failed: ${e.toString().replaceAll("Exception: ", "")}',
-          isError: true,
-        );
-      }
-    }
-  }
-
-  Future<void> _publishVersion() async {
-    final versionId = _currentVersionId;
-    if (versionId == null) return;
-    try {
-      await widget.apiClient.post(
-          '/me/diet-plans/${widget.planId}/versions/$versionId/publish');
-      if (mounted) {
-        showPremiumSnackBar(
-            context, 'Diet version published! You can now activate this plan.');
-        _loadPlanDetails();
-      }
-    } catch (e) {
-      if (mounted) {
-        showPremiumSnackBar(
-          context,
-          'Publish failed: ${e.toString().replaceAll("Exception: ", "")}',
           isError: true,
         );
       }
@@ -755,6 +785,11 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
         _plan!['currentVersion'] as Map<String, dynamic>?;
     final versionStatus = version?['status'] as String? ?? 'draft';
     final isDraft = versionStatus == 'draft';
+    final isActive = _plan!['is_currently_active'] == 1 ||
+        _plan!['is_currently_active'] == true ||
+        _plan!['is_active'] == 1 ||
+        _plan!['isActive'] == true ||
+        _plan!['active_assignment_id'] != null;
     final meals = (version?['meals'] as List<dynamic>?) ?? [];
 
     return PremiumScaffold(
@@ -766,16 +801,10 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
             color: colors.surfaceElevated,
             onSelected: (val) {
               if (val == 'clone') _clonePlan();
-              if (val == 'publish') _publishVersion();
               if (val == 'activate') _activatePlan();
             },
             itemBuilder: (ctx) => [
-              if (isDraft)
-                const PopupMenuItem(
-                  value: 'publish',
-                  child: Text('Publish Version'),
-                ),
-              if (!isDraft)
+              if (!isActive)
                 const PopupMenuItem(
                   value: 'activate',
                   child: Text('Activate Plan'),
@@ -814,15 +843,26 @@ class _DietPlanDetailScreenState extends State<DietPlanDetailScreen> {
                         ),
                       ),
                     ),
-                    if (isDraft)
-                      PremiumButton(
-                        text: 'Publish',
-                        height: 32,
-                        onPressed: _publishVersion,
+                    if (isActive)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: colors.primaryMuted,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: colors.primary.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(
+                          'CURRENT ACTIVE',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: colors.primary,
+                          ),
+                        ),
                       )
                     else
                       PremiumButton(
-                        text: 'Activate',
+                        text: 'Activate Plan',
                         height: 32,
                         onPressed: _activatePlan,
                       ),

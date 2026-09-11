@@ -23,11 +23,22 @@ export class DietPlanService {
     return this.repo.findPlansForUser(userId);
   }
 
-  async getPlanById(planId: number) {
+  async getPlanById(planId: number, userId?: number) {
     const plan = await this.repo.findPlanById(planId);
     if (!plan) throw new NotFoundError('Diet plan not found');
     const versions = await this.repo.findVersionsByPlanId(planId);
-    return { ...plan, versions };
+    let isCurrentlyActive = false;
+    if (userId) {
+      const activeAssign = await this.db.queryOne<any>(
+        `SELECT 1 FROM user_diet_assignments uda
+         JOIN diet_plan_versions dpv ON dpv.id = uda.diet_plan_version_id
+         WHERE dpv.diet_plan_id = ? AND uda.user_id = ? AND uda.status = 'active'
+         LIMIT 1`,
+        [planId, userId]
+      );
+      isCurrentlyActive = !!activeAssign;
+    }
+    return { ...plan, versions, is_currently_active: isCurrentlyActive };
   }
 
   async createPlan(data: {
@@ -156,12 +167,27 @@ export class DietPlanService {
     const plan = await this.repo.findPlanById(planId);
     if (!plan) throw new NotFoundError('Diet plan not found');
 
-    const publishedVersion = await this.db.queryOne<any>(
+    let publishedVersion = await this.db.queryOne<any>(
       `SELECT * FROM diet_plan_versions 
        WHERE diet_plan_id = ? AND status = 'published' 
        ORDER BY version_number DESC LIMIT 1`,
       [planId]
     );
+    if (!publishedVersion) {
+      const draftVersion = await this.db.queryOne<any>(
+        `SELECT * FROM diet_plan_versions
+         WHERE diet_plan_id = ? AND status = 'draft'
+         ORDER BY version_number DESC LIMIT 1`,
+        [planId]
+      );
+      if (draftVersion) {
+        await this.publishVersion(draftVersion.id);
+        publishedVersion = await this.db.queryOne<any>(
+          `SELECT * FROM diet_plan_versions WHERE id = ?`,
+          [draftVersion.id]
+        );
+      }
+    }
     if (!publishedVersion) {
       throw new ValidationError('Diet plan must have a published version before it can be activated');
     }
@@ -172,7 +198,7 @@ export class DietPlanService {
     return this.db.withTransaction(async (conn) => {
       await conn.execute(
         `UPDATE user_diet_assignments 
-         SET status = 'completed', effective_until = ?, updated_at = CURRENT_TIMESTAMP 
+         SET status = 'ended', effective_until = ?, updated_at = CURRENT_TIMESTAMP 
          WHERE user_id = ? AND status = 'active' AND effective_from < ?`,
         [effectiveUntil, userId, effectiveFromDate]
       );
@@ -945,7 +971,7 @@ export class DietPlanController {
     const auth = (request as AuthenticatedRequest).user;
     const params = request.params as { id: string };
     const planId = parsePositiveInt(params.id, 'planId');
-    const plan = await this.service.getPlanById(planId);
+    const plan = await this.service.getPlanById(planId, auth.userId);
     assertCanViewDietPlan(plan, auth);
     return reply.status(200).send({ success: true, data: plan });
   }

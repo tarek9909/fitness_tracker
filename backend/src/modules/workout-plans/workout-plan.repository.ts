@@ -56,12 +56,19 @@ export class WorkoutPlanRepository {
              wp.goal as goal_category,
              (CASE WHEN wp.status = 'archived' THEN 1 ELSE 0 END) as is_archived,
              (SELECT COUNT(*) FROM workout_plan_versions wpv WHERE wpv.workout_plan_id = wp.id) as version_count,
-             (SELECT wpv.version_number FROM workout_plan_versions wpv WHERE wpv.workout_plan_id = wp.id AND wpv.status = 'published' ORDER BY wpv.version_number DESC LIMIT 1) as active_version_number
+             (SELECT wpv.version_number FROM workout_plan_versions wpv WHERE wpv.workout_plan_id = wp.id AND wpv.status = 'published' ORDER BY wpv.version_number DESC LIMIT 1) as active_version_number,
+             (SELECT wpv.id FROM workout_plan_versions wpv WHERE wpv.workout_plan_id = wp.id ORDER BY wpv.version_number DESC LIMIT 1) as latest_version_id,
+             (SELECT wpv.status FROM workout_plan_versions wpv WHERE wpv.workout_plan_id = wp.id ORDER BY wpv.version_number DESC LIMIT 1) as latest_version_status,
+             EXISTS (
+               SELECT 1 FROM user_workout_assignments uwa
+               JOIN workout_plan_versions wpv ON wpv.id = uwa.workout_plan_version_id
+               WHERE wpv.workout_plan_id = wp.id AND uwa.user_id = ? AND uwa.status = 'active'
+             ) as is_currently_active
       FROM workout_plans wp
       WHERE wp.owner_user_id = ? OR wp.visibility = 'admin'
       ORDER BY wp.id DESC
     `;
-    return this.db.query(sql, [userId]);
+    return this.db.query(sql, [userId, userId]);
   }
 
   async updatePlan(planId: number, data: Partial<{ name: string; description: string | null; goalCategory: string | null; isArchived: number }>): Promise<void> {

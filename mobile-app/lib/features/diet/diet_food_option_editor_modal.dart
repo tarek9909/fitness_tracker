@@ -570,42 +570,45 @@ class _DietFoodOptionEditorModalState
                       borderRadius: BorderRadius.circular(AppRadii.md),
                       border: Border.all(color: colors.border),
                     ),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, __) =>
-                          Divider(height: 1, color: colors.border),
-                      itemBuilder: (_, index) {
-                        final food = filtered[index];
-                        final foodId = _asInt(food['id']);
-                        final selected = foodId == _selectedFoodId;
-                        final brand = food['brand']?.toString();
-                        return ListTile(
-                          dense: true,
-                          selected: selected,
-                          selectedTileColor: colors.primaryMuted,
-                          leading: Icon(
-                            selected
-                                ? Icons.radio_button_checked
-                                : Icons.radio_button_unchecked,
-                            color: selected ? colors.primary : colors.textMuted,
-                          ),
-                          title: Text(
-                            food['name']?.toString() ?? 'Food',
-                            style: TextStyle(
-                              color: colors.textPrimary,
-                              fontWeight: FontWeight.w700,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) =>
+                            Divider(height: 1, color: colors.border),
+                        itemBuilder: (_, index) {
+                          final food = filtered[index];
+                          final foodId = _asInt(food['id']);
+                          final selected = foodId == _selectedFoodId;
+                          final brand = food['brand']?.toString();
+                          return ListTile(
+                            dense: true,
+                            selected: selected,
+                            selectedTileColor: colors.primaryMuted,
+                            leading: Icon(
+                              selected
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_unchecked,
+                              color: selected ? colors.primary : colors.textMuted,
                             ),
-                          ),
-                          subtitle: Text(
-                            brand == null || brand.isEmpty
-                                ? '${food['calories'] ?? '-'} kcal per reference serving'
-                                : '$brand • ${food['calories'] ?? '-'} kcal',
-                            style: TextStyle(color: colors.textSecondary),
-                          ),
-                          onTap: () => _selectFood(food),
-                        );
-                      },
+                            title: Text(
+                              food['name']?.toString() ?? 'Food',
+                              style: TextStyle(
+                                color: colors.textPrimary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            subtitle: Text(
+                              brand == null || brand.isEmpty
+                                  ? '${food['calories'] ?? '-'} kcal per reference serving'
+                                  : '$brand • ${food['calories'] ?? '-'} kcal',
+                              style: TextStyle(color: colors.textSecondary),
+                            ),
+                            onTap: () => _selectFood(food),
+                          );
+                        },
+                      ),
                     ),
                   ),
 

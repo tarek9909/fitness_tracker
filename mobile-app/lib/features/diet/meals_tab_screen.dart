@@ -366,6 +366,8 @@ class _MealsTabScreenState extends State<MealsTabScreen> {
                       children: [
                         Text(
                           name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
