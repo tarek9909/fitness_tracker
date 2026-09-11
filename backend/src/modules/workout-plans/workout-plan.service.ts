@@ -319,23 +319,74 @@ export class WorkoutPlanService {
   }
 
   async addDay(versionId: number, data: { weekdayNumber: number; name: string; isRestDay?: boolean | null; notes?: string | null; orderIndex?: number | null }) {
-    const dayId = await this.db.withTransaction(async (conn) => {
+    const { dayId, dayOrder } = await this.db.withTransaction(async (conn) => {
       const version = await conn.queryOne<any>('SELECT status FROM workout_plan_versions WHERE id = ?', [versionId]);
       if (!version) throw new NotFoundError('Workout plan version not found');
-      const result = await conn.execute(
-        `INSERT INTO workout_plan_days (workout_plan_version_id, weekday, name, is_rest_day, notes, day_order)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [
-          versionId,
-          data.weekdayNumber,
-          data.name,
-          data.isRestDay ? 1 : 0,
-          data.notes || null,
-          data.orderIndex ?? data.weekdayNumber,
-        ]
+
+      const existingWeekday = await conn.queryOne<any>(
+        'SELECT id FROM workout_plan_days WHERE workout_plan_version_id = ? AND weekday = ?',
+        [versionId, data.weekdayNumber]
       );
-      if (version.status === 'published') await this.validatePublishedStructure(versionId, conn);
-      return result.insertId;
+      if (existingWeekday) {
+        throw new ConflictError(
+          `Weekday ${data.weekdayNumber} is already scheduled in this workout plan version`,
+          'WORKOUT_DAY_WEEKDAY_EXISTS'
+        );
+      }
+
+      let order = data.orderIndex;
+      if (order === undefined || order === null) {
+        const maxOrderRes = await conn.queryOne<{ max_order: number | null }>(
+          'SELECT MAX(day_order) as max_order FROM workout_plan_days WHERE workout_plan_version_id = ?',
+          [versionId]
+        );
+        order = (maxOrderRes?.max_order ?? 0) + 1;
+      } else {
+        const existingOrder = await conn.queryOne<any>(
+          'SELECT id FROM workout_plan_days WHERE workout_plan_version_id = ? AND day_order = ?',
+          [versionId, order]
+        );
+        if (existingOrder) {
+          throw new ConflictError(
+            `A workout day with order ${order} already exists in this plan version`,
+            'WORKOUT_DAY_ORDER_EXISTS'
+          );
+        }
+      }
+
+      try {
+        const result = await conn.execute(
+          `INSERT INTO workout_plan_days (workout_plan_version_id, weekday, name, is_rest_day, notes, day_order)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            versionId,
+            data.weekdayNumber,
+            data.name,
+            data.isRestDay ? 1 : 0,
+            data.notes || null,
+            order,
+          ]
+        );
+        if (version.status === 'published') await this.validatePublishedStructure(versionId, conn);
+        return { dayId: result.insertId, dayOrder: order };
+      } catch (err: any) {
+        if (err.code === 'ER_DUP_ENTRY' || err.message?.includes('Duplicate entry') || err.message?.includes('UNIQUE constraint failed')) {
+          if (err.message?.includes('weekday') || err.message?.includes('uq_workout_plan_day_weekday')) {
+            throw new ConflictError(
+              `Weekday ${data.weekdayNumber} is already scheduled in this workout plan version`,
+              'WORKOUT_DAY_WEEKDAY_EXISTS'
+            );
+          }
+          if (err.message?.includes('day_order') || err.message?.includes('uq_workout_plan_day_order')) {
+            throw new ConflictError(
+              `A workout day with order ${order} already exists in this plan version`,
+              'WORKOUT_DAY_ORDER_EXISTS'
+            );
+          }
+          throw new ConflictError('A workout day with these parameters already exists in this plan version', 'WORKOUT_DAY_CONFLICT');
+        }
+        throw err;
+      }
     });
     return {
       id: dayId,
@@ -344,7 +395,7 @@ export class WorkoutPlanService {
       name: data.name,
       is_rest_day: data.isRestDay ? 1 : 0,
       notes: data.notes || null,
-      day_order: data.orderIndex ?? data.weekdayNumber,
+      day_order: dayOrder,
       exercises: [],
     };
   }
@@ -368,13 +419,22 @@ export class WorkoutPlanService {
       if (data.orderIndex !== undefined) {
         const current = await conn.queryOne<any>('SELECT day_order FROM workout_plan_days WHERE id = ?', [dayId]);
         if (current && current.day_order !== data.orderIndex) {
-          await conn.execute('UPDATE workout_plan_days SET day_order = ? WHERE id = ?', [-9999, dayId]);
           const target = await conn.queryOne<any>(
             'SELECT id FROM workout_plan_days WHERE workout_plan_version_id = ? AND day_order = ? AND id != ?',
             [day.workout_plan_version_id, data.orderIndex, dayId],
           );
-          if (target) await conn.execute('UPDATE workout_plan_days SET day_order = ? WHERE id = ?', [current.day_order, target.id]);
-          await conn.execute('UPDATE workout_plan_days SET day_order = ? WHERE id = ?', [data.orderIndex, dayId]);
+          if (target) {
+            const maxRes = await conn.queryOne<{ max_order: number | null }>(
+              'SELECT MAX(day_order) as max_order FROM workout_plan_days WHERE workout_plan_version_id = ?',
+              [day.workout_plan_version_id]
+            );
+            const tempOrder = (maxRes?.max_order ?? 0) + 1000;
+            await conn.execute('UPDATE workout_plan_days SET day_order = ? WHERE id = ?', [tempOrder, target.id]);
+            await conn.execute('UPDATE workout_plan_days SET day_order = ? WHERE id = ?', [data.orderIndex, dayId]);
+            await conn.execute('UPDATE workout_plan_days SET day_order = ? WHERE id = ?', [current.day_order, target.id]);
+          } else {
+            await conn.execute('UPDATE workout_plan_days SET day_order = ? WHERE id = ?', [data.orderIndex, dayId]);
+          }
         }
       }
 
@@ -435,30 +495,52 @@ export class WorkoutPlanService {
           [dayId]
         );
         orderIndex = (maxRes?.max_order ?? 0) + 1;
+      } else {
+        const existingOrder = await conn.queryOne<any>(
+          'SELECT id FROM workout_plan_exercises WHERE workout_plan_day_id = ? AND exercise_order = ?',
+          [dayId, orderIndex]
+        );
+        if (existingOrder) {
+          throw new ConflictError(
+            `An exercise with order ${orderIndex} already exists in this workout day`,
+            'WORKOUT_EXERCISE_ORDER_EXISTS'
+          );
+        }
       }
 
-      const res = await conn.execute(
-        `INSERT INTO workout_plan_exercises (
-          workout_plan_day_id, exercise_id, exercise_order, exercise_name_snapshot, tracking_type_snapshot,
-          target_sets, target_reps_min, target_reps_max, target_duration_seconds,
-          target_distance_meters, rest_seconds, notes, is_optional
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          dayId,
-          data.exerciseId,
-          orderIndex,
-          exerciseName,
-          trackingType,
-          data.targetSets,
-          data.repsMin ?? null,
-          data.repsMax ?? null,
-          data.targetDurationSeconds ?? null,
-          data.targetDistanceMeters ?? null,
-          data.restSeconds ?? null,
-          data.notes || null,
-          data.isOptional ? 1 : 0,
-        ]
-      );
+      let res: any;
+      try {
+        res = await conn.execute(
+          `INSERT INTO workout_plan_exercises (
+            workout_plan_day_id, exercise_id, exercise_order, exercise_name_snapshot, tracking_type_snapshot,
+            target_sets, target_reps_min, target_reps_max, target_duration_seconds,
+            target_distance_meters, rest_seconds, notes, is_optional
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            dayId,
+            data.exerciseId,
+            orderIndex,
+            exerciseName,
+            trackingType,
+            data.targetSets,
+            data.repsMin ?? null,
+            data.repsMax ?? null,
+            data.targetDurationSeconds ?? null,
+            data.targetDistanceMeters ?? null,
+            data.restSeconds ?? null,
+            data.notes || null,
+            data.isOptional ? 1 : 0,
+          ]
+        );
+      } catch (err: any) {
+        if (err.code === 'ER_DUP_ENTRY' || err.message?.includes('Duplicate entry') || err.message?.includes('UNIQUE constraint failed')) {
+          throw new ConflictError(
+            `An exercise with order ${orderIndex} already exists in this workout day`,
+            'WORKOUT_EXERCISE_ORDER_EXISTS'
+          );
+        }
+        throw err;
+      }
       await this.repo.replaceExerciseSets(res.insertId, data.sets || this.defaultSets(data, data.targetSets), conn);
       if (day.status === 'published') await this.validatePublishedStructure(day.workout_plan_version_id, conn);
       return { id: res.insertId };
@@ -497,8 +579,14 @@ export class WorkoutPlanService {
           [ex.workout_plan_day_id, data.orderIndex, exerciseId]
         );
         if (existingAtTarget) {
-          // Use temporary negative order to prevent UNIQUE(workout_plan_day_id, exercise_order) constraint collision
-          await conn.execute('UPDATE workout_plan_exercises SET exercise_order = ? WHERE id = ?', [-9999, existingAtTarget.id]);
+          // Use temporary positive order to prevent UNIQUE(workout_plan_day_id, exercise_order) constraint collision
+          // and prevent MySQL ER_WARN_DATA_OUT_OF_RANGE on UNSIGNED columns
+          const maxRes = await conn.queryOne<{ max_order: number | null }>(
+            'SELECT MAX(exercise_order) as max_order FROM workout_plan_exercises WHERE workout_plan_day_id = ?',
+            [ex.workout_plan_day_id]
+          );
+          const tempOrder = (maxRes?.max_order ?? 0) + 1000;
+          await conn.execute('UPDATE workout_plan_exercises SET exercise_order = ? WHERE id = ?', [tempOrder, existingAtTarget.id]);
           await conn.execute('UPDATE workout_plan_exercises SET exercise_order = ? WHERE id = ?', [data.orderIndex, exerciseId]);
           await conn.execute('UPDATE workout_plan_exercises SET exercise_order = ? WHERE id = ?', [ex.exercise_order, existingAtTarget.id]);
           delete updatePayload.orderIndex; // Order swap already executed atomically

@@ -156,6 +156,19 @@ describe('Workout & Diet Plans Dedicated Lifecycle, Ownership & Transactional Ro
       expect(day2Res.statusCode).toBe(201);
       day2Id = day2Res.json().data.id;
 
+      // Duplicate weekday: Trying to add another day with weekday 1 should fail with 409 Conflict
+      const dupDayRes = await app.inject({
+        method: 'POST',
+        url: `/api/v1/me/workout-plans/${workoutPlanId}/versions/${versionId}/days`,
+        headers: { authorization: `Bearer ${johnToken}` },
+        payload: {
+          weekdayNumber: 1,
+          name: 'Duplicate Monday Day',
+        },
+      });
+      expect(dupDayRes.statusCode).toBe(409);
+      expect(dupDayRes.json().error.code).toBe('WORKOUT_DAY_WEEKDAY_EXISTS');
+
       // Update Day 1 metadata
       const updateDayRes = await app.inject({
         method: 'PUT',
@@ -246,6 +259,42 @@ describe('Workout & Diet Plans Dedicated Lifecycle, Ownership & Transactional Ro
         { setNumber: 1, targetRepsMin: 8, targetRepsMax: 12, targetWeightKg: 50, restSeconds: 60, notes: 'legacy set' },
       ], mockConn);
       expect(executedSqls.some((s) => s.includes('target_reps'))).toBe(true);
+
+      // Reorder exercises: Swap Ex 2 to orderIndex 1 (using PATCH endpoint)
+      const reorderExRes = await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/me/workout-plans/${workoutPlanId}/exercises/${ex2Id}`,
+        headers: { authorization: `Bearer ${johnToken}` },
+        payload: {
+          orderIndex: 1,
+        },
+      });
+      expect(reorderExRes.statusCode).toBe(200);
+
+      const dbExs = await pool.query<any>(
+        'SELECT id, exercise_order FROM workout_plan_exercises WHERE workout_plan_day_id = ? ORDER BY exercise_order ASC',
+        [day1Id],
+      );
+      expect(dbExs.find((e: any) => e.id === ex2Id)?.exercise_order).toBe(1);
+      expect(dbExs.find((e: any) => e.id === ex1Id)?.exercise_order).toBe(2);
+
+      // Reorder days: Swap Day 2 to orderIndex 1 (using PATCH endpoint)
+      const reorderDayRes = await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/me/workout-plans/${workoutPlanId}/days/${day2Id}`,
+        headers: { authorization: `Bearer ${johnToken}` },
+        payload: {
+          orderIndex: 1,
+        },
+      });
+      expect(reorderDayRes.statusCode).toBe(200);
+
+      const dbDays = await pool.query<any>(
+        'SELECT id, day_order FROM workout_plan_days WHERE workout_plan_version_id = ? ORDER BY day_order ASC',
+        [versionId],
+      );
+      expect(dbDays.find((d: any) => d.id === day2Id)?.day_order).toBe(1);
+      expect(dbDays.find((d: any) => d.id === day1Id)?.day_order).toBe(2);
     });
 
     it('enforces strict ownership checks on workout plan access and modifications', async () => {

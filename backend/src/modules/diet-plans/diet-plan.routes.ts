@@ -470,7 +470,12 @@ export class DietPlanService {
           [meal.diet_plan_version_id, data.orderIndex, mealId]
         );
         if (existingAtTarget) {
-          await conn.execute('UPDATE diet_meals SET meal_order = ? WHERE id = ?', [-9999, existingAtTarget.id]);
+          const maxRes = await conn.queryOne<{ max_order: number | null }>(
+            'SELECT MAX(meal_order) as max_order FROM diet_meals WHERE diet_plan_version_id = ?',
+            [meal.diet_plan_version_id]
+          );
+          const tempOrder = (maxRes?.max_order ?? 0) + 1000;
+          await conn.execute('UPDATE diet_meals SET meal_order = ? WHERE id = ?', [tempOrder, existingAtTarget.id]);
           await conn.execute('UPDATE diet_meals SET meal_order = ? WHERE id = ?', [data.orderIndex, mealId]);
           await conn.execute('UPDATE diet_meals SET meal_order = ? WHERE id = ?', [meal.meal_order, existingAtTarget.id]);
           delete updatePayload.orderIndex;
@@ -579,7 +584,12 @@ export class DietPlanService {
           [group.diet_meal_id, data.orderIndex, groupId]
         );
         if (existingAtTarget) {
-          await conn.execute('UPDATE diet_meal_option_groups SET group_order = ? WHERE id = ?', [-9999, existingAtTarget.id]);
+          const maxRes = await conn.queryOne<{ max_order: number | null }>(
+            'SELECT MAX(group_order) as max_order FROM diet_meal_option_groups WHERE diet_meal_id = ?',
+            [group.diet_meal_id]
+          );
+          const tempOrder = (maxRes?.max_order ?? 0) + 1000;
+          await conn.execute('UPDATE diet_meal_option_groups SET group_order = ? WHERE id = ?', [tempOrder, existingAtTarget.id]);
           await conn.execute('UPDATE diet_meal_option_groups SET group_order = ? WHERE id = ?', [data.orderIndex, groupId]);
           await conn.execute('UPDATE diet_meal_option_groups SET group_order = ? WHERE id = ?', [group.group_order, existingAtTarget.id]);
           delete updatePayload.orderIndex;
@@ -752,7 +762,12 @@ export class DietPlanService {
           [option.diet_meal_option_group_id, data.orderIndex, optionId]
         );
         if (existingAtTarget) {
-          await conn.execute('UPDATE diet_meal_options SET option_order = ? WHERE id = ?', [-9999, existingAtTarget.id]);
+          const maxRes = await conn.queryOne<{ max_order: number | null }>(
+            'SELECT MAX(option_order) as max_order FROM diet_meal_options WHERE diet_meal_option_group_id = ?',
+            [option.diet_meal_option_group_id]
+          );
+          const tempOrder = (maxRes?.max_order ?? 0) + 1000;
+          await conn.execute('UPDATE diet_meal_options SET option_order = ? WHERE id = ?', [tempOrder, existingAtTarget.id]);
           await conn.execute('UPDATE diet_meal_options SET option_order = ? WHERE id = ?', [data.orderIndex, optionId]);
           await conn.execute('UPDATE diet_meal_options SET option_order = ? WHERE id = ?', [option.option_order, existingAtTarget.id]);
           delete updatePayload.orderIndex;

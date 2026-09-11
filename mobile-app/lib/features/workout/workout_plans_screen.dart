@@ -644,11 +644,16 @@ class _WorkoutPlanDetailScreenState extends State<WorkoutPlanDetailScreen> {
                       ),
                     ),
                     items: List.generate(7, (i) {
+                      final dayNum = i + 1;
+                      final isTaken = takenWeekdays.contains(dayNum);
                       return DropdownMenuItem(
-                        value: i + 1,
+                        value: dayNum,
+                        enabled: !isTaken,
                         child: Text(
-                          weekdays[i],
-                          style: TextStyle(color: colors.textPrimary),
+                          isTaken ? '${weekdays[i]} (already in plan)' : weekdays[i],
+                          style: TextStyle(
+                            color: isTaken ? colors.textSecondary.withOpacity(0.4) : colors.textPrimary,
+                          ),
                         ),
                       );
                     }),

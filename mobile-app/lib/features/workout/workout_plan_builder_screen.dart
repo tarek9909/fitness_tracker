@@ -131,9 +131,22 @@ class _WorkoutPlanBuilderScreenState extends State<WorkoutPlanBuilderScreen> {
   Future<void> _editDay({Map<String, dynamic>? existing}) async {
     final versionId = _asInt(_version?['id']);
     if (versionId == null) return;
+
+    final existingWeekdays = _days.map((d) => _asInt(d['weekday'] ?? d['weekday_number'])).whereType<int>().toSet();
+    if (existing != null) {
+      existingWeekdays.remove(_asInt(existing['weekday'] ?? existing['weekday_number']));
+    }
+    final availableWeekdays = List.generate(7, (i) => i + 1).where((w) => !existingWeekdays.contains(w)).toList();
+    if (existing == null && availableWeekdays.isEmpty) {
+      showPremiumSnackBar(context, 'This plan already has all 7 days of the week configured.', isError: true);
+      return;
+    }
+
     final name = TextEditingController(text: existing?['name']?.toString() ?? '');
     final notes = TextEditingController(text: existing?['notes']?.toString() ?? '');
-    var weekday = _asInt(existing?['weekday'] ?? existing?['weekday_number']) ?? 1;
+    var weekday = existing != null
+        ? (_asInt(existing['weekday'] ?? existing['weekday_number']) ?? 1)
+        : (availableWeekdays.isNotEmpty ? availableWeekdays.first : 1);
     var rest = existing?['is_rest_day'] == 1 || existing?['isRestDay'] == true;
     final saved = await showPremiumDialog<bool>(
       context: context,
@@ -147,7 +160,20 @@ class _WorkoutPlanBuilderScreenState extends State<WorkoutPlanBuilderScreen> {
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
               initialValue: weekday,
-              items: List.generate(7, (index) => DropdownMenuItem(value: index + 1, child: Text('Day ${index + 1}'))),
+              items: List.generate(7, (index) {
+                final dayNum = index + 1;
+                final isTaken = existingWeekdays.contains(dayNum);
+                return DropdownMenuItem(
+                  value: dayNum,
+                  enabled: !isTaken,
+                  child: Text(
+                    isTaken ? 'Day $dayNum (already in plan)' : 'Day $dayNum',
+                    style: TextStyle(
+                      color: isTaken ? colors.textSecondary.withOpacity(0.4) : colors.textPrimary,
+                    ),
+                  ),
+                );
+              }),
               onChanged: (value) => setState(() => weekday = value ?? weekday),
             ),
             SwitchListTile(title: const Text('Rest day'), value: rest, onChanged: (value) => setState(() => rest = value)),

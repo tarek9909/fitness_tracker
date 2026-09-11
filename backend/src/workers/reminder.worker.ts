@@ -608,8 +608,16 @@ export class ReminderWorker {
   }
 }
 
-// Entrypoint when invoked directly via CLI
-if (process.argv[1]?.includes('reminder.worker')) {
+// Entrypoint when invoked directly via CLI or PM2 process manager
+const isMainWorker =
+  !process.env.VITEST &&
+  (
+    process.argv[1]?.includes('reminder.worker') ||
+    process.env.pm_exec_path?.includes('reminder.worker') ||
+    process.env.name === 'fitness-worker'
+  );
+
+if (isMainWorker) {
   const worker = new ReminderWorker();
 
   const shutdown = async (signal: string) => {
