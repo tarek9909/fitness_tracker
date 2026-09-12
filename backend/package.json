@@ -25,6 +25,7 @@
     "migrate": "tsx src/database/migrate.ts",
     "migrate:prod": "node dist/database/migrate.js",
     "reset:dev": "tsx src/scripts/reset-dev-db.ts",
+    "seed:prod": "tsx src/scripts/seed-tarek-production.ts",
     "db:dump": "tsx src/scripts/export-database-dump.ts"
   },
   "keywords": [
