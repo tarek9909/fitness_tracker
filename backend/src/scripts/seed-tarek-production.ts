@@ -604,9 +604,9 @@ export async function applyTarekProductionSeed() {
         // Insert sets
         for (const s of exDef.sets) {
           await db.execute(
-            `INSERT INTO workout_plan_exercise_sets (workout_plan_exercise_id, set_number, target_reps_min, target_reps_max, rest_seconds, set_order)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [wpeRow.id, s.setNumber, s.repsMin, s.repsMax, s.restSeconds, s.setNumber]
+            `INSERT INTO workout_plan_exercise_sets (workout_plan_exercise_id, set_number, target_reps_min, target_reps_max, rest_seconds)
+             VALUES (?, ?, ?, ?, ?)`,
+            [wpeRow.id, s.setNumber, s.repsMin, s.repsMax, s.restSeconds]
           );
         }
       }
