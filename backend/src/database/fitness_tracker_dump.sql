@@ -1,6 +1,6 @@
 -- =====================================================================
 -- FITNESS TRACKING PLATFORM - COMPLETE PRODUCTION DATABASE DUMP
--- Generated: 2026-09-06T17:40:50.689Z
+-- Generated: 2026-09-12T19:00:18.676Z
 -- Target Engine: MySQL 8.x / MariaDB 10.5+
 --
 -- Usage Instructions:
@@ -349,6 +349,7 @@ CREATE TABLE IF NOT EXISTS workout_plan_days (
     day_order INT UNSIGNED NOT NULL,
     description TEXT NULL,
     is_rest_day BOOLEAN NOT NULL DEFAULT FALSE,
+    notes TEXT NULL,
     created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     CONSTRAINT uq_workout_plan_day_weekday UNIQUE (workout_plan_version_id, weekday),
@@ -822,7 +823,7 @@ CREATE TABLE IF NOT EXISTS meal_logs (
 CREATE TABLE IF NOT EXISTS meal_log_selections (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     meal_log_id BIGINT UNSIGNED NOT NULL,
-    diet_meal_option_group_id BIGINT UNSIGNED NOT NULL,
+    diet_meal_option_group_id BIGINT UNSIGNED NULL,
     diet_meal_option_id BIGINT UNSIGNED NULL,
     group_name_snapshot VARCHAR(150) NOT NULL,
     option_label_snapshot VARCHAR(255) NOT NULL,
@@ -850,14 +851,18 @@ CREATE TABLE IF NOT EXISTS cardio_logs (
     user_cardio_target_id BIGINT UNSIGNED NULL,
     cardio_activity_id BIGINT UNSIGNED NOT NULL,
     activity_name_snapshot VARCHAR(150) NOT NULL,
-    target_date DATE NOT NULL,
+    target_date DATE NULL,
+    cardio_date DATE NULL,
     duration_minutes INT UNSIGNED NOT NULL,
     distance_km DECIMAL(8,2) NULL,
     calories_burned INT UNSIGNED NULL,
     average_speed_kmh DECIMAL(6,2) NULL,
+    speed_kmh DECIMAL(6,2) NULL,
     incline_pct DECIMAL(5,2) NULL,
+    incline DECIMAL(5,2) NULL,
     heart_rate_avg INT UNSIGNED NULL,
     heart_rate_max INT UNSIGNED NULL,
+    started_at DATETIME NULL,
     notes TEXT NULL,
     completed_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -1205,318 +1210,566 @@ CREATE TABLE IF NOT EXISTS auth_webauthn_challenges (
 -- BASELINE DATA & SEED CATALOG INSERTS
 -- =====================================================================
 
--- Table: schema_migrations (8 rows)
+-- Table: schema_migrations (19 rows)
 LOCK TABLES `schema_migrations` WRITE;
 INSERT IGNORE INTO `schema_migrations` (`version`, `applied_at`) VALUES
-  ('001-initial-schema', '2026-09-03 18:03:08'),
-  ('002-workout-sessions-unique-user-date', '2026-09-03 18:03:08'),
-  ('003-worker-locks-table', '2026-09-03 18:03:08'),
-  ('004-harmonize-schema-columns', '2026-09-03 18:03:08'),
-  ('005-self-service-and-rir-removal', '2026-09-03 18:03:08'),
-  ('006-cardio-and-plan-validation-compatibility', '2026-09-06 13:06:37'),
-  ('007-passkey-authentication-tables', '2026-09-06 13:06:37'),
-  ('008-passkey-credential-format-and-plan-set-compatibility', '2026-09-06 13:09:35');
+  ('001-initial-schema', '2026-09-12 19:00:00'),
+  ('002-workout-sessions-unique-user-date', '2026-09-12 19:00:00'),
+  ('003-worker-locks-table', '2026-09-12 19:00:00'),
+  ('004-harmonize-schema-columns', '2026-09-12 19:00:00'),
+  ('005-self-service-and-rir-removal', '2026-09-12 19:00:00'),
+  ('006-cardio-and-plan-validation-compatibility', '2026-09-12 19:00:00'),
+  ('007-passkey-authentication-tables', '2026-09-12 19:00:00'),
+  ('008-passkey-credential-format-and-plan-set-compatibility', '2026-09-12 19:00:00'),
+  ('009-daily-tasks-and-runtime-columns', '2026-09-12 19:00:00'),
+  ('010-realign-runtime-tables', '2026-09-12 19:00:00'),
+  ('011-workout-plan-days-and-exercises', '2026-09-12 19:00:00'),
+  ('012-meal-log-selections-nullable-group', '2026-09-12 19:00:00'),
+  ('013-seed-baseline-foods-if-empty', '2026-09-12 19:00:00'),
+  ('014-workout-plan-exercise-sets-columns', '2026-09-12 19:00:00'),
+  ('015-seed-baseline-cardio-activities-if-empty', '2026-09-12 19:00:00'),
+  ('016-reminder-rules-canonical-columns', '2026-09-12 19:00:00'),
+  ('017-seed-baseline-cardio-activities-canonical', '2026-09-12 19:00:00'),
+  ('018-notifications-canonical-columns', '2026-09-12 19:00:00'),
+  ('019-cardio-logs-canonical-columns', '2026-09-12 19:00:00');
 UNLOCK TABLES;
 
 -- Table: roles (3 rows)
 LOCK TABLES `roles` WRITE;
 INSERT IGNORE INTO `roles` (`id`, `name`, `description`, `created_at`, `updated_at`) VALUES
-  (1, 'super_admin', 'Full platform administrative control', '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (2, 'admin', 'Plan builder and client manager', '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (3, 'user', 'Fitness tracking client application user', '2026-09-03 18:03:08', '2026-09-03 18:03:08');
+  (1, 'super_admin', 'Full platform administrative control', '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (2, 'admin', 'Plan builder and client manager', '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (3, 'user', 'Fitness tracking client application user', '2026-09-12 19:00:00', '2026-09-12 19:00:00');
 UNLOCK TABLES;
 
 -- Table: measurement_units (9 rows)
 LOCK TABLES `measurement_units` WRITE;
 INSERT IGNORE INTO `measurement_units` (`id`, `code`, `name`, `unit_type`, `is_active`, `created_at`, `updated_at`, `base_unit`) VALUES
-  (1, 'g', 'Grams', 'mass', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 0),
-  (2, 'kg', 'Kilograms', 'mass', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 0),
-  (3, 'ml', 'Milliliters', 'volume', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 0),
-  (4, 'l', 'Liters', 'volume', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 0),
-  (5, 'serving', 'Serving', 'serving', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 0),
-  (6, 'item', 'Item / Piece', 'count', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 0),
-  (7, 'km', 'Kilometers', 'distance', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 0),
-  (8, 'minute', 'Minutes', 'time', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 0),
-  (9, 'second', 'Seconds', 'time', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 0);
+  (1, 'g', 'Grams', 'mass', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 0),
+  (2, 'kg', 'Kilograms', 'mass', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 0),
+  (3, 'ml', 'Milliliters', 'volume', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 0),
+  (4, 'l', 'Liters', 'volume', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 0),
+  (5, 'serving', 'Serving', 'serving', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 0),
+  (6, 'item', 'Item / Piece', 'count', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 0),
+  (7, 'km', 'Kilometers', 'distance', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 0),
+  (8, 'minute', 'Minutes', 'time', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 0),
+  (9, 'second', 'Seconds', 'time', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 0);
 UNLOCK TABLES;
 
 -- Table: muscle_groups (11 rows)
 LOCK TABLES `muscle_groups` WRITE;
 INSERT IGNORE INTO `muscle_groups` (`id`, `name`, `is_active`, `created_at`, `updated_at`) VALUES
-  (1, 'Chest', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (2, 'Back', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (3, 'Shoulders', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (4, 'Biceps', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (5, 'Triceps', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (6, 'Quadriceps', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (7, 'Hamstrings', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (8, 'Glutes', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (9, 'Calves', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (10, 'Core', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (11, 'Cardio / Full Body', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08');
+  (1, 'Chest', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (2, 'Back', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (3, 'Shoulders', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (4, 'Biceps', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (5, 'Triceps', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (6, 'Quadriceps', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (7, 'Hamstrings', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (8, 'Glutes', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (9, 'Calves', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (10, 'Core', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (11, 'Cardio / Full Body', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00');
 UNLOCK TABLES;
 
 -- Table: equipment_types (7 rows)
 LOCK TABLES `equipment_types` WRITE;
 INSERT IGNORE INTO `equipment_types` (`id`, `name`, `description`, `is_active`, `created_at`, `updated_at`) VALUES
-  (1, 'Barbell', NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (2, 'Dumbbell', NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (3, 'Cable Machine', NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (4, 'Plate Loaded / Machine', NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (5, 'Bodyweight', NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (6, 'Cardio Machine', NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (7, 'Resistance Band', NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08');
+  (1, 'Barbell', NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (2, 'Dumbbell', NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (3, 'Cable Machine', NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (4, 'Plate Loaded / Machine', NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (5, 'Bodyweight', NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (6, 'Cardio Machine', NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (7, 'Resistance Band', NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00');
 UNLOCK TABLES;
 
--- Table: exercises (12 rows)
+-- Table: exercises (32 rows)
 LOCK TABLES `exercises` WRITE;
 INSERT IGNORE INTO `exercises` (`id`, `name`, `description`, `equipment_type_id`, `tracking_type`, `instructions`, `video_url`, `is_active`, `created_by`, `created_at`, `updated_at`, `primary_muscle_group_id`, `secondary_muscle_group_id`, `is_custom`, `is_archived`) VALUES
-  (1, 'Barbell Bench Press', 'Compound horizontal chest press', 1, 'weight_reps', 'Lower bar to mid-chest, drive feet into floor, press up without flaring elbows.', NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, 0, 0),
-  (2, 'Incline Dumbbell Press', 'Upper chest hypertrophy movement', 2, 'weight_reps', 'Set bench to 30 degrees. Press dumbbells up in a slight arc.', NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, 0, 0),
-  (3, 'Barbell Back Squat', 'Fundamental compound lower body exercise', 1, 'weight_reps', 'Descend until hip crease is below top of knees. Maintain neutral spine.', NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, 0, 0),
-  (4, 'Leg Press 45°', 'Quad-dominant machine press', 4, 'weight_reps', 'Place feet shoulder-width on platform. Lower sled under control.', NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, 0, 0),
-  (5, 'Romanian Deadlift (RDL)', 'Posterior chain builder targeting hamstrings and glutes', 1, 'weight_reps', 'Hinge at the hips with slight knee bend, lowering barbell along shins.', NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, 0, 0),
-  (6, 'Lat Pulldown (Wide Grip)', 'Vertical back pulling exercise', 3, 'weight_reps', 'Pull bar smoothly to upper chest, retracting shoulder blades.', NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, 0, 0),
-  (7, 'Barbell Bent-Over Row', 'Horizontal compound back pull', 1, 'weight_reps', 'Hinge torso to 45 degrees, row bar to lower ribcage.', NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, 0, 0),
-  (8, 'Standing Overhead Dumbbell Press', 'Deltoid vertical pressing movement', 2, 'weight_reps', 'Press dumbbells overhead from shoulder height, core braced.', NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, 0, 0),
-  (9, 'Dumbbell Lateral Raise', 'Side deltoid isolation', 2, 'weight_reps', 'Raise dumbbells out to sides until parallel to floor. Slight forward lean.', NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, 0, 0),
-  (10, 'Barbell Bicep Curl', 'Bicep isolation', 1, 'weight_reps', 'Curl bar up keeping elbows pinned at sides.', NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, 0, 0),
-  (11, 'Tricep Cable Rope Pushdown', 'Tricep isolation', 3, 'weight_reps', 'Extend elbows fully and spread rope at the bottom.', NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, 0, 0),
-  (12, 'Plank Hold', 'Isometric core endurance', 5, 'duration', 'Hold rigid pushup or forearm position without sagging hips.', NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, 0, 0);
+  (1, 'Barbell Bench Press', 'Compound horizontal chest press', 1, 'weight_reps', 'Lower bar to mid-chest, drive feet into floor, press up without flaring elbows.', 'https://www.youtube.com/results?search_query=barbell+bench+press+proper+form', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (2, 'Incline Dumbbell Press', 'Upper chest hypertrophy movement', 2, 'weight_reps', 'Set bench to 30 degrees. Press dumbbells up in a slight arc.', 'https://www.youtube.com/results?search_query=incline+dumbbell+press+proper+form', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (3, 'Barbell Back Squat', 'Fundamental compound lower body exercise', 1, 'weight_reps', 'Descend until hip crease is below top of knees. Maintain neutral spine.', 'https://www.youtube.com/results?search_query=barbell+back+squat+proper+form', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (4, 'Leg Press 45°', 'Quad-dominant machine press', 4, 'weight_reps', 'Place feet shoulder-width on platform. Lower sled under control.', 'https://www.youtube.com/results?search_query=leg+press+proper+form', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (5, 'Romanian Deadlift (RDL)', 'Posterior chain builder targeting hamstrings and glutes', 1, 'weight_reps', 'Hinge at the hips with slight knee bend, lowering barbell along shins.', 'https://www.youtube.com/results?search_query=romanian+deadlift+proper+form', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (6, 'Lat Pulldown (Wide Grip)', 'Vertical back pulling exercise', 3, 'weight_reps', 'Pull bar smoothly to upper chest, retracting shoulder blades.', 'https://www.youtube.com/results?search_query=lat+pulldown+wide+grip+form', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (7, 'Barbell Bent-Over Row', 'Horizontal compound back pull', 1, 'weight_reps', 'Hinge torso to 45 degrees, row bar to lower ribcage.', 'https://www.youtube.com/results?search_query=barbell+bent+over+row+proper+form', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (8, 'Standing Overhead Dumbbell Press', 'Deltoid vertical pressing movement', 2, 'weight_reps', 'Press dumbbells overhead from shoulder height, core braced.', 'https://www.youtube.com/results?search_query=standing+overhead+dumbbell+press+form', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (9, 'Dumbbell Lateral Raise', 'Side deltoid isolation', 2, 'weight_reps', 'Raise dumbbells out to sides until parallel to floor. Slight forward lean.', 'https://www.youtube.com/results?search_query=dumbbell+lateral+raise+proper+form', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (10, 'Barbell Bicep Curl', 'Bicep isolation', 1, 'weight_reps', 'Curl bar up keeping elbows pinned at sides.', 'https://www.youtube.com/results?search_query=barbell+bicep+curl+form', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (11, 'Rope Triceps Pushdown', 'Tricep cable isolation using rope attachment', 3, 'weight_reps', 'Extend elbows fully and spread rope at the bottom. Keep elbows pinned at sides.', 'https://www.youtube.com/results?search_query=rope+triceps+pushdown+proper+form+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (12, 'Plank Hold', 'Isometric core endurance', 5, 'duration', 'Hold rigid pushup or forearm position without sagging hips.', 'https://www.youtube.com/results?search_query=plank+hold+proper+form', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (13, 'Machine Chest Press', 'Chest press on machine providing stable path and controlled loading', 4, 'weight_reps', 'Set seat height so handles align with mid-chest. Press smoothly without locking elbows.', 'https://www.youtube.com/results?search_query=machine+chest+press+proper+form+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (14, 'Neutral-Grip Lat Pulldown', 'Vertical pulling movement utilizing neutral grip for joint-friendly lat activation', 3, 'weight_reps', 'Grip neutral handles, pull elbows down toward hips while keeping chest tall.', 'https://www.youtube.com/results?search_query=neutral+grip+lat+pulldown+proper+form+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (15, 'Chest-Supported Row', 'Horizontal row with supported chest eliminating lower back stress', 4, 'weight_reps', 'Keep chest firmly supported on pad. Row elbows back and squeeze shoulder blades.', 'https://www.youtube.com/results?search_query=chest+supported+row+proper+form+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (16, 'Cable Lateral Raise', 'Side deltoid exercise with constant cable resistance profile', 3, 'weight_reps', 'Set cable to wrist height or lowest setting. Raise arm out to side until parallel to floor.', 'https://www.youtube.com/results?search_query=cable+lateral+raise+proper+form+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (17, 'Rope Face Pull', 'Upper back and rear deltoid builder protecting shoulder health', 3, 'weight_reps', 'Attach rope high. Pull towards forehead/eyes and rotate hands back externally.', 'https://www.youtube.com/results?search_query=E3+Rehab+face+pull+exercise+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (18, 'Cable Biceps Curl', 'Constant tension cable curl for bicep hypertrophy', 3, 'weight_reps', 'Maintain upright posture, pin elbows at sides, and curl attachment smoothly upward.', 'https://www.youtube.com/results?search_query=cable+biceps+curl+proper+form+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (19, 'Hack Squat / Leg Press', 'Lower body compound builder focusing on quadriceps and glutes with back support', 4, 'weight_reps', 'Place feet shoulder-width on platform. Lower sled under control until knees reach 90 degrees.', 'https://www.youtube.com/results?search_query=leg+press+hack+squat+proper+form+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (20, 'Supported Bulgarian Split Squat', 'Unilateral quad and glute exercise with stable hand support', 2, 'weight_reps', 'Place rear foot on bench. Use hand on rack for balance if needed. Lower until front thigh is parallel.', 'https://www.youtube.com/results?search_query=supported+Bulgarian+split+squat+proper+form+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (21, 'Hip Thrust', 'Primary glute builder with back elevated against bench', 4, 'weight_reps', 'Rest upper back across bench. Drive through heels to full hip extension, tucking chin.', 'https://www.youtube.com/results?search_query=hip+thrust+proper+form+tutorial+neutral+spine', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (22, 'Seated Leg Curl', 'Hamstring isolation in stretched hip flexion position', 4, 'weight_reps', 'Lock thigh pad securely. Curl heels back under thighs and control the return.', 'https://www.youtube.com/results?search_query=seated+leg+curl+proper+form+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (23, 'Leg Extension', 'Direct quadriceps isolation movement', 4, 'weight_reps', 'Align knee joints with machine pivot point. Extend legs fully with a 1-second squeeze at top.', 'https://www.youtube.com/results?search_query=leg+extension+proper+form+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (24, 'Standing Calf Raise', 'Gastrocnemius calf isolation through full plantarflexion range', 4, 'weight_reps', 'Lower heels for a deep 2-second calf stretch, then rise onto balls of feet explosively.', 'https://www.youtube.com/results?search_query=calf+raise+proper+form+full+range+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (25, 'Pallof Press', 'Anti-rotation core stability exercise resisting rotational torque', 3, 'weight_reps', 'Hold cable handle at chest level with side-on stance. Press straight out and resist rotation.', 'https://www.youtube.com/results?search_query=E3+Rehab+Pallof+press+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (26, 'Supported Reverse Lunge', 'Joint-friendly unilateral lower body exercise with support', 2, 'weight_reps', 'Step back into a controlled lunge. Lightly support hand on frame for stability.', 'https://www.youtube.com/results?search_query=supported+reverse+lunge+proper+form+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (27, 'Incline Machine Chest Press', 'Upper clavicular chest hypertrophy variation with fixed path', 4, 'weight_reps', 'Adjust seat so handles align with upper chest. Press up smoothly along incline path.', 'https://www.youtube.com/results?search_query=incline+machine+chest+press+proper+form+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (28, 'Single-Arm Landmine Press', 'Angled unilateral shoulder and chest press friendly on shoulder joint', 1, 'weight_reps', 'Hold end of barbell at shoulder. Press upward and forward at natural angle without overarching.', 'https://www.youtube.com/results?search_query=E3+Rehab+single+arm+landmine+press+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (29, 'Pec-Deck Fly', 'Direct chest fly isolation with continuous peak contraction', 4, 'weight_reps', 'Maintain slight elbow bend. Sweep arms together across chest, emphasizing peak contraction.', 'https://www.youtube.com/results?search_query=pec+deck+fly+proper+form+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (30, 'Seated Cable Row', 'Horizontal compound back pull with neutral grip', 3, 'weight_reps', 'Sit tall with knees slightly bent. Pull handle to upper abdomen while keeping chest high.', 'https://www.youtube.com/results?search_query=seated+cable+row+proper+form+neutral+spine+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (31, 'Reverse Pec-Deck', 'Posterior deltoid and upper back isolation', 4, 'weight_reps', 'Face machine pad. Move arms outward and back horizontally, leading with elbows.', 'https://www.youtube.com/results?search_query=reverse+pec+deck+proper+form+rear+delts+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0),
+  (32, 'Chest-Supported Dumbbell Shrug', 'Upper trapezius builder performed prone on incline bench', 2, 'weight_reps', 'Lie chest-down on incline bench. Shrug shoulders upward towards ears without rolling.', 'https://www.youtube.com/results?search_query=chest+supported+dumbbell+shrug+proper+form+tutorial', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, 0, 0);
 UNLOCK TABLES;
 
--- Table: exercise_muscle_groups (12 rows)
+-- Table: exercise_muscle_groups (32 rows)
 LOCK TABLES `exercise_muscle_groups` WRITE;
 INSERT IGNORE INTO `exercise_muscle_groups` (`exercise_id`, `muscle_group_id`, `is_primary`, `created_at`) VALUES
-  (1, 1, 1, '2026-09-03 18:03:08'),
-  (2, 1, 1, '2026-09-03 18:03:08'),
-  (3, 6, 1, '2026-09-03 18:03:08'),
-  (4, 6, 1, '2026-09-03 18:03:08'),
-  (5, 7, 1, '2026-09-03 18:03:08'),
-  (6, 2, 1, '2026-09-03 18:03:08'),
-  (7, 2, 1, '2026-09-03 18:03:08'),
-  (8, 3, 1, '2026-09-03 18:03:08'),
-  (9, 3, 1, '2026-09-03 18:03:08'),
-  (10, 4, 1, '2026-09-03 18:03:08'),
-  (11, 5, 1, '2026-09-03 18:03:08'),
-  (12, 10, 1, '2026-09-03 18:03:08');
+  (1, 1, 1, '2026-09-12 19:00:00'),
+  (2, 1, 1, '2026-09-12 19:00:00'),
+  (3, 6, 1, '2026-09-12 19:00:00'),
+  (4, 6, 1, '2026-09-12 19:00:00'),
+  (5, 7, 1, '2026-09-12 19:00:00'),
+  (6, 2, 1, '2026-09-12 19:00:00'),
+  (7, 2, 1, '2026-09-12 19:00:00'),
+  (8, 3, 1, '2026-09-12 19:00:00'),
+  (9, 3, 1, '2026-09-12 19:00:00'),
+  (10, 4, 1, '2026-09-12 19:00:00'),
+  (11, 5, 1, '2026-09-12 19:00:00'),
+  (12, 10, 1, '2026-09-12 19:00:00'),
+  (13, 1, 1, '2026-09-12 19:00:00'),
+  (14, 2, 1, '2026-09-12 19:00:00'),
+  (15, 2, 1, '2026-09-12 19:00:00'),
+  (16, 3, 1, '2026-09-12 19:00:00'),
+  (17, 3, 1, '2026-09-12 19:00:00'),
+  (18, 4, 1, '2026-09-12 19:00:00'),
+  (19, 6, 1, '2026-09-12 19:00:00'),
+  (20, 6, 1, '2026-09-12 19:00:00'),
+  (21, 8, 1, '2026-09-12 19:00:00'),
+  (22, 7, 1, '2026-09-12 19:00:00'),
+  (23, 6, 1, '2026-09-12 19:00:00'),
+  (24, 9, 1, '2026-09-12 19:00:00'),
+  (25, 10, 1, '2026-09-12 19:00:00'),
+  (26, 6, 1, '2026-09-12 19:00:00'),
+  (27, 1, 1, '2026-09-12 19:00:00'),
+  (28, 3, 1, '2026-09-12 19:00:00'),
+  (29, 1, 1, '2026-09-12 19:00:00'),
+  (30, 2, 1, '2026-09-12 19:00:00'),
+  (31, 3, 1, '2026-09-12 19:00:00'),
+  (32, 2, 1, '2026-09-12 19:00:00');
 UNLOCK TABLES;
 
--- Table: foods (12 rows)
+-- Table: foods (29 rows)
 LOCK TABLES `foods` WRITE;
 INSERT IGNORE INTO `foods` (`id`, `name`, `brand`, `reference_quantity`, `reference_unit_id`, `calories`, `protein_g`, `carbs_g`, `fat_g`, `fiber_g`, `notes`, `is_active`, `created_by`, `created_at`, `updated_at`, `serving_unit`, `serving_size`, `calories_per_serving`, `protein_grams`, `carbs_grams`, `fat_grams`, `fiber_grams`, `sugar_grams`, `is_system`, `is_verified`) VALUES
-  (1, 'Skinless Chicken Breast (Cooked)', NULL, 100, 1, 165, 31, 0, 3.6, 0, NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
-  (2, 'Brown Rice (Cooked)', NULL, 100, 1, 111, 2.6, 23, 0.9, 1.8, NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
-  (3, 'Rolled Oats (Dry)', NULL, 100, 1, 389, 16.9, 66.3, 6.9, 10.6, NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
-  (4, 'Whole Large Egg', NULL, 1, 6, 72, 6.3, 0.4, 4.8, 0, NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
-  (5, 'Liquid Egg Whites', NULL, 100, 1, 52, 10.9, 0.7, 0.2, 0, NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
-  (6, 'Whey Protein Isolate Powder', NULL, 1, 5, 120, 24, 2, 1, 0, NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
-  (7, 'Greek Yogurt 0% Fat', NULL, 100, 1, 59, 10, 3.6, 0.4, 0, NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
-  (8, 'Raw Whole Almonds', NULL, 30, 1, 170, 6, 6, 15, 3.5, NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
-  (9, 'Medium Banana', NULL, 1, 6, 105, 1.3, 27, 0.3, 3.1, NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
-  (10, 'Extra Virgin Olive Oil', NULL, 10, 1, 88, 0, 0, 10, 0, NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
-  (11, 'Lean Ground Beef 93/7', NULL, 100, 1, 152, 21.4, 0, 7.3, 0, NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
-  (12, 'Sweet Potato (Baked)', NULL, 100, 1, 90, 2, 20.7, 0.1, 3.3, NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0);
+  (1, 'Skinless Chicken Breast (Cooked)', NULL, 100, 1, 165, 31, 0, 3.6, 0, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (2, 'Brown Rice (Cooked)', NULL, 100, 1, 111, 2.6, 23, 0.9, 1.8, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (3, 'Rolled Oats (Dry)', NULL, 100, 1, 389, 16.9, 66.3, 6.9, 10.6, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (4, 'Whole Large Egg', NULL, 1, 6, 72, 6.3, 0.4, 4.8, 0, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (5, 'Liquid Egg Whites', NULL, 100, 1, 52, 10.9, 0.7, 0.2, 0, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (6, 'Whey Protein Isolate Powder', NULL, 1, 5, 120, 24, 2, 1, 0, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (7, 'Greek Yogurt 0% Fat', NULL, 100, 1, 59, 10, 3.6, 0.4, 0, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (8, 'Raw Whole Almonds', NULL, 30, 1, 170, 6, 6, 15, 3.5, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (9, 'Medium Banana', NULL, 1, 6, 105, 1.3, 27, 0.3, 3.1, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (10, 'Extra Virgin Olive Oil', NULL, 10, 1, 88, 0, 0, 10, 0, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (11, 'Lean Ground Beef 93/7', NULL, 100, 1, 152, 21.4, 0, 7.3, 0, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (12, 'Sweet Potato (Baked)', NULL, 100, 1, 90, 2, 20.7, 0.1, 3.3, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (13, 'Medium French Bread / خبز فرنجي وسط', NULL, 1, 6, 140, 4.5, 28, 1, 1.2, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (14, 'Oat Bread / خبز شوفان', NULL, 1, 6, 120, 4.5, 22, 1.5, 3, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (15, 'Boiled Potato / بطاطا مسلوقة', NULL, 100, 1, 87, 1.9, 20.1, 0.1, 1.8, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (16, 'Low Fat White Cheese / جبنة بيضاء قليلة الدسم', NULL, 100, 1, 180, 20, 2, 10, 0, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (17, 'Traditional Labneh / لبنة', NULL, 100, 1, 110, 9, 4, 6, 0, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (18, 'Smoked Turkey Breast / صدر حبش مدخن', NULL, 100, 1, 105, 22, 1.5, 1.5, 0, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (19, 'Boiled Pasta / معكرونة مسلوقة', NULL, 100, 1, 158, 5.8, 30.9, 0.9, 1.8, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (20, 'Grilled Chicken Escalope / اسكالوب دجاج مشوي', NULL, 100, 1, 170, 26, 6, 4, 0.5, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (21, 'Grilled Shish Tawook / شيش طاووق مشوي', NULL, 100, 1, 150, 25, 2, 4.5, 0, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (22, 'Lean Beef Steak / ستيك عجل قليل الدهن', NULL, 100, 1, 160, 26, 0, 6, 0, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (23, 'Grilled Fish Fillet / سمك فيليه مشوي', NULL, 100, 1, 110, 23, 0, 2, 0, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (24, 'Crab Sticks / أصابع كراب', NULL, 100, 1, 95, 15, 7, 0.5, 0, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (25, 'Light Halloumi Cheese / جبنة حلوم لايت', NULL, 100, 1, 260, 21, 2, 19, 0, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (26, 'Skim Milk / حليب خالي الدسم', NULL, 240, 3, 86, 8.4, 12.2, 0.2, 0, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (27, 'Fresh Fruit Serving / حصة فاكهة طازجة', NULL, 1, 5, 80, 1, 20, 0.3, 3, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (28, 'Fresh Garden Salad / سلطة خضراء', NULL, 1, 5, 35, 1.8, 7, 0.4, 2.5, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0),
+  (29, 'Steamed or Raw Vegetables / خضار مسلوقة أو طازجة', NULL, 1, 5, 35, 2, 7, 0.3, 3, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0);
 UNLOCK TABLES;
 
--- Table: cardio_activities (5 rows)
+-- Table: cardio_activities (6 rows)
 LOCK TABLES `cardio_activities` WRITE;
 INSERT IGNORE INTO `cardio_activities` (`id`, `name`, `description`, `supports_speed`, `supports_incline`, `supports_distance`, `is_active`, `created_at`, `updated_at`, `met_value`, `is_system`) VALUES
-  (1, 'Treadmill Incline Walking', NULL, 1, 1, 1, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, 1),
-  (2, 'Stationary Cycling', NULL, 1, 0, 1, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, 1),
-  (3, 'Rowing Machine', NULL, 1, 0, 1, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, 1),
-  (4, 'Outdoor Running', NULL, 1, 0, 1, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, 1),
-  (5, 'Stair Climber', NULL, 1, 0, 0, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, 1);
+  (1, 'Treadmill Incline Walking', NULL, 1, 1, 1, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, 1),
+  (2, 'Stationary Cycling', NULL, 1, 0, 1, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, 1),
+  (3, 'Rowing Machine', NULL, 1, 0, 1, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, 1),
+  (4, 'Outdoor Running', NULL, 1, 0, 1, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, 1),
+  (5, 'Stair Climber', NULL, 1, 0, 0, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, 1),
+  (6, 'Walking', NULL, 1, 1, 1, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, 1);
 UNLOCK TABLES;
 
--- Table: users (3 rows)
+-- Table: users (4 rows)
 LOCK TABLES `users` WRITE;
 INSERT IGNORE INTO `users` (`id`, `role_id`, `first_name`, `last_name`, `email`, `password_hash`, `phone`, `date_of_birth`, `height_cm`, `gender`, `timezone`, `locale`, `status`, `security_version`, `email_verified_at`, `unit_system`, `last_login_at`, `created_at`, `updated_at`) VALUES
-  (1, 1, 'Platform', 'Administrator', 'admin@fitnessplatform.com', '$2a$10$YAd3wnXxZtxq7Ap94p/SauvmDPiO0lRXBMvhfFzZkJUgkMCmbdVa6', NULL, NULL, 182, NULL, 'UTC', 'en', 'active', 1, NULL, 'metric', NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (2, 3, 'John', 'Doe', 'john.doe@fitnessplatform.com', '$2a$10$QFZFZJ4QIApMVHDulOirpeF/bDVKXUxmTMyjVGtiCIrnfrYHCKp.y', NULL, NULL, 180, NULL, 'UTC', 'en', 'active', 1, NULL, 'metric', NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (3, 3, 'Tarek', 'Aswad', 'tarek.aswad@fitnessplatform.com', '$2a$10$pSC8XRHwf4h8eRmqqJT/n.w9gk0WNXZ1jQxUfWQqvtxqRNdB4ig5O', NULL, NULL, 180, NULL, 'Asia/Beirut', 'en', 'active', 1, NULL, 'metric', '2026-09-06 13:34:46', '2026-09-03 23:23:01', '2026-09-03 23:23:01');
+  (1, 1, 'Platform', 'Administrator', 'admin@fitnessplatform.com', '$2a$10$XEesheGnWGlPREp0bu.GIekzQC2G.w76Y7E1tuHzsT6fz99lhEn8O', NULL, NULL, 182, NULL, 'UTC', 'en', 'active', 1, NULL, 'metric', NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (2, 3, 'John', 'Doe', 'john.doe@fitnessplatform.com', '$2a$10$GgzdQcAEXwY7XY3xqJqB2ORJIHhy8Q26oceGSKazva2Y.bDCAHSFK', NULL, NULL, 180, NULL, 'UTC', 'en', 'active', 1, NULL, 'metric', NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (3, 3, 'Tarek', 'Aswad', 'tarek.aswad@fitnessplatform.com', '$2a$10$DlWfAl685yKqseNQaM6DeeKcjgkMGOtR.zD5Cs7RLN6XTWzc1IIZa', NULL, NULL, 180, NULL, 'Asia/Beirut', 'en', 'active', 1, NULL, 'metric', NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (4, 3, 'Tarek', 'Aswad', 'aswadt12@gmail.com', '$2a$10$gkxR3WcV9SI4VRYoXc9UWeS6iitNjz2YalsEvpuQQUixifX1y6pme', NULL, NULL, 180, NULL, 'Asia/Beirut', 'en', 'active', 1, NULL, 'metric', NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00');
 UNLOCK TABLES;
 
--- Table: user_notification_settings (2 rows)
+-- Table: user_notification_settings (3 rows)
 LOCK TABLES `user_notification_settings` WRITE;
 INSERT IGNORE INTO `user_notification_settings` (`user_id`, `in_app_enabled`, `push_enabled`, `local_notifications_enabled`, `quiet_hours_enabled`, `quiet_hours_start`, `quiet_hours_end`, `created_at`, `updated_at`) VALUES
-  (2, 1, 1, 1, 0, NULL, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (3, 1, 1, 1, 0, NULL, NULL, '2026-09-03 23:23:11', '2026-09-03 23:23:11');
+  (2, 1, 1, 1, 0, NULL, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (3, 1, 1, 1, 0, NULL, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (4, 1, 1, 1, 0, NULL, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00');
 UNLOCK TABLES;
 
--- Table: user_adherence_configs (2 rows)
+-- Table: user_adherence_configs (3 rows)
 LOCK TABLES `user_adherence_configs` WRITE;
 INSERT IGNORE INTO `user_adherence_configs` (`id`, `user_id`, `diet_weight_pct`, `workout_weight_pct`, `cardio_weight_pct`, `water_weight_pct`, `weight_logging_weight_pct`, `effective_from`, `effective_until`, `is_active`, `created_at`, `updated_at`) VALUES
-  (1, 2, 35, 25, 15, 15, 10, '2026-01-01', NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (2, 3, 35, 25, 15, 15, 10, '2026-01-01', NULL, 1, '2026-09-03 23:23:11', '2026-09-03 23:23:11');
+  (1, 2, 35, 25, 15, 15, 10, '2026-01-01', NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (2, 3, 35, 25, 15, 15, 10, '2026-01-01', NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (3, 4, 35, 25, 15, 15, 10, '2026-01-01', NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00');
 UNLOCK TABLES;
 
--- Table: user_water_targets (2 rows)
+-- Table: user_water_targets (3 rows)
 LOCK TABLES `user_water_targets` WRITE;
 INSERT IGNORE INTO `user_water_targets` (`id`, `user_id`, `target_ml`, `effective_from`, `effective_until`, `status`, `created_by`, `created_at`, `updated_at`) VALUES
-  (1, 2, 3000, '2026-01-01', NULL, 'active', NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (2, 3, 3500, '2026-01-01', NULL, 'active', NULL, '2026-09-03 23:23:11', '2026-09-03 23:23:11');
+  (1, 2, 3000, '2026-01-01', NULL, 'active', NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (2, 3, 3500, '2026-01-01', NULL, 'active', NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (3, 4, 3500, '2026-01-01', NULL, 'active', NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00');
 UNLOCK TABLES;
 
--- Table: user_water_quick_add_options (8 rows)
+-- Table: user_water_quick_add_options (12 rows)
 LOCK TABLES `user_water_quick_add_options` WRITE;
 INSERT IGNORE INTO `user_water_quick_add_options` (`id`, `user_id`, `amount_ml`, `display_order`, `is_active`, `created_at`) VALUES
-  (1, 2, 250, 1, 1, '2026-09-03 18:03:08'),
-  (2, 2, 500, 2, 1, '2026-09-03 18:03:08'),
-  (3, 2, 750, 3, 1, '2026-09-03 18:03:08'),
-  (4, 2, 1000, 4, 1, '2026-09-03 18:03:08'),
-  (5, 3, 250, 1, 1, '2026-09-03 23:23:11'),
-  (6, 3, 500, 2, 1, '2026-09-03 23:23:11'),
-  (7, 3, 750, 3, 1, '2026-09-03 23:23:11'),
-  (8, 3, 1000, 4, 1, '2026-09-03 23:23:11');
+  (1, 2, 250, 1, 1, '2026-09-12 19:00:00'),
+  (2, 2, 500, 2, 1, '2026-09-12 19:00:00'),
+  (3, 2, 750, 3, 1, '2026-09-12 19:00:00'),
+  (4, 2, 1000, 4, 1, '2026-09-12 19:00:00'),
+  (5, 3, 250, 1, 1, '2026-09-12 19:00:00'),
+  (6, 3, 500, 2, 1, '2026-09-12 19:00:00'),
+  (7, 3, 750, 3, 1, '2026-09-12 19:00:00'),
+  (8, 3, 1000, 4, 1, '2026-09-12 19:00:00'),
+  (9, 4, 250, 1, 1, '2026-09-12 19:00:00'),
+  (10, 4, 500, 2, 1, '2026-09-12 19:00:00'),
+  (11, 4, 750, 3, 1, '2026-09-12 19:00:00'),
+  (12, 4, 1000, 4, 1, '2026-09-12 19:00:00');
 UNLOCK TABLES;
 
--- Table: user_weight_goals (2 rows)
+-- Table: user_weight_goals (3 rows)
 LOCK TABLES `user_weight_goals` WRITE;
 INSERT IGNORE INTO `user_weight_goals` (`id`, `user_id`, `goal_type`, `starting_weight_kg`, `target_weight_kg`, `start_date`, `target_date`, `status`, `notes`, `created_by`, `created_at`, `updated_at`) VALUES
-  (1, 2, 'lose_weight', 92.5, 82, '2026-01-01', '2026-12-31', 'active', NULL, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (2, 3, 'lose_weight', 105.2, 86.3, '2026-01-01', '2026-12-31', 'active', NULL, NULL, '2026-09-03 23:23:11', '2026-09-03 23:23:11');
+  (1, 2, 'lose_weight', 92.5, 82, '2026-01-01', '2026-12-31', 'active', NULL, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (2, 3, 'lose_weight', 105.2, 86.3, '2026-01-01', '2026-12-31', 'active', NULL, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (3, 4, 'lose_weight', 105.2, 86.3, '2026-01-01', '2026-12-31', 'active', NULL, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00');
 UNLOCK TABLES;
 
--- Table: user_cardio_targets (2 rows)
+-- Table: user_cardio_targets (3 rows)
 LOCK TABLES `user_cardio_targets` WRITE;
 INSERT IGNORE INTO `user_cardio_targets` (`id`, `user_id`, `cardio_activity_id`, `target_minutes_min`, `target_minutes_max`, `target_speed_min_kmh`, `target_speed_max_kmh`, `target_incline_min`, `target_incline_max`, `target_distance_min_km`, `target_distance_max_km`, `effective_from`, `effective_until`, `status`, `notes`, `created_by`, `created_at`, `updated_at`) VALUES
-  (1, 2, 2, 25, 35, NULL, NULL, NULL, NULL, NULL, NULL, '2026-01-01', NULL, 'active', NULL, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (2, 3, 2, 30, 40, NULL, NULL, NULL, NULL, NULL, NULL, '2026-01-01', NULL, 'active', NULL, NULL, '2026-09-03 23:23:11', '2026-09-03 23:23:11');
+  (1, 2, 2, 25, 35, NULL, NULL, NULL, NULL, NULL, NULL, '2026-01-01', NULL, 'active', NULL, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (2, 3, 2, 30, 40, NULL, NULL, NULL, NULL, NULL, NULL, '2026-01-01', NULL, 'active', NULL, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (3, 4, 2, 30, 40, NULL, NULL, NULL, NULL, NULL, NULL, '2026-01-01', NULL, 'active', NULL, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00');
 UNLOCK TABLES;
 
 -- Table: user_cardio_target_days (7 rows)
 LOCK TABLES `user_cardio_target_days` WRITE;
 INSERT IGNORE INTO `user_cardio_target_days` (`user_cardio_target_id`, `weekday`, `created_at`) VALUES
-  (1, 1, '2026-09-03 18:03:08'),
-  (1, 3, '2026-09-03 18:03:08'),
-  (1, 5, '2026-09-03 18:03:08'),
-  (2, 1, '2026-09-03 23:23:11'),
-  (2, 2, '2026-09-03 23:23:11'),
-  (2, 4, '2026-09-03 23:23:11'),
-  (2, 5, '2026-09-03 23:23:11');
+  (1, 1, '2026-09-12 19:00:00'),
+  (1, 3, '2026-09-12 19:00:00'),
+  (1, 5, '2026-09-12 19:00:00'),
+  (2, 5, '2026-09-12 19:00:00'),
+  (2, 6, '2026-09-12 19:00:00'),
+  (3, 5, '2026-09-12 19:00:00'),
+  (3, 6, '2026-09-12 19:00:00');
 UNLOCK TABLES;
 
--- Table: workout_plans (1 rows)
+-- Table: workout_plans (2 rows)
 LOCK TABLES `workout_plans` WRITE;
 INSERT IGNORE INTO `workout_plans` (`id`, `name`, `description`, `goal`, `status`, `owner_user_id`, `visibility`, `created_by`, `created_at`, `updated_at`, `is_archived`, `archived_at`) VALUES
-  (1, '4-Day Hypertrophy Split (Upper / Lower)', 'Progressive overload 4-day split balancing strength and hypertrophy', 'hypertrophy', 'active', NULL, 'admin', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 0, NULL);
+  (1, '4-Day Hypertrophy Split (Upper / Lower)', 'Progressive overload 4-day split balancing strength and hypertrophy', 'hypertrophy', 'active', NULL, 'admin', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 0, NULL),
+  (2, '4-Day Gym Program (Fat Loss & Muscle Building)', 'Refined 4-day Upper / Lower / Push / Pull split balancing hypertrophy, strength, and fatigue management with stable machine variations.', 'hypertrophy', 'active', NULL, 'admin', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 0, NULL);
 UNLOCK TABLES;
 
--- Table: workout_plan_versions (1 rows)
+-- Table: workout_plan_versions (2 rows)
 LOCK TABLES `workout_plan_versions` WRITE;
 INSERT IGNORE INTO `workout_plan_versions` (`id`, `workout_plan_id`, `version_number`, `status`, `change_notes`, `published_at`, `created_by`, `published_by`, `created_at`, `updated_at`, `change_summary`) VALUES
-  (1, 1, 1, 'published', 'Initial 4-day Upper/Lower version with periodized volume', '2026-09-03 18:03:08', 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL);
+  (1, 1, 1, 'published', 'Initial 4-day Upper/Lower version with periodized volume', '2026-09-12 19:00:00', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL),
+  (2, 2, 1, 'published', 'Refined Monday-Thursday schedule with combined leg day, full exercise volume, and form guides.', '2026-09-12 19:00:00', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL);
 UNLOCK TABLES;
 
--- Table: workout_plan_days (7 rows)
+-- Table: workout_plan_days (14 rows)
 LOCK TABLES `workout_plan_days` WRITE;
 INSERT IGNORE INTO `workout_plan_days` (`id`, `workout_plan_version_id`, `weekday`, `name`, `description`, `is_rest_day`, `day_order`, `notes`, `created_at`, `updated_at`) VALUES
-  (1, 1, 1, 'Upper Body A', NULL, 0, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (2, 1, 2, 'Lower Body A', NULL, 0, 2, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (3, 1, 3, 'Active Recovery & Rest', NULL, 1, 3, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (4, 1, 4, 'Upper Body B', NULL, 0, 4, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (5, 1, 5, 'Lower Body B', NULL, 0, 5, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (6, 1, 6, 'Weekend Rest Day', NULL, 1, 6, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (7, 1, 7, 'Weekend Rest Day', NULL, 1, 7, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08');
+  (1, 1, 1, 'Upper Body A', 'Baseline upper body strength session', 0, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (2, 1, 2, 'Lower Body A', 'Baseline lower body strength session with core duration hold', 0, 2, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (3, 1, 3, 'Active Recovery & Rest', 'Rest and active recovery', 1, 3, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (4, 1, 4, 'Upper Body B', 'Upper body hypertrophy session', 0, 4, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (5, 1, 5, 'Lower Body B', 'Lower body hypertrophy session', 0, 5, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (6, 1, 6, 'Weekend Rest Day', 'Weekend rest', 1, 6, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (7, 1, 7, 'Weekend Rest Day', 'Weekend rest', 1, 7, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (8, 2, 1, 'Upper Body', 'Balanced upper-body work with stable positions and controlled loading.', 0, 1, 'Technique note: Keep your chest supported during rows and maintain a neutral neck. Stop if an exercise causes sharp or radiating pain.', '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (9, 2, 2, 'Combined Leg Day', 'One complete lower-body session combining the strongest elements of Lower A and Lower B.', 0, 2, 'Technique note: Choose either the leg press or hack squat as the main squat pattern. The reverse lunge is optional; skip it if fatigue or recovery becomes excessive. Keep your hips and lower back supported during machine work.', '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (10, 2, 3, 'Push - Chest, Shoulders, Triceps', 'Chest, shoulders, and triceps using stable pressing variations.', 0, 3, 'Technique note: Keep your head supported and avoid pushing it forward. Replace the landmine press if it aggravates your neck or shoulder.', '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (11, 2, 4, 'Pull - Back, Rear Delts, Biceps', 'Back, rear shoulders, trapezius, and biceps with stable rowing positions.', 0, 4, 'Technique note: Shrug upward without rolling your shoulders. Keep your neck neutral and use controlled repetitions.', '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (12, 2, 5, 'Recovery & Walking', 'Active recovery and steady-state movement.', 1, 5, 'Do 30-40 minutes of easy-to-moderate cardio on Friday or Saturday. Consistency matters more than exhausting cardio sessions.', '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (13, 2, 6, 'Optional Light Cardio / Walking', 'Optional light cardio or walking session.', 1, 6, 'Optional 30-40 minutes easy-to-moderate cardio or walking.', '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (14, 2, 7, 'Full Rest Day', 'Full rest, nervous system recovery, and sleep prioritization.', 1, 7, 'Use Friday through Sunday to recover. Keep at least one full rest day and prioritize regular sleep.', '2026-09-12 19:00:00', '2026-09-12 19:00:00');
 UNLOCK TABLES;
 
--- Table: workout_plan_exercises (9 rows)
+-- Table: workout_plan_exercises (37 rows)
 LOCK TABLES `workout_plan_exercises` WRITE;
 INSERT IGNORE INTO `workout_plan_exercises` (`id`, `workout_plan_day_id`, `exercise_id`, `exercise_order`, `exercise_name_snapshot`, `tracking_type_snapshot`, `target_sets`, `target_reps_min`, `target_reps_max`, `target_duration_seconds`, `target_distance_meters`, `rest_seconds`, `notes`, `is_optional`, `created_at`, `updated_at`) VALUES
-  (1, 1, 1, 1, 'Flat Barbell Bench Press', 'weight_reps', 4, 6, 8, NULL, NULL, 120, 'Pyramid warm-ups, then 4 heavy working sets.', 0, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (2, 1, 6, 2, 'Lat Pulldown (Wide Grip)', 'weight_reps', 4, 8, 12, NULL, NULL, 90, 'Full stretch at the top, squeeze lats.', 0, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (3, 1, 8, 3, 'Standing Overhead Barbell Press', 'weight_reps', 3, 8, 10, NULL, NULL, 90, 'Maintain vertical torso, brace glutes.', 0, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (4, 1, 7, 4, 'Seated Cable Row', 'weight_reps', 3, 8, 12, NULL, NULL, 90, 'Pull towards belly button.', 0, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (5, 1, 11, 5, 'Triceps Rope Pushdown', 'weight_reps', 3, 12, 15, NULL, NULL, 60, 'Keep elbows tight.', 0, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (6, 2, 3, 1, 'Barbell Back Squat', 'weight_reps', 4, 6, 8, NULL, NULL, 150, 'Warm up thoroughly. Descend to depth with upright chest.', 0, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (7, 2, 5, 2, 'Romanian Deadlift (Barbell)', 'weight_reps', 4, 8, 10, NULL, NULL, 120, 'Feel the hamstring stretch. Keep back straight.', 0, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (8, 2, 4, 3, 'Leg Press 45°', 'weight_reps', 3, 10, 12, NULL, NULL, 90, 'Full range of motion, avoid locking knees.', 0, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (9, 2, 12, 4, 'Plank', 'duration', 3, NULL, NULL, NULL, NULL, 60, 'Target: 60 seconds hold per set.', 0, '2026-09-03 18:03:08', '2026-09-03 18:03:08');
+  (1, 1, 1, 1, 'Flat Barbell Bench Press', 'weight_reps', 4, 6, 8, NULL, NULL, 120, 'Pyramid warm-ups, then 4 heavy working sets.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (2, 1, 6, 2, 'Lat Pulldown (Wide Grip)', 'weight_reps', 4, 8, 12, NULL, NULL, 90, 'Full stretch at the top, squeeze lats.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (3, 1, 8, 3, 'Standing Overhead Barbell Press', 'weight_reps', 3, 8, 10, NULL, NULL, 90, 'Maintain vertical torso, brace glutes.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (4, 1, 7, 4, 'Seated Cable Row', 'weight_reps', 3, 8, 12, NULL, NULL, 90, 'Pull towards belly button.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (5, 1, 11, 5, 'Triceps Rope Pushdown', 'weight_reps', 3, 12, 15, NULL, NULL, 60, 'Keep elbows tight.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (6, 2, 3, 1, 'Barbell Back Squat', 'weight_reps', 4, 6, 8, NULL, NULL, 150, 'Warm up thoroughly. Descend to depth with upright chest.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (7, 2, 5, 2, 'Romanian Deadlift (Barbell)', 'weight_reps', 4, 8, 10, NULL, NULL, 120, 'Feel the hamstring stretch. Keep back straight.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (8, 2, 4, 3, 'Leg Press 45°', 'weight_reps', 3, 10, 12, NULL, NULL, 90, 'Full range of motion, avoid locking knees.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (9, 2, 12, 4, 'Plank', 'duration', 3, NULL, NULL, NULL, NULL, 60, 'Target: 60 seconds hold per set.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (10, 8, 13, 1, 'Machine Chest Press', 'weight_reps', 3, 8, 12, NULL, NULL, 120, 'Keep chest supported and maintain neutral neck.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (11, 8, 14, 2, 'Neutral-Grip Lat Pulldown', 'weight_reps', 3, 8, 12, NULL, NULL, 120, 'Full stretch at the top, squeeze lats.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (12, 8, 15, 3, 'Chest-Supported Row', 'weight_reps', 3, 8, 12, NULL, NULL, 120, 'Keep chest firmly supported on bench/pad.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (13, 8, 16, 4, 'Cable Lateral Raise', 'weight_reps', 2, 12, 20, NULL, NULL, 75, 'Raise to shoulder level with controlled tempo.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (14, 8, 17, 5, 'Rope Face Pull', 'weight_reps', 2, 12, 15, NULL, NULL, 75, 'Pull towards forehead, rotating hands back.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (15, 8, 11, 6, 'Rope Triceps Pushdown', 'weight_reps', 2, 10, 15, NULL, NULL, 75, 'Keep elbows tight and spread rope at the bottom.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (16, 8, 18, 7, 'Cable Biceps Curl', 'weight_reps', 2, 10, 15, NULL, NULL, 75, 'Maintain strict elbow position throughout.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (17, 9, 19, 1, 'Hack Squat / Leg Press', 'weight_reps', 3, 8, 12, NULL, NULL, 120, 'Main squat pattern: choose either leg press or hack squat.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (18, 9, 20, 2, 'Supported Bulgarian Split Squat', 'weight_reps', 2, 8, 10, NULL, NULL, 90, '8-10 reps per leg. Maintain upright/slight forward torso.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (19, 9, 21, 3, 'Hip Thrust', 'weight_reps', 3, 8, 12, NULL, NULL, 120, 'Drive through heels, pause at top with neutral spine.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (20, 9, 22, 4, 'Seated Leg Curl', 'weight_reps', 3, 10, 15, NULL, NULL, 90, 'Control eccentric phase smoothly on every rep.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (21, 9, 23, 5, 'Leg Extension', 'weight_reps', 2, 10, 15, NULL, NULL, 75, 'Pause briefly at full extension without hyperextending.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (22, 9, 24, 6, 'Standing Calf Raise', 'weight_reps', 3, 10, 15, NULL, NULL, 75, 'Full stretch at bottom, peak squeeze at top.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (23, 9, 25, 7, 'Pallof Press', 'weight_reps', 3, 10, 12, NULL, NULL, 60, '10-12 reps per side. Brace core and resist rotation.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (24, 9, 26, 8, 'Supported Reverse Lunge', 'weight_reps', 2, 8, 10, NULL, NULL, 90, 'Optional movement (8-10 reps/leg). Skip if recovery or fatigue warrants.', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (25, 10, 27, 1, 'Incline Machine Chest Press', 'weight_reps', 3, 8, 12, NULL, NULL, 120, 'Upper chest focus. Keep shoulders retracted.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (26, 10, 13, 2, 'Machine Chest Press', 'weight_reps', 2, 10, 12, NULL, NULL, 120, 'Flat press variation for mid chest hypertrophy.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (27, 10, 28, 3, 'Single-Arm Landmine Press', 'weight_reps', 3, 8, 12, NULL, NULL, 90, '8-12 reps per arm. Keep head supported, avoid pushing neck forward.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (28, 10, 16, 4, 'Cable Lateral Raise', 'weight_reps', 3, 12, 20, NULL, NULL, 75, 'Side deltoid hypertrophy with continuous tension.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (29, 10, 29, 5, 'Pec-Deck Fly', 'weight_reps', 2, 12, 15, NULL, NULL, 75, 'Deep stretch across pecs, squeeze at center.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (30, 10, 11, 6, 'Rope Triceps Pushdown', 'weight_reps', 3, 10, 15, NULL, NULL, 75, 'Full elbow extension and lockouts.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (31, 11, 14, 1, 'Neutral-Grip Lat Pulldown', 'weight_reps', 3, 8, 12, NULL, NULL, 120, 'Vertical pull targeting lats with joint-friendly grip.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (32, 11, 15, 2, 'Chest-Supported Row', 'weight_reps', 3, 8, 12, NULL, NULL, 120, 'Horizontal compound pull with zero lower back strain.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (33, 11, 30, 3, 'Seated Cable Row', 'weight_reps', 2, 10, 12, NULL, NULL, 90, 'Maintain neutral spine, pull smoothly to lower abdomen.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (34, 11, 31, 4, 'Reverse Pec-Deck', 'weight_reps', 3, 12, 15, NULL, NULL, 75, 'Rear deltoid flyes, leading with elbows.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (35, 11, 17, 5, 'Rope Face Pull', 'weight_reps', 2, 12, 15, NULL, NULL, 75, 'Upper back and external rotator cuff focus.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (36, 11, 32, 6, 'Chest-Supported Dumbbell Shrug', 'weight_reps', 2, 10, 15, NULL, NULL, 75, 'Shrug upward without rolling shoulders. Keep neck neutral.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (37, 11, 18, 7, 'Cable Biceps Curl', 'weight_reps', 3, 10, 15, NULL, NULL, 75, 'Controlled tempo bicep builder with peak squeeze.', 0, '2026-09-12 19:00:00', '2026-09-12 19:00:00');
 UNLOCK TABLES;
 
--- Table: user_workout_assignments (2 rows)
+-- Table: workout_plan_exercise_sets (72 rows)
+LOCK TABLES `workout_plan_exercise_sets` WRITE;
+INSERT IGNORE INTO `workout_plan_exercise_sets` (`id`, `workout_plan_exercise_id`, `set_number`, `target_reps_min`, `target_reps_max`, `target_weight_kg`, `target_duration_seconds`, `target_distance_meters`, `rest_seconds`, `notes`, `created_at`, `updated_at`, `set_order`, `target_reps`, `reps_min_target`, `reps_max_target`, `weight_kg_target`, `duration_seconds_target`, `rest_seconds_target`) VALUES
+  (1, 10, 1, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (2, 10, 2, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (3, 10, 3, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (4, 11, 1, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (5, 11, 2, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (6, 11, 3, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (7, 12, 1, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (8, 12, 2, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (9, 12, 3, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (10, 13, 1, 12, 20, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (11, 13, 2, 12, 20, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (12, 14, 1, 12, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (13, 14, 2, 12, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (14, 15, 1, 10, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (15, 15, 2, 10, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (16, 16, 1, 10, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (17, 16, 2, 10, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (18, 17, 1, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (19, 17, 2, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (20, 17, 3, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (21, 18, 1, 8, 10, NULL, NULL, NULL, 90, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (22, 18, 2, 8, 10, NULL, NULL, NULL, 90, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (23, 19, 1, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (24, 19, 2, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (25, 19, 3, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (26, 20, 1, 10, 15, NULL, NULL, NULL, 90, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (27, 20, 2, 10, 15, NULL, NULL, NULL, 90, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (28, 20, 3, 10, 15, NULL, NULL, NULL, 90, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (29, 21, 1, 10, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (30, 21, 2, 10, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (31, 22, 1, 10, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (32, 22, 2, 10, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (33, 22, 3, 10, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (34, 23, 1, 10, 12, NULL, NULL, NULL, 60, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (35, 23, 2, 10, 12, NULL, NULL, NULL, 60, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (36, 23, 3, 10, 12, NULL, NULL, NULL, 60, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (37, 24, 1, 8, 10, NULL, NULL, NULL, 90, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (38, 24, 2, 8, 10, NULL, NULL, NULL, 90, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (39, 25, 1, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (40, 25, 2, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (41, 25, 3, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (42, 26, 1, 10, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (43, 26, 2, 10, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (44, 27, 1, 8, 12, NULL, NULL, NULL, 90, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (45, 27, 2, 8, 12, NULL, NULL, NULL, 90, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (46, 27, 3, 8, 12, NULL, NULL, NULL, 90, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (47, 28, 1, 12, 20, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (48, 28, 2, 12, 20, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (49, 28, 3, 12, 20, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (50, 29, 1, 12, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL);
+INSERT IGNORE INTO `workout_plan_exercise_sets` (`id`, `workout_plan_exercise_id`, `set_number`, `target_reps_min`, `target_reps_max`, `target_weight_kg`, `target_duration_seconds`, `target_distance_meters`, `rest_seconds`, `notes`, `created_at`, `updated_at`, `set_order`, `target_reps`, `reps_min_target`, `reps_max_target`, `weight_kg_target`, `duration_seconds_target`, `rest_seconds_target`) VALUES
+  (51, 29, 2, 12, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (52, 30, 1, 10, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (53, 30, 2, 10, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (54, 30, 3, 10, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (55, 31, 1, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (56, 31, 2, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (57, 31, 3, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (58, 32, 1, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (59, 32, 2, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (60, 32, 3, 8, 12, NULL, NULL, NULL, 120, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (61, 33, 1, 10, 12, NULL, NULL, NULL, 90, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (62, 33, 2, 10, 12, NULL, NULL, NULL, 90, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (63, 34, 1, 12, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (64, 34, 2, 12, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (65, 34, 3, 12, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (66, 35, 1, 12, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (67, 35, 2, 12, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (68, 36, 1, 10, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (69, 36, 2, 10, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (70, 37, 1, 10, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (71, 37, 2, 10, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL),
+  (72, 37, 3, 10, 15, NULL, NULL, NULL, 75, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL, NULL);
+UNLOCK TABLES;
+
+-- Table: user_workout_assignments (3 rows)
 LOCK TABLES `user_workout_assignments` WRITE;
 INSERT IGNORE INTO `user_workout_assignments` (`id`, `user_id`, `workout_plan_version_id`, `effective_from`, `effective_until`, `status`, `assignment_source`, `notes`, `assigned_by`, `created_at`, `updated_at`) VALUES
-  (1, 2, 1, '2026-01-01', NULL, 'active', 'admin', NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (2, 3, 1, '2026-01-01', NULL, 'active', 'admin', NULL, 1, '2026-09-03 23:23:11', '2026-09-03 23:23:11');
+  (1, 2, 1, '2026-01-01', NULL, 'active', 'admin', NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (2, 3, 2, '2026-01-01', NULL, 'active', 'admin', NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (3, 4, 2, '2026-01-01', NULL, 'active', 'admin', NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00');
 UNLOCK TABLES;
 
--- Table: diet_plans (1 rows)
+-- Table: diet_plans (2 rows)
 LOCK TABLES `diet_plans` WRITE;
 INSERT IGNORE INTO `diet_plans` (`id`, `name`, `description`, `status`, `owner_user_id`, `visibility`, `created_by`, `created_at`, `updated_at`, `is_archived`, `archived_at`) VALUES
-  (1, '2,200 kcal Clean Lean Bulk & Recomposition', 'High-protein nutritional protocol with configurable options', 'active', NULL, 'admin', 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 0, NULL);
+  (1, '2,200 kcal Clean Lean Bulk & Recomposition', 'High-protein nutritional protocol with configurable options', 'active', NULL, 'admin', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 0, NULL),
+  (2, 'Tarek Refined Diet Plan (خطة الغذاء المنقحة)', 'High-protein nutritional protocol designed by nutritionist Farah El-Moubader. Features 7 timed meals with balanced carbohydrate choices, lean protein sources, and strict portion controls.', 'active', NULL, 'admin', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 0, NULL);
 UNLOCK TABLES;
 
--- Table: diet_plan_versions (1 rows)
+-- Table: diet_plan_versions (2 rows)
 LOCK TABLES `diet_plan_versions` WRITE;
 INSERT IGNORE INTO `diet_plan_versions` (`id`, `diet_plan_id`, `version_number`, `status`, `daily_calorie_target`, `daily_protein_target_g`, `daily_carbs_target_g`, `daily_fat_target_g`, `change_notes`, `published_at`, `created_by`, `published_by`, `created_at`, `updated_at`, `change_summary`) VALUES
-  (1, 1, 1, 'published', 2200, 180, 220, 65, 'Initial balanced 4-meal plan with flexible protein and carb choices', '2026-09-03 18:03:08', 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL);
+  (1, 1, 1, 'published', 2200, 180, 220, 65, 'Initial balanced 4-meal plan with flexible protein and carb choices', '2026-09-12 19:00:00', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL),
+  (2, 2, 1, 'published', 2050, 200, 185, 45, 'Refined 7-meal protocol with standardized lean protein substitutes and adjusted halloumi portions.', '2026-09-12 19:00:00', 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL);
 UNLOCK TABLES;
 
--- Table: diet_meals (4 rows)
+-- Table: diet_meals (11 rows)
 LOCK TABLES `diet_meals` WRITE;
 INSERT IGNORE INTO `diet_meals` (`id`, `diet_plan_version_id`, `name`, `meal_order`, `scheduled_time`, `default_grace_minutes`, `description`, `is_required`, `created_at`, `updated_at`, `meal_date`, `order_index`) VALUES
-  (1, 1, 'Breakfast', 1, '08:00:00', 60, NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, 1),
-  (2, 1, 'Lunch', 2, '12:30:00', 60, NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, 2),
-  (3, 1, 'Pre-Workout Snack', 3, '16:00:00', 60, NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, 3),
-  (4, 1, 'Dinner', 4, '19:30:00', 60, NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', NULL, 4);
+  (1, 1, 'Breakfast', 1, '08:00:00', 60, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, 1),
+  (2, 1, 'Lunch', 2, '12:30:00', 60, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, 1),
+  (3, 1, 'Pre-Workout Snack', 3, '16:00:00', 60, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, 1),
+  (4, 1, 'Dinner', 4, '19:30:00', 60, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, 1),
+  (5, 2, 'الفطور - 7:30 (Breakfast 1)', 1, '07:30:00', 60, 'تناول كوبين من المياه بعد الاستيقاظ بنصف ساعة إلى ساعة. اختر خياراً واحداً للنشويات وخياراً واحداً للبروتين. قهوة بدون سكر.', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, 1),
+  (6, 2, 'الفطور - 10:00 (Breakfast 2)', 2, '10:00:00', 60, 'نفس خيارات فطور 7:30 ونفس الكميات. اختر بديلاً واحداً من النشويات وبديلاً واحداً من البروتين.', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, 1),
+  (7, 2, 'الغداء - 12:00 (Lunch)', 3, '12:00:00', 60, 'اختر مصدراً واحداً للنشويات (100غ) ومصدراً واحداً للبروتين (150غ) مع سلطة خس وبندورة وخيار بدون صلصات دسمة.', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, 1),
+  (8, 2, 'سناك - 3:00 (Afternoon Snack 1)', 4, '15:00:00', 60, 'كوب حليب خالي الدسم أو 1/2 كوب لبن يوناني + حصة فاكهة + 2 ملعقة طعام شوفان.', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, 1),
+  (9, 2, 'سناك - 5:00 (Pre-Workout Snack)', 5, '17:00:00', 60, 'حصة فاكهة كمصدر بسيط للطاقة قبل التمرين.', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, 1),
+  (10, 2, 'العشاء - 7:00 (Dinner 1)', 6, '19:00:00', 60, 'اختر مصدراً واحداً للنشويات ومصدراً واحداً للبروتين مع خضار نيئة أو مطبوخة حسب الرغبة.', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, 1),
+  (11, 2, 'العشاء - 10:00 (Dinner 2)', 7, '22:00:00', 60, 'بروتين خفيف بدون نشويات مع خضار قبل النوم.', 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, 1);
 UNLOCK TABLES;
 
--- Table: diet_meal_option_groups (4 rows)
+-- Table: diet_meal_option_groups (20 rows)
 LOCK TABLES `diet_meal_option_groups` WRITE;
 INSERT IGNORE INTO `diet_meal_option_groups` (`id`, `diet_meal_id`, `name`, `group_order`, `min_selection_count`, `max_selection_count`, `is_required`, `notes`, `created_at`, `updated_at`, `order_index`) VALUES
-  (1, 1, 'Protein Source', 1, 1, 1, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 1),
-  (2, 1, 'Carbohydrate Source', 2, 1, 1, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 2),
-  (3, 2, 'Main Lean Protein', 1, 1, 1, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 1),
-  (4, 2, 'Starch / Grain Base', 2, 1, 1, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 2);
+  (1, 1, 'Protein Source', 1, 1, 1, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1),
+  (2, 1, 'Carbohydrate Source', 2, 1, 1, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1),
+  (3, 2, 'Main Lean Protein', 1, 1, 1, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1),
+  (4, 2, 'Starch / Grain Base', 2, 1, 1, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1),
+  (5, 5, 'Carbohydrate Source / مصدر النشويات', 1, 1, 1, 1, 'اختر بديلاً واحداً فقط', '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1),
+  (6, 5, 'Protein Source / مصدر البروتين', 2, 1, 1, 1, 'اختر بديلاً واحداً فقط (أولوية للبيض أو الحبش في أيام التمرين)', '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1),
+  (7, 6, 'Carbohydrate Source / مصدر النشويات', 1, 1, 1, 1, 'اختر بديلاً واحداً فقط', '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1),
+  (8, 6, 'Protein Source / مصدر البروتين', 2, 1, 1, 1, 'اختر بديلاً واحداً فقط', '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1),
+  (9, 7, 'Carbohydrate Base / النشويات (100غ)', 1, 1, 1, 1, 'اختر 100غ من الرز أو البطاطا أو المعكرونة المسلوقة', '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1),
+  (10, 7, 'Lean Protein / بروتين قليل الدهن (150غ)', 2, 1, 1, 1, 'اختر 150غ من البروتين الصافي المشوي أو المسلوق', '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1),
+  (11, 7, 'Fresh Salad / سلطة طازجة', 3, 0, 1, 0, 'سلطة خس وبندورة وخيار بدون صلصات دسمة', '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1),
+  (12, 8, 'Dairy Base / الحليب أو اللبن', 1, 1, 1, 1, 'كوب حليب خالي الدسم أو نصف كوب لبن يوناني', '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1),
+  (13, 8, 'Fruit Portion / حصة فاكهة', 2, 1, 1, 1, 'حصة فاكهة طازجة', '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1),
+  (14, 8, 'Oats / شوفان', 3, 1, 1, 1, '2 ملعقة طعام شوفان (20غ)', '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1),
+  (15, 9, 'Pre-Workout Fruit / فاكهة قبل التمرين', 1, 1, 1, 1, 'حصة فاكهة كمصدر سريع للطاقة قبل التمرين', '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1),
+  (16, 10, 'Carbohydrate Base / النشويات (100غ)', 1, 1, 1, 1, 'اختر 100غ مسلوق', '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1),
+  (17, 10, 'Protein Source / مصدر البروتين (150غ)', 2, 1, 1, 1, '150غ بروتين أو 60-80غ جبنة حلوم', '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1),
+  (18, 10, 'Vegetables / خضار', 3, 0, 1, 0, 'خضار نيئة أو مطبوخة حسب الرغبة', '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1),
+  (19, 11, 'Late Protein Source / بروتين مسائي (150غ)', 1, 1, 1, 1, '150غ بروتين أو 60-80غ جبنة حلوم بدون نشويات', '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1),
+  (20, 11, 'Vegetables / خضار', 2, 0, 1, 0, 'خضار نيئة أو مطبوخة حسب الرغبة', '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1);
 UNLOCK TABLES;
 
--- Table: diet_meal_options (8 rows)
+-- Table: diet_meal_options (53 rows)
 LOCK TABLES `diet_meal_options` WRITE;
 INSERT IGNORE INTO `diet_meal_options` (`id`, `diet_meal_option_group_id`, `food_id`, `option_order`, `label`, `quantity`, `unit_id`, `calories_snapshot`, `protein_g_snapshot`, `carbs_g_snapshot`, `fat_g_snapshot`, `fiber_g_snapshot`, `notes`, `is_active`, `created_at`, `updated_at`, `order_index`, `custom_label`, `serving_quantity`, `protein_snapshot`, `carbs_snapshot`, `fat_snapshot`) VALUES
-  (1, 1, 4, 1, '3 Whole Large Eggs', 3, 6, 216, 18.9, 1.2, 14.4, NULL, NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 1, NULL, NULL, NULL, NULL, NULL),
-  (2, 1, 5, 2, '250g Liquid Egg Whites + 1 Whole Egg', 1, 1, 202, 33.5, 2.1, 5.3, NULL, NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 2, NULL, NULL, NULL, NULL, NULL),
-  (3, 2, 3, 1, '80g Rolled Oats', 80, 1, 311, 13.5, 53, 5.5, NULL, NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 1, NULL, NULL, NULL, NULL, NULL),
-  (4, 2, 9, 2, '2 Medium Bananas', 2, 6, 210, 2.6, 54, 0.6, NULL, NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 2, NULL, NULL, NULL, NULL, NULL),
-  (5, 3, 1, 1, '180g Grilled Chicken Breast', 180, 1, 297, 55.8, 0, 6.5, NULL, NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 1, NULL, NULL, NULL, NULL, NULL),
-  (6, 3, 11, 2, '180g Lean Ground Beef (93/7)', 180, 1, 274, 38.5, 0, 13.1, NULL, NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 2, NULL, NULL, NULL, NULL, NULL),
-  (7, 4, 2, 1, '200g Cooked Brown Rice', 200, 1, 222, 5.2, 46, 1.8, NULL, NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 1, NULL, NULL, NULL, NULL, NULL),
-  (8, 4, 12, 2, '250g Baked Sweet Potato', 250, 1, 225, 5, 51.7, 0.2, NULL, NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08', 2, NULL, NULL, NULL, NULL, NULL);
+  (1, 1, 4, 1, '3 Whole Large Eggs', 3, 6, 216, 18.9, 1.2, 14.4, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (2, 1, 5, 2, '250g Liquid Egg Whites + 1 Whole Egg', 1, 1, 202, 33.5, 2.1, 5.3, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (3, 2, 3, 1, '80g Rolled Oats', 80, 1, 311, 13.5, 53, 5.5, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (4, 2, 9, 2, '2 Medium Bananas', 2, 6, 210, 2.6, 54, 0.6, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (5, 3, 1, 1, '180g Grilled Chicken Breast', 180, 1, 297, 55.8, 0, 6.5, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (6, 3, 11, 2, '180g Lean Ground Beef (93/7)', 180, 1, 274, 38.5, 0, 13.1, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (7, 4, 2, 1, '200g Cooked Brown Rice', 200, 1, 222, 5.2, 46, 1.8, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (8, 4, 12, 2, '250g Baked Sweet Potato', 250, 1, 225, 5, 51.7, 0.2, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (9, 5, 13, 1, '1 Medium French Bread (1 خبز فرنجي وسط بلا سمسم)', 1, 6, 140, 4.5, 28, 1, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (10, 5, 14, 2, '1 Oat Bread (1 خبز شوفان)', 1, 6, 120, 4.5, 22, 1.5, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (11, 5, 15, 3, '1 Boiled Potato 50g (1 حبة بطاطا مسلوقة 50غ)', 50, 1, 44, 1, 10, 0.1, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (12, 6, 4, 1, '2 Whole Eggs + 3 Egg Whites (2 بيضة كاملة + 3 بياض البيض)', 1, 5, 196, 23.5, 1.4, 9.8, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (13, 6, 16, 2, '60g Low Fat White Cheese (60غ جبنة بيضاء)', 60, 1, 108, 12, 1.2, 6, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (14, 6, 17, 3, '4 Tbsp Labneh (4 ملاعق طعام لبنة)', 60, 1, 66, 5.4, 2.4, 3.6, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (15, 6, 18, 4, '60g Smoked Turkey Breast (60غ حبش مدخن)', 60, 1, 63, 13.2, 0.9, 0.9, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (16, 7, 13, 1, '1 Medium French Bread (1 خبز فرنجي وسط بلا سمسم)', 1, 6, 140, 4.5, 28, 1, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (17, 7, 14, 2, '1 Oat Bread (1 خبز شوفان)', 1, 6, 120, 4.5, 22, 1.5, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (18, 7, 15, 3, '1 Boiled Potato 50g (1 حبة بطاطا مسلوقة 50غ)', 50, 1, 44, 1, 10, 0.1, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (19, 8, 4, 1, '2 Whole Eggs + 3 Egg Whites (2 بيضة كاملة + 3 بياض البيض)', 1, 5, 196, 23.5, 1.4, 9.8, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (20, 8, 16, 2, '60g Low Fat White Cheese (60غ جبنة بيضاء)', 60, 1, 108, 12, 1.2, 6, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (21, 8, 17, 3, '4 Tbsp Labneh (4 ملاعق طعام لبنة)', 60, 1, 66, 5.4, 2.4, 3.6, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (22, 8, 18, 4, '60g Smoked Turkey Breast (60غ حبش مدخن)', 60, 1, 63, 13.2, 0.9, 0.9, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (23, 9, 2, 1, '100g Boiled Rice (100غ رز مسلوق)', 100, 1, 130, 2.7, 28.2, 0.3, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (24, 9, 15, 2, '100g Boiled Potato (100غ بطاطا مسلوقة)', 100, 1, 87, 1.9, 20.1, 0.1, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (25, 9, 19, 3, '100g Boiled Pasta (100غ معكرونة مسلوقة)', 100, 1, 158, 5.8, 30.9, 0.9, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (26, 10, 1, 1, '150g Grilled Skinless Chicken Breast (150غ صدر دجاج مشوي)', 150, 1, 248, 46.5, 0, 5.4, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (27, 10, 20, 2, '150g Grilled Chicken Escalope (150غ اسكالوب دجاج مشوي)', 150, 1, 255, 39, 9, 6, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (28, 10, 21, 3, '150g Grilled Shish Tawook (150غ شيش طاووق مشوي)', 150, 1, 225, 37.5, 3, 6.8, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (29, 10, 22, 4, '150g Lean Beef Steak (150غ ستايك عجل بدون دهن)', 150, 1, 240, 39, 0, 9, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (30, 10, 23, 5, '150g Grilled Fish Fillet (150غ سمك فيليه مشوي)', 150, 1, 165, 34.5, 0, 3, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (31, 11, 28, 1, 'Fresh Garden Salad: Lettuce, Tomato, Cucumber (سلطة خضراء طازجة)', 1, 5, 35, 1.8, 7, 0.4, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (32, 12, 26, 1, '1 Cup Skim Milk (1 كوب حليب خالي الدسم)', 240, 3, 86, 8.4, 12.2, 0.2, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (33, 12, 7, 2, '1/2 Cup Greek Yogurt 0% Fat (1/2 كوب لبن يوناني خالي الدسم)', 120, 1, 71, 12, 4.3, 0.5, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (34, 13, 27, 1, '1 Serving Fresh Fruit (1 حصة فاكهة طازجة)', 1, 5, 80, 1, 20, 0.3, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (35, 14, 3, 1, '2 Tbsp Rolled Oats (2 ملعقة طعام شوفان - 20غ)', 20, 1, 78, 3.4, 13.3, 1.4, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (36, 15, 27, 1, '1 Serving Fruit: Banana or Apple (1 حصة فاكهة: موزة أو تفاح)', 1, 5, 95, 1.2, 24, 0.3, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (37, 16, 2, 1, '100g Boiled Rice (100غ رز مسلوق)', 100, 1, 130, 2.7, 28.2, 0.3, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (38, 16, 15, 2, '100g Boiled Potato (100غ بطاطا مسلوقة)', 100, 1, 87, 1.9, 20.1, 0.1, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (39, 16, 19, 3, '100g Boiled Pasta (100غ معكرونة مسلوقة)', 100, 1, 158, 5.8, 30.9, 0.9, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (40, 17, 18, 1, '150g Turkey Breast (150غ صدر حبش)', 150, 1, 158, 33, 2.3, 2.3, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (41, 17, 24, 2, '150g Crab Sticks (150غ أصابع كراب)', 150, 1, 143, 22.5, 10.5, 0.8, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (42, 17, 1, 3, '150g Skinless Chicken Breast (150غ صدر دجاج بدون جلد)', 150, 1, 248, 46.5, 0, 5.4, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (43, 17, 11, 4, '150g Lean Beef (150غ لحمة بدون دهن)', 150, 1, 228, 32.1, 0, 11, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (44, 17, 21, 5, '150g Shish Tawook (150غ شيش طاووق)', 150, 1, 225, 37.5, 3, 6.8, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (45, 17, 25, 6, '70g Light Halloumi Cheese (70غ جبنة حلوم لايت)', 70, 1, 182, 14.7, 1.4, 13.3, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (46, 18, 29, 1, 'Raw or Steamed Vegetables (خضار نيئة أو مطبوخة حسب الرغبة)', 1, 5, 35, 2, 7, 0.3, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (47, 19, 18, 1, '150g Turkey Breast (150غ صدر حبش)', 150, 1, 158, 33, 2.3, 2.3, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (48, 19, 24, 2, '150g Crab Sticks (150غ أصابع كراب)', 150, 1, 143, 22.5, 10.5, 0.8, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (49, 19, 1, 3, '150g Skinless Chicken Breast (150غ صدر دجاج بدون جلد)', 150, 1, 248, 46.5, 0, 5.4, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (50, 19, 11, 4, '150g Lean Beef (150غ لحمة بدون دهن)', 150, 1, 228, 32.1, 0, 11, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL);
+INSERT IGNORE INTO `diet_meal_options` (`id`, `diet_meal_option_group_id`, `food_id`, `option_order`, `label`, `quantity`, `unit_id`, `calories_snapshot`, `protein_g_snapshot`, `carbs_g_snapshot`, `fat_g_snapshot`, `fiber_g_snapshot`, `notes`, `is_active`, `created_at`, `updated_at`, `order_index`, `custom_label`, `serving_quantity`, `protein_snapshot`, `carbs_snapshot`, `fat_snapshot`) VALUES
+  (51, 19, 21, 5, '150g Shish Tawook (150غ شيش طاووق)', 150, 1, 225, 37.5, 3, 6.8, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (52, 19, 25, 6, '70g Light Halloumi Cheese (70غ جبنة حلوم لايت)', 70, 1, 182, 14.7, 1.4, 13.3, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL),
+  (53, 20, 29, 1, 'Raw or Steamed Vegetables (خضار نيئة أو مطبوخة حسب الرغبة)', 1, 5, 35, 2, 7, 0.3, NULL, NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00', 1, NULL, NULL, NULL, NULL, NULL);
 UNLOCK TABLES;
 
--- Table: user_diet_assignments (2 rows)
+-- Table: user_diet_assignments (3 rows)
 LOCK TABLES `user_diet_assignments` WRITE;
 INSERT IGNORE INTO `user_diet_assignments` (`id`, `user_id`, `diet_plan_version_id`, `effective_from`, `effective_until`, `status`, `assignment_source`, `notes`, `assigned_by`, `created_at`, `updated_at`) VALUES
-  (1, 2, 1, '2026-01-01', NULL, 'active', 'admin', NULL, 1, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (2, 3, 1, '2026-01-01', NULL, 'active', 'admin', NULL, 1, '2026-09-03 23:23:11', '2026-09-03 23:23:11');
-UNLOCK TABLES;
-
--- Table: daily_tasks (14 rows)
-LOCK TABLES `daily_tasks` WRITE;
-INSERT IGNORE INTO `daily_tasks` (`id`, `user_id`, `task_date`, `task_key`, `task_type`, `user_diet_assignment_id`, `user_workout_assignment_id`, `diet_meal_id`, `workout_plan_day_id`, `user_cardio_target_id`, `user_water_target_id`, `user_weight_goal_id`, `title_snapshot`, `description_snapshot`, `target_snapshot`, `scheduled_at`, `due_at`, `status`, `completed_at`, `created_at`, `updated_at`) VALUES
-  (1, 3, '2026-09-04', 'weight', 'weight', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Log Morning Body Weight', NULL, NULL, '2026-09-04 08:00:00', '2026-09-04 12:00:00', 'pending', NULL, '2026-09-03 23:23:02', '2026-09-03 23:23:02'),
-  (2, 3, '2026-09-04', 'water', 'water', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Hit Daily Water Goal', NULL, NULL, '2026-09-04 21:00:00', '2026-09-04 23:59:59', 'pending', NULL, '2026-09-03 23:23:26', '2026-09-03 23:23:26'),
-  (3, 3, '2026-09-04', 'meal:1', 'meal', NULL, NULL, 1, NULL, NULL, NULL, NULL, 'Meal: Breakfast', NULL, NULL, '2026-09-04 08:00:00', '2026-09-04 09:00:00', 'pending', NULL, '2026-09-03 23:23:26', '2026-09-03 23:23:26'),
-  (4, 3, '2026-09-04', 'meal:2', 'meal', NULL, NULL, 2, NULL, NULL, NULL, NULL, 'Meal: Lunch', NULL, NULL, '2026-09-04 12:30:00', '2026-09-04 13:30:00', 'pending', NULL, '2026-09-03 23:23:26', '2026-09-03 23:23:26'),
-  (5, 3, '2026-09-04', 'meal:3', 'meal', NULL, NULL, 3, NULL, NULL, NULL, NULL, 'Meal: Pre-Workout Snack', NULL, NULL, '2026-09-04 16:00:00', '2026-09-04 17:00:00', 'pending', NULL, '2026-09-03 23:23:26', '2026-09-03 23:23:26'),
-  (6, 3, '2026-09-04', 'meal:4', 'meal', NULL, NULL, 4, NULL, NULL, NULL, NULL, 'Meal: Dinner', NULL, NULL, '2026-09-04 19:30:00', '2026-09-04 20:30:00', 'pending', NULL, '2026-09-03 23:23:26', '2026-09-03 23:23:26'),
-  (7, 3, '2026-09-04', 'workout:5', 'workout', NULL, NULL, NULL, 5, NULL, NULL, NULL, 'Workout: Lower Body B', NULL, NULL, '2026-09-04 17:00:00', '2026-09-04 23:59:59', 'pending', NULL, '2026-09-03 23:23:26', '2026-09-03 23:23:26'),
-  (8, 3, '2026-09-04', 'cardio:2', 'cardio', NULL, NULL, NULL, NULL, 2, NULL, NULL, 'Cardio: Stationary Cycling', NULL, NULL, '2026-09-04 18:00:00', '2026-09-04 23:59:59', 'pending', NULL, '2026-09-03 23:23:26', '2026-09-03 23:23:26'),
-  (9, 3, '2026-09-06', 'weight', 'weight', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Log Morning Body Weight', NULL, NULL, '2026-09-06 08:00:00', '2026-09-06 12:00:00', 'pending', NULL, '2026-09-06 13:34:46', '2026-09-06 13:34:46'),
-  (10, 3, '2026-09-06', 'water', 'water', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Hit Daily Water Goal', NULL, NULL, '2026-09-06 21:00:00', '2026-09-06 23:59:59', 'pending', NULL, '2026-09-06 13:34:46', '2026-09-06 13:34:46'),
-  (11, 3, '2026-09-06', 'meal:1', 'meal', NULL, NULL, 1, NULL, NULL, NULL, NULL, 'Meal: Breakfast', NULL, NULL, '2026-09-06 08:00:00', '2026-09-06 09:00:00', 'pending', NULL, '2026-09-06 13:34:46', '2026-09-06 13:34:46'),
-  (12, 3, '2026-09-06', 'meal:2', 'meal', NULL, NULL, 2, NULL, NULL, NULL, NULL, 'Meal: Lunch', NULL, NULL, '2026-09-06 12:30:00', '2026-09-06 13:30:00', 'pending', NULL, '2026-09-06 13:34:46', '2026-09-06 13:34:46'),
-  (13, 3, '2026-09-06', 'meal:3', 'meal', NULL, NULL, 3, NULL, NULL, NULL, NULL, 'Meal: Pre-Workout Snack', NULL, NULL, '2026-09-06 16:00:00', '2026-09-06 17:00:00', 'pending', NULL, '2026-09-06 13:34:46', '2026-09-06 13:34:46'),
-  (14, 3, '2026-09-06', 'meal:4', 'meal', NULL, NULL, 4, NULL, NULL, NULL, NULL, 'Meal: Dinner', NULL, NULL, '2026-09-06 19:30:00', '2026-09-06 20:30:00', 'pending', NULL, '2026-09-06 13:34:46', '2026-09-06 13:34:46');
+  (1, 2, 1, '2026-01-01', NULL, 'active', 'admin', NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (2, 3, 2, '2026-01-01', NULL, 'active', 'admin', NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00'),
+  (3, 4, 2, '2026-01-01', NULL, 'active', 'admin', NULL, 1, '2026-09-12 19:00:00', '2026-09-12 19:00:00');
 UNLOCK TABLES;
 
 -- Table: reminder_rules (3 rows)
 LOCK TABLES `reminder_rules` WRITE;
-INSERT IGNORE INTO `reminder_rules` (`id`, `name`, `category`, `rule_scope`, `user_id`, `diet_meal_id`, `workout_plan_day_id`, `trigger_mode`, `fixed_time`, `offset_minutes`, `grace_period_minutes`, `repeat_interval_minutes`, `max_repeats`, `active_window_start`, `active_window_end`, `is_active`, `created_by`, `created_at`, `updated_at`) VALUES
-  (1, 'Morning Weight Log', 'weight', 'user', NULL, NULL, NULL, 'fixed_time', '08:00:00', NULL, 0, NULL, 1, NULL, NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (2, 'Hydration Reminder', 'water', 'user', NULL, NULL, NULL, 'interval', NULL, NULL, 0, NULL, 1, NULL, NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08'),
-  (3, 'Workout Time', 'workout', 'user', NULL, NULL, NULL, 'fixed_time', '17:00:00', NULL, 0, NULL, 1, NULL, NULL, 1, NULL, '2026-09-03 18:03:08', '2026-09-03 18:03:08');
+INSERT IGNORE INTO `reminder_rules` (`id`, `name`, `category`, `rule_scope`, `user_id`, `diet_meal_id`, `workout_plan_day_id`, `trigger_mode`, `fixed_time`, `offset_minutes`, `grace_period_minutes`, `repeat_interval_minutes`, `max_repeats`, `active_window_start`, `active_window_end`, `is_active`, `created_by`, `created_at`, `updated_at`, `title`, `target_category`, `mode`) VALUES
+  (1, 'Morning Weight Log', 'weight', 'user', NULL, NULL, NULL, 'fixed_time', '08:00:00', NULL, 0, NULL, 1, NULL, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL),
+  (2, 'Hydration Reminder', 'water', 'user', NULL, NULL, NULL, 'interval', NULL, NULL, 0, NULL, 1, NULL, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL),
+  (3, 'Workout Time', 'workout', 'user', NULL, NULL, NULL, 'fixed_time', '17:00:00', NULL, 0, NULL, 1, NULL, NULL, 1, NULL, '2026-09-12 19:00:00', '2026-09-12 19:00:00', NULL, NULL, NULL);
 UNLOCK TABLES;
 
 SET FOREIGN_KEY_CHECKS = 1;
