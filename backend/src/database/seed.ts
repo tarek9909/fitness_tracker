@@ -13,8 +13,8 @@ export function toDialectInsertOrIgnore(sql: string, client: 'sqlite' | 'mysql' 
 }
 
 export async function seedDatabase(customDb?: DatabasePool, targetClient: 'sqlite' | 'mysql' = env.dbClient) {
-  if (env.nodeEnv === 'production') {
-    throw new Error('FATAL: Demo seeding is disabled when NODE_ENV=production. Use an approved data migration instead.');
+  if (env.nodeEnv === 'production' && process.env.ALLOW_SEED !== 'true') {
+    throw new Error('FATAL: Demo seeding is disabled when NODE_ENV=production. Use an approved data migration instead or set ALLOW_SEED=true.');
   }
 
   await runMigrations(customDb);
